@@ -6,6 +6,9 @@ extern crate nalgebra as na;
 
 use std::{env, path};
 use std::collections::HashMap;
+use std::time::{self, Instant};
+
+use rayon::prelude::*;
 
 use ggez::{Context, ContextBuilder, GameResult, conf};
 use ggez::input::keyboard::KeyCode;
@@ -119,27 +122,49 @@ impl event::EventHandler<ggez::GameError> for MainState {
             self.screen_dims[1]/ reconstruction_ratio
         );
 
-        for tile in self.tiles.iter() {
-            let image = &self.tile_map[&tile.asset];
+        let render_results: Vec<_> = self.tiles.par_iter().filter_map(|tile| {
 
             let pix_pos = (tile.pos - center) * scaling_ratio;
             let scale = self.scale * scaling_ratio;
 
-            let draw_param = graphics::DrawParam::new()
-                    .dest(pix_pos)
-                    .scale(scale);
+            if -50.0 < pix_pos[0]
+                && -50.0 < pix_pos[1] 
+                && pix_pos[0] < self.screen_dims[0]+50.0
+                && pix_pos[1] < self.screen_dims[1]+50.0 {
+                    let image = &self.tile_map[&tile.asset];
+                    let draw_param = graphics::DrawParam::new()
+                        .dest(pix_pos)
+                        .scale(scale);
+                    Some((image, draw_param))
+                } else {
+                    None
+                }
+        }).collect();
+
+        for (image, draw_param) in render_results {
             canvas.draw(image, draw_param);
         }
 
-        for object in self.objects.iter() {
-            let image = &self.object_map[&object.asset];
+        let render_results: Vec<_> = self.objects.par_iter().filter_map( |object|{
 
             let pix_pos = (object.pos - center) * scaling_ratio;
             let scale = self.scale * scaling_ratio;
 
-            let draw_param = graphics::DrawParam::new()
-                .dest(pix_pos)
-                .scale(scale);
+            if -50.0 < pix_pos[0] 
+                && -50.0 < pix_pos[1] 
+                && pix_pos[0] < self.screen_dims[0]+50.0 
+                && pix_pos[1] < self.screen_dims[1]+50.0 {
+                    let image = &self.object_map[&object.asset];
+                    let draw_param = graphics::DrawParam::new()
+                        .dest(pix_pos)
+                        .scale(scale);
+                    Some((image, draw_param))
+                } else {
+                    None
+                }
+        }).collect();
+
+        for (image, draw_param) in render_results {
             canvas.draw(image, draw_param);
         }
 
