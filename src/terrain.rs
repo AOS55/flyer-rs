@@ -1,7 +1,6 @@
 #![warn(clippy::all)]
 
 extern crate nalgebra as na;
-use image::io::Reader;
 use na::DMatrix;
 
 use rand::prelude::*;
@@ -33,6 +32,7 @@ pub struct TerrainConfig {
 
 impl TerrainConfig {
 
+    #[allow(dead_code)]
     pub fn update_name(&mut self) {
         // Update the name of the TerrainConfig to be a unique string identifier
         

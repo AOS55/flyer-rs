@@ -3,12 +3,10 @@ use std::collections::HashMap;
 use crate::terrain::{Tile, StaticObject, TerrainConfig, Terrain, RandomFuncs};
 use crate::aircraft::Aircraft;
 
-use std::{path, env, fs};
+use std::fs;
 
 use glam::Vec2;
 use tiny_skia::*;
-
-use image::{DynamicImage, ImageBuffer};
 
 use rayon::prelude::*;
 
@@ -22,8 +20,7 @@ pub struct World {
     pub object_map: HashMap<String, Pixmap>,
     pub screen_dims: Vec2,
     pub scale: f32,
-    pub settings: Settings,
-    path_buf: path::PathBuf
+    pub settings: Settings
 }
 
 impl Default for World{
@@ -40,8 +37,7 @@ impl Default for World{
             object_map: HashMap::new(),
             screen_dims: Vec2::new(1024.0, 1024.0),
             scale: 25.0,
-            settings: Settings::default(),
-            path_buf: path::PathBuf::new()
+            settings: Settings::default()
         }
     }
 
@@ -52,7 +48,7 @@ impl World {
 
     /// World Construction methods that allow a new world to be setup
 
-
+    #[allow(dead_code)]
     pub fn update_settings(&mut self,
         simulation_frequency: Option<f64>,
         policy_frequency: Option<f64>,
@@ -143,6 +139,7 @@ impl World {
 
     }
 
+    #[allow(dead_code)]
     pub fn set_screen_dims(&mut self,
         width: f32, 
         height: f32,
@@ -150,6 +147,7 @@ impl World {
         self.screen_dims = Vec2::new(width, height);
     }
 
+    #[allow(dead_code)]
     pub fn add_aircraft(&mut self, aircraft: Aircraft) {
         
         self.vehicles.push(aircraft);
@@ -250,6 +248,7 @@ impl Default for Camera{
 
 impl Camera {
 
+    #[allow(dead_code)]
     fn new(
         x: f64,
         y: f64,

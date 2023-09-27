@@ -307,6 +307,7 @@ impl Aircraft {
         Self {name: aircraft_name.to_string(), aff_body}
     }
 
+    #[allow(dead_code)]
     pub fn update(&mut self,
         dt: f64,
         input_state: Vec<f64>) {
