@@ -6,6 +6,7 @@ use crate::aircraft::Aircraft;
 use std::{path, env, fs};
 
 use glam::Vec2;
+use tiny_skia::*;
 
 use image::{DynamicImage, ImageBuffer};
 
@@ -16,9 +17,9 @@ pub struct World {
     pub camera: Camera,
     pub controls: Vec<f64>,
     pub tiles: Vec<Tile>,
-    pub tile_map: HashMap<String, Vec<Vec<[u8; 3]>>>,
+    pub tile_map: HashMap<String, Pixmap>,
     pub objects: Vec<StaticObject>,
-    pub object_map: HashMap<String, Vec<Vec<[u8; 3]>>>,
+    pub object_map: HashMap<String, Pixmap>,
     pub screen_dims: Vec2,
     pub scale: f32,
     pub settings: Settings,
@@ -107,7 +108,7 @@ impl World {
         // Build up the TileMap from the context fs, only part that uses ctx from GGEZ
 
 
-        let tile_dir: Vec<_> = match fs::read_dir("resources/tiles") {
+        let tile_dir: Vec<_> = match fs::read_dir("assets/tiles") {
             Ok(td) => {
                 td
                 .filter_map(|entry| Some(entry.ok()?.path()))
@@ -119,7 +120,7 @@ impl World {
             }
         };
 
-        let so_dir: Vec<_> = match fs::read_dir("resources/objects") {
+        let so_dir: Vec<_> = match fs::read_dir("assets/objects") {
             Ok(so) => {
                 so
                 .filter_map(|entry| Some(entry.ok()?.path()))
@@ -159,10 +160,12 @@ impl World {
 
 impl World {
 
-    pub fn render(&mut self) {
+    pub fn render(&mut self) -> Pixmap {
 
         // TODO: Test this out
-        // let texture_creator = self.canvas.texture_creator();
+
+        let mut canvas = Pixmap::new(self.screen_dims[0] as u32, self.screen_dims[1] as u32).unwrap();
+        let paint = PixmapPaint::default();
 
         let center = Vec2::new(self.camera.x as f32, self.camera.y as f32);  // center of image in [m]
         let reconstruction_ratio = self.camera.f * self.camera.z;  // how large the fov is
@@ -172,88 +175,47 @@ impl World {
             self.screen_dims[1]/ reconstruction_ratio as f32
         );
 
-        // self.tiles.par_iter().filter(|tile| {
+        let render_results = self.tiles.par_iter().filter_map(|tile: &Tile| {
 
-        //     let pix_pos = (tile.pos - center) * scaling_ratio;
-        //     let scale = self.scale * scaling_ratio;
-        //     if -50.0 < pix_pos[0]
-        //         && -50.0 < pix_pos[1] 
-        //         && pix_pos[0] < self.screen_dims[0]+50.0
-        //         && pix_pos[1] < self.screen_dims[1]+50.0 {
-        //             let surf = &self.tile_map[&tile.asset];
-        //             let surf = &self.tile_map[&tile.asset];
-        //             // let texture = texture_creator.create_texture_from_surface(&surf).unwrap();
-        //             // let draw_rect = Rect::new(
-        //             //     pix_pos[0] as i32, pix_pos[1] as i32,
-        //             //     (scale[0]*16.0) as u32, (scale[1]*16.0) as u32);
-        //             // Some((texture, draw_rect));
-        //         } else {
-        //             None;
-        //         }
-        // });
-        
-        println!("Screen_dims: {:?}, ScalingRatio: {:?}", self.screen_dims, scaling_ratio);
-
-        self.tiles.iter().for_each(|tile| {
             let pix_pos = (tile.pos - center) * scaling_ratio;
             let scale = self.scale * scaling_ratio;
             if -50.0 < pix_pos[0]
                 && -50.0 < pix_pos[1] 
                 && pix_pos[0] < self.screen_dims[0]+50.0
                 && pix_pos[1] < self.screen_dims[1]+50.0 {
-                    let texture = &self.tile_map[&tile.asset];
-                    let draw = app.draw();
-                    draw.texture(texture)
-                        .xy(pix_pos)
-                        .wh(scale);
-                    draw.to_frame(app, frame).unwrap();
-                    println!("pix_pos: {:?}, scale: {:?}", pix_pos, scale);
+                    let tile = &self.tile_map[&tile.asset];
+                    let transform = Transform::from_row(scale[0]/16.0, 0.0, 0.0, scale[1]/16.0, pix_pos[0], pix_pos[1]);
+                    Some((tile.clone(), transform))
+                } else {
+                    None
                 }
-        });
+        }).collect::<Vec<(Pixmap, Transform)>>();
 
-        self.objects.iter().for_each(|object: &StaticObject| {
+        for (pixmap, transform) in render_results {
+            canvas.draw_pixmap(0, 0, pixmap.as_ref(), &paint, transform, None);
+        }
+
+        let render_results = self.objects.par_iter().filter_map(|object: &StaticObject| {
+
             let pix_pos = (object.pos - center) * scaling_ratio;
             let scale = self.scale * scaling_ratio;
             if -50.0 < pix_pos[0]
                 && -50.0 < pix_pos[1] 
                 && pix_pos[0] < self.screen_dims[0]+50.0
                 && pix_pos[1] < self.screen_dims[1]+50.0 {
-                    let texture = &self.tile_map[&object.asset];
-                    let draw = app.draw();
-                    draw.texture(texture)
-                        .xy(pix_pos)
-                        .wh(scale);
-                    draw.to_frame(app, frame).unwrap();
-                    println!("pix_pos: {:?}, scale: {:?}", pix_pos, scale);
+                    let object = &self.object_map[&object.asset];
+                    let transform: Transform = Transform::from_row(scale[0]/16.0, 0.0, 0.0, scale[1]/16.0, pix_pos[0], pix_pos[1]);
+                    Some((object.clone(), transform))
+                } else {
+                    None
                 }
-        });
+        }).collect::<Vec<(Pixmap, Transform)>>();
 
-        // for (surf, draw_rect) in render_results {
-        //     canvas.copy(&texture, None, draw_rect).unwrap();
-        // }
+        for (pixmap, transform) in render_results {
+            canvas.draw_pixmap(0, 0, pixmap.as_ref(), &paint, transform, None);
+        }
 
-        // let render_results: Vec<_> = self.objects.par_iter().filter_map( |object|{
-
-        //     let pix_pos = (object.pos - center) * scaling_ratio;
-        //     let scale = self.scale * scaling_ratio;
-
-        //     if -50.0 < pix_pos[0] 
-        //         && -50.0 < pix_pos[1] 
-        //         && pix_pos[0] < self.screen_dims[0]+50.0 
-        //         && pix_pos[1] < self.screen_dims[1]+50.0 {
-        //             let image = &self.object_map[&object.asset];
-        //             let draw_param = graphics::DrawParam::new()
-        //                 .dest(pix_pos)
-        //                 .scale(scale);
-        //             Some((image, draw_param))
-        //         } else {
-        //             None
-        //         }
-        // }).collect();
-
-        // for (image, draw_param) in render_results {
-        //     canvas.draw(image, draw_param);
-        // }
+        canvas
 
     } 
 

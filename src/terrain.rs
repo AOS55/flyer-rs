@@ -2,7 +2,6 @@
 
 extern crate nalgebra as na;
 use image::io::Reader;
-use image::DynamicImage;
 use na::DMatrix;
 
 use rand::prelude::*;
@@ -18,6 +17,7 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 
 use glam::Vec2;
+use tiny_skia::*;
 
 #[allow(dead_code)] 
 pub struct TerrainConfig {
@@ -30,8 +30,6 @@ pub struct TerrainConfig {
     orchard_tree_density: f32,
     orchard_flower_density: f32
 }
-
-use crate::utils::image_to_array;
 
 impl TerrainConfig {
 
@@ -226,18 +224,18 @@ impl Terrain {
         land_map
     }
 
-    pub fn load_assets(&self, assets: Vec<PathBuf>) -> HashMap<String, Vec<Vec<[u8; 3]>>> {
-        let mut asset_map: HashMap<String, Vec<Vec<[u8; 3]>>> = HashMap::new();
+    pub fn load_assets(&self, assets: Vec<PathBuf>) -> HashMap<String, Pixmap> {
+        let mut asset_map: HashMap<String, Pixmap> = HashMap::new();
         for path in assets {
             let path_str = path.to_str().unwrap_or_default().to_string();
-            match Reader::open(path) {
-                Ok(image) => {
+            match Pixmap::load_png(path) {
+                Ok(pixmap) => {
                     let name: Vec<&str> = path_str.split('/').collect();
                     let name = name[2].to_string();
                     let name: Vec<&str> = name.split('.').collect();
                     let name = name[0].to_string();
                     // println!("name: {}", name);
-                    asset_map.insert(name, image_to_array(image.decode().unwrap()));
+                    asset_map.insert(name, pixmap);
                 }
                 Err(err) => {
                     println!("Path is: {}", path_str);
