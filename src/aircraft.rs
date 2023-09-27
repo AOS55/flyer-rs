@@ -1,9 +1,10 @@
-use aerso::density_models::{ConstantDensity, StandardDensity};
+#![warn(clippy::all)]
+
+use aerso::density_models::ConstantDensity;
 use aerso::wind_models::*;
 use aerso::*;
 use aerso::types::*;
-use noise::Constant;
-use std::{fs::File, io::Read};
+use std::{fs::File, io::Read, f64::consts::PI};
 use serde::{Deserialize, Serialize};
 
 pub struct Aerodynamics {
@@ -157,11 +158,11 @@ impl AeroEffect for Aerodynamics {
 
     fn get_effect(&self, airstate: AirState, _rates: Vector3, input: &Vec<f64>) -> (Force, Torque) {
 
-        let alpha = airstate.alpha;
-        let beta = airstate.beta;
-        let p = _rates[0];
-        let q = _rates[1];
-        let r = _rates[2];
+        let alpha = airstate.alpha.clamp(-4.0 * (PI / 180.0), 30.0 * (PI / 180.0));
+        let beta = airstate.beta.clamp(-20.0 * (PI / 180.0), 20.0 * (PI / 180.0));
+        let p = _rates[0].clamp(-100.0 * (PI / 180.0), 100.0 * (PI / 180.0));
+        let q = _rates[1].clamp(-50.0 * (PI / 180.0), 50.0 * (PI / 180.0));
+        let r = _rates[2].clamp(-50.0 * (PI / 180.0), 50.0 * (PI / 180.0));
 
         let tilde_p = (self.wing_span * p) / (2.0 * airstate.airspeed);
         let tilde_q = (self.wing_area * q) / (2.0 * airstate.airspeed);
@@ -239,7 +240,39 @@ impl AeroEffect for Aerodynamics {
     }
 }
 
+#[allow(dead_code)]
+struct PowerPlant {
+    name: String,
+    shaft_power: f64,
+    v_max: f64,
+    efficiency: f64
+}
+
+impl PowerPlant {
+
+    fn pt6() -> Self {
+        Self {
+            name: "PT6".to_string(),
+            shaft_power: 2.0 * 1.12e6,
+            v_max: 40.0,
+            efficiency: 0.6
+        }
+    }
+}
+
+impl AeroEffect for PowerPlant {
+
+    fn get_effect(&self, _airstate: AirState, _rates: Vector3, input: &Vec<f64>) -> (Force, Torque) {
+        let thrust = ((self.shaft_power * self.efficiency) / self.v_max) * input[2];
+        (
+            Force::body(thrust, 0.0, 0.0),
+            Torque::body(0.0, 0.0, 0.0)
+        )
+    }
+}
+
 pub struct Aircraft {
+    pub name: String,
     pub aff_body: AffectedBody<Vec<f64>, f64, ConstantWind<f64>, ConstantDensity>,
 }
 
@@ -253,6 +286,7 @@ impl Aircraft {
                initial_rates: Vector3<f64>) -> Self {
         
         let aero = Aerodynamics::from_json(aircraft_name);
+        let power = PowerPlant::pt6();
 
         let k_body = Body::new(
             aero.mass,
@@ -267,15 +301,39 @@ impl Aircraft {
 
         let aff_body = AffectedBody {
             body: a_body,
-            effectors: vec![Box::new(aero)],
+            effectors: vec![Box::new(aero), Box::new(power)],
         };
 
-        Self {aff_body}
+        Self {name: aircraft_name.to_string(), aff_body}
+    }
+
+    pub fn update(&mut self,
+        dt: f64,
+        input_state: Vec<f64>) {
+            self.aff_body.step(dt, &input_state);
+        }
+
+}
+
+impl Clone for Aircraft {
+    fn clone(&self) -> Self {
+
+        let name = self.name.clone();
+        let pos = self.position();
+        let vel = self.velocity();
+        let att = self.attitude();
+        let rates = self.rates();
+        let ac = Aircraft::new(&name, pos, vel, att, rates);
+
+        Self {
+            name: ac.name,
+            aff_body: ac.aff_body
+        }       
     }
 }
 
 impl StateView for Aircraft {
-    fn position(&self) -> Vector3 {
+    fn position(&self) -> Vector3<f64> {
         self.aff_body.position()
     }
 
