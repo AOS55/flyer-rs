@@ -3,20 +3,11 @@ use std::collections::HashMap;
 use crate::terrain::{Tile, StaticObject, TerrainConfig, Terrain, RandomFuncs};
 use crate::aircraft::Aircraft;
 
-use std::{path, env};
+use std::{path, env, fs};
 
-use ggez::{ContextBuilder, Context, GameResult, conf};
-use ggez::graphics::{self, Image, Color};
-use ggez::glam::Vec2;
-use ggez::event;
+use glam::Vec2;
 
-extern crate sdl2;
-
-// use sdl2::pixels::PixelFormatEnum;
-// use sdl2::render::Canvas;
-// use sdl2::surface::Surface;
-// use sdl2::rect::Rect;
-// use sdl2::pixels::Color;
+use image::{DynamicImage, ImageBuffer};
 
 use rayon::prelude::*;
 
@@ -25,32 +16,18 @@ pub struct World {
     pub camera: Camera,
     pub controls: Vec<f64>,
     pub tiles: Vec<Tile>,
-    pub tile_map: HashMap<String, Image>,
+    pub tile_map: HashMap<String, Vec<Vec<[u8; 3]>>>,
     pub objects: Vec<StaticObject>,
-    pub object_map: HashMap<String, Image>,
+    pub object_map: HashMap<String, Vec<Vec<[u8; 3]>>>,
     pub screen_dims: Vec2,
     pub scale: f32,
     pub settings: Settings,
-    pub ctx: Context
+    path_buf: path::PathBuf
 }
 
 impl Default for World{
 
     fn default() -> Self {
-
-        // Build a context for the main game window
-        let mut cb = ContextBuilder::new("flyer-env", "ggez")
-            .window_mode(conf::WindowMode::default().dimensions(1024.0, 1024.0));
-
-        // Add resources to the main game path
-        if let Ok(manifest_dir) = env::var("CARGO_MANIFEST_DIR") {
-            let mut path = path::PathBuf::from(manifest_dir);
-            path.push("resources");
-            println!("Adding path {path:?}");
-            cb = cb.add_resource_path(path);
-        }
-
-        let (ctx, _) = cb.build().unwrap();
 
         Self {
             vehicles: vec![],
@@ -61,9 +38,9 @@ impl Default for World{
             objects: vec![],
             object_map: HashMap::new(),
             screen_dims: Vec2::new(1024.0, 1024.0),
-            scale: 25.0/16.0,
+            scale: 25.0,
             settings: Settings::default(),
-            ctx
+            path_buf: path::PathBuf::new()
         }
     }
 
@@ -73,7 +50,8 @@ impl Default for World{
 impl World {
 
     /// World Construction methods that allow a new world to be setup
-    
+
+
     pub fn update_settings(&mut self,
         simulation_frequency: Option<f64>,
         policy_frequency: Option<f64>,
@@ -128,9 +106,12 @@ impl World {
 
         // Build up the TileMap from the context fs, only part that uses ctx from GGEZ
 
-        let tile_dir: Vec<_> = match self.ctx.fs.read_dir("/tiles") {
+
+        let tile_dir: Vec<_> = match fs::read_dir("resources/tiles") {
             Ok(td) => {
-                td.collect()
+                td
+                .filter_map(|entry| Some(entry.ok()?.path()))
+                .collect()
             },
             Err(_td) => {
                 eprintln!("{}", "Tiles dir not found in context");
@@ -138,9 +119,11 @@ impl World {
             }
         };
 
-        let so_dir: Vec<_> = match self.ctx.fs.read_dir("/objects") {
+        let so_dir: Vec<_> = match fs::read_dir("resources/objects") {
             Ok(so) => {
-                so.collect()
+                so
+                .filter_map(|entry| Some(entry.ok()?.path()))
+                .collect()
             },
             Err(_so) => {
                 eprintln!("{}", "Object dir not found in context");
@@ -148,8 +131,8 @@ impl World {
             }
         };
 
-        let tile_map = terrain.load_assets(&mut self.ctx, tile_dir);
-        let object_map = terrain.load_assets(&mut self.ctx, so_dir);
+        let tile_map = terrain.load_assets(tile_dir);
+        let object_map = terrain.load_assets(so_dir);
 
         self.tiles = tiles;
         self.objects = objects;
@@ -179,16 +162,7 @@ impl World {
     pub fn render(&mut self) {
 
         // TODO: Test this out
-
-        self.ctx.gfx.begin_frame().unwrap();  // Start the gfx wgpu frame
-
-        let mut canvas = graphics::Canvas::from_frame(&mut self.ctx, Color::BLACK);
-        
-        let image = &self.tile_map["grass"];
-        let draw_param = graphics::DrawParam::new()
-            .dest(Vec2::new(0.0, 0.0))
-            .scale(Vec2::new(1.0, 1.0));
-        canvas.draw(image, draw_param);
+        // let texture_creator = self.canvas.texture_creator();
 
         let center = Vec2::new(self.camera.x as f32, self.camera.y as f32);  // center of image in [m]
         let reconstruction_ratio = self.camera.f * self.camera.z;  // how large the fov is
@@ -198,141 +172,100 @@ impl World {
             self.screen_dims[1]/ reconstruction_ratio as f32
         );
 
-        let render_results: Vec<_> = self.tiles.par_iter().filter_map(|tile| {
+        // self.tiles.par_iter().filter(|tile| {
 
+        //     let pix_pos = (tile.pos - center) * scaling_ratio;
+        //     let scale = self.scale * scaling_ratio;
+        //     if -50.0 < pix_pos[0]
+        //         && -50.0 < pix_pos[1] 
+        //         && pix_pos[0] < self.screen_dims[0]+50.0
+        //         && pix_pos[1] < self.screen_dims[1]+50.0 {
+        //             let surf = &self.tile_map[&tile.asset];
+        //             let surf = &self.tile_map[&tile.asset];
+        //             // let texture = texture_creator.create_texture_from_surface(&surf).unwrap();
+        //             // let draw_rect = Rect::new(
+        //             //     pix_pos[0] as i32, pix_pos[1] as i32,
+        //             //     (scale[0]*16.0) as u32, (scale[1]*16.0) as u32);
+        //             // Some((texture, draw_rect));
+        //         } else {
+        //             None;
+        //         }
+        // });
+        
+        println!("Screen_dims: {:?}, ScalingRatio: {:?}", self.screen_dims, scaling_ratio);
+
+        self.tiles.iter().for_each(|tile| {
             let pix_pos = (tile.pos - center) * scaling_ratio;
             let scale = self.scale * scaling_ratio;
             if -50.0 < pix_pos[0]
                 && -50.0 < pix_pos[1] 
                 && pix_pos[0] < self.screen_dims[0]+50.0
                 && pix_pos[1] < self.screen_dims[1]+50.0 {
-                    let image = &self.tile_map[&tile.asset];
-                    let draw_param = graphics::DrawParam::new()
-                        .dest(pix_pos)
-                        .scale(scale);
-                    Some((image, draw_param))
-                } else {
-                    None
+                    let texture = &self.tile_map[&tile.asset];
+                    let draw = app.draw();
+                    draw.texture(texture)
+                        .xy(pix_pos)
+                        .wh(scale);
+                    draw.to_frame(app, frame).unwrap();
+                    println!("pix_pos: {:?}, scale: {:?}", pix_pos, scale);
                 }
-        }).collect();
+        });
 
-        for (image, draw_param) in render_results {
-            canvas.draw(image, draw_param);
-        }
-
-        let render_results: Vec<_> = self.objects.par_iter().filter_map( |object|{
-
+        self.objects.iter().for_each(|object: &StaticObject| {
             let pix_pos = (object.pos - center) * scaling_ratio;
             let scale = self.scale * scaling_ratio;
-
-            if -50.0 < pix_pos[0] 
+            if -50.0 < pix_pos[0]
                 && -50.0 < pix_pos[1] 
-                && pix_pos[0] < self.screen_dims[0]+50.0 
+                && pix_pos[0] < self.screen_dims[0]+50.0
                 && pix_pos[1] < self.screen_dims[1]+50.0 {
-                    let image = &self.object_map[&object.asset];
-                    let draw_param = graphics::DrawParam::new()
-                        .dest(pix_pos)
-                        .scale(scale);
-                    Some((image, draw_param))
-                } else {
-                    None
+                    let texture = &self.tile_map[&object.asset];
+                    let draw = app.draw();
+                    draw.texture(texture)
+                        .xy(pix_pos)
+                        .wh(scale);
+                    draw.to_frame(app, frame).unwrap();
+                    println!("pix_pos: {:?}, scale: {:?}", pix_pos, scale);
                 }
-        }).collect();
+        });
 
-        for (image, draw_param) in render_results {
-            canvas.draw(image, draw_param);
-        }
+        // for (surf, draw_rect) in render_results {
+        //     canvas.copy(&texture, None, draw_rect).unwrap();
+        // }
 
-        let _ = canvas.finish(&mut self.ctx);
+        // let render_results: Vec<_> = self.objects.par_iter().filter_map( |object|{
 
-        let _ = self.ctx.gfx.end_frame();
+        //     let pix_pos = (object.pos - center) * scaling_ratio;
+        //     let scale = self.scale * scaling_ratio;
+
+        //     if -50.0 < pix_pos[0] 
+        //         && -50.0 < pix_pos[1] 
+        //         && pix_pos[0] < self.screen_dims[0]+50.0 
+        //         && pix_pos[1] < self.screen_dims[1]+50.0 {
+        //             let image = &self.object_map[&object.asset];
+        //             let draw_param = graphics::DrawParam::new()
+        //                 .dest(pix_pos)
+        //                 .scale(scale);
+        //             Some((image, draw_param))
+        //         } else {
+        //             None
+        //         }
+        // }).collect();
+
+        // for (image, draw_param) in render_results {
+        //     canvas.draw(image, draw_param);
+        // }
 
     } 
 
-    pub fn get_image(&mut self) -> Vec<u8> {
+    // pub fn get_image(&mut self) -> Vec<u8> {
 
-        let frame_image = self.ctx.gfx.frame();
-        // println!("Height: {}, Width: {}", frame_image.height(), frame_image.width());
-        frame_image.to_pixels(&self.ctx).unwrap()
+    //     let rect = Rect::new(0, 0, 1024, 1024);
+    //     self.canvas.read_pixels(rect, PixelFormatEnum::RGB24).unwrap()
     
-    }
+    // }
 
 }
 
-impl event::EventHandler<ggez::GameError> for World {
-
-    fn update(&mut self, _ctx: &mut Context) -> GameResult {
-
-        let dt = 0.05;
-
-        for vehicle in &mut self.vehicles {
-            vehicle.update(dt, self.controls.clone()); 
-        }
-        Ok(())
-    }
-
-    fn draw(&mut self, _ctx: &mut Context) -> GameResult {
-        
-        let mut canvas = graphics::Canvas::from_frame(_ctx, Color::BLACK);
-
-        let center = Vec2::new(self.camera.x as f32, self.camera.y as f32);  // center of image in [m]
-        let reconstruction_ratio = self.camera.f * self.camera.z;  // how large the fov is
-        let scaling_ratio = Vec2::new(
-            self.screen_dims[0] / reconstruction_ratio as f32,
-            self.screen_dims[1]/ reconstruction_ratio as f32
-        );
-
-        let render_results: Vec<_> = self.tiles.par_iter().filter_map(|tile| {
-
-            let pix_pos = (tile.pos - center) * scaling_ratio;
-            let scale = self.scale * scaling_ratio;
-
-            if -50.0 < pix_pos[0]
-                && -50.0 < pix_pos[1] 
-                && pix_pos[0] < self.screen_dims[0]+50.0
-                && pix_pos[1] < self.screen_dims[1]+50.0 {
-                    let image = &self.tile_map[&tile.asset];
-                    let draw_param = graphics::DrawParam::new()
-                        .dest(pix_pos)
-                        .scale(scale);
-                    Some((image, draw_param))
-                } else {
-                    None
-                }
-        }).collect();
-
-        for (image, draw_param) in render_results {
-            canvas.draw(image, draw_param);
-        }
-
-        let render_results: Vec<_> = self.objects.par_iter().filter_map( |object|{
-
-            let pix_pos = (object.pos - center) * scaling_ratio;
-            let scale = self.scale * scaling_ratio;
-
-            if -50.0 < pix_pos[0] 
-                && -50.0 < pix_pos[1] 
-                && pix_pos[0] < self.screen_dims[0]+50.0 
-                && pix_pos[1] < self.screen_dims[1]+50.0 {
-                    let image = &self.object_map[&object.asset];
-                    let draw_param = graphics::DrawParam::new()
-                        .dest(pix_pos)
-                        .scale(scale);
-                    Some((image, draw_param))
-                } else {
-                    None
-                }
-        }).collect();
-
-        for (image, draw_param) in render_results {
-            canvas.draw(image, draw_param);
-        }
-
-        canvas.finish(_ctx) 
-
-    }
-
-}
 
 pub struct Camera {
     pub x: f64,  // camera's x-position
@@ -347,7 +280,7 @@ impl Default for Camera{
         Self {
             x: 0.0,
             y: 0.0, 
-            z: 1000.0,
+            z: 2000.0,
             f: 1.0
         }
     }

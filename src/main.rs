@@ -1,104 +1,57 @@
-use ggez::{Context, ContextBuilder, GameResult, conf};
-use ggez::graphics::{self, Color, Image};
+
 use aerso::types::*;
-use image::{DynamicImage, ImageBuffer};
-
-// use ggez::event::{self, EventHandler};
-
+use image::{DynamicImage, ImageBuffer, GenericImageView};
 mod world;
 mod aircraft;
 mod terrain;
-
-use plotters::style::RGBAColor;
 use world::World;
-use aircraft::Aircraft;
 
-use std::fs::File;
-use std::{env, path};
+use std::env;
 
-/// Render the image
-fn render(_ctx: &mut Context) -> GameResult {
-    
-    _ctx.gfx.begin_frame().unwrap();
-    let image = Image::from_color(
-        _ctx,
-        12,
-        12, 
-        Some(Color::BLUE));
+fn image_to_array(image: DynamicImage) -> Option<Vec<Vec<[u8; 3]>>> {
 
-    // let canvas = graphics::Canvas::from_image(_ctx, image, Color::BLACK);
-    let mut canvas = graphics::Canvas::from_frame(_ctx, Color::RED);
-    
-    canvas.draw(&image, ggez::glam::Vec2::new(0.0, 0.0));
+    let (width, height) = image.dimensions();
+    // Create a 3D array to store the RGB values
+    let mut pixel_array = vec![vec![[0; 3]; width as usize]; height as usize];
 
-    canvas.finish(_ctx)?;
-    _ctx.gfx.end_frame()?;
+    for y in 0..height {
+        for x in 0..width {
+            // Get the RGB pixel value at each coordinate
+            let pixel = image.get_pixel(x, y);
+            pixel_array[y as usize][x as usize] = [pixel[0], pixel[1], pixel[2]];
+        }
+    }
 
-    Ok(())
-    
-}
-
-/// Use wgpu gfx context to retrieve the image data as serialized [RGBA] data
-fn get_image(_ctx: &mut Context) -> GameResult<Vec<u8>> {
-
-    let frame_image = _ctx.gfx.frame();
-    // println!("Height: {}, Width: {}", frame_image.height(), frame_image.width());
-    let pixels = frame_image.to_pixels(_ctx)?;
-    println!("{:?}", pixels);
-
-    Ok(pixels)
-
+    Some(pixel_array)
 }
 
 fn main() {
 
-    // // Build a context for the main game window
-    // let mut cb = ContextBuilder::new("flyer-env", "ggez")
-    //     .window_mode(conf::WindowMode::default().dimensions(64.0, 64.0));
+    println!("current dir: {:?}", env::current_dir());
 
-    // // Add resources to the main game path
-    // if let Ok(manifest_dir) = env::var("CARGO_MANIFEST_DIR") {
-    //     let mut path = path::PathBuf::from(manifest_dir);
-    //     path.push("resources");
-    //     println!("Adding path {path:?}");
-    //     cb = cb.add_resource_path(path);
-    // }
+    let image = image::open("assets/tiles/1-flower.png").unwrap();
+    if let Some(array) = image_to_array(image) {
+        // Use the array for further processing
+        println!("Array shape: [{}, {}, 3]", array.len(), array[0].len());
 
-    let aircraft = Aircraft::new(
-        "TO",
-        Vector3::new(0.0, 0.0, 1000.0),
-        Vector3::new(100.0, 0.0, 0.0),
-        UnitQuaternion::from_euler_angles(0.0, 0.0, 0.0),
-        Vector3::zeros()
-    );
+        // Access individual RGB values
+        println!("Example RGB: [{}, {}, {}]", array[0][0][0], array[0][0][1], array[0][0][2]);
+    } else {
+        println!("Failed to convert image to array.");
+    }
 
-    // let (mut ctx, _) = cb.build().unwrap();
 
-    let mut w = World::default();
-    w.add_aircraft(aircraft);
-    w.create_map(
-        1,
-        Some(vec![256, 256]),
-        Some(25.0),
-        Some(true) 
-    );
+    // let mut w = World::default();
+    // w.create_map(3, None, None, Some(true));
+    // w.render();
+    // let bytes: Vec<u8> = w.get_image();
+    
+    // let buffer: ImageBuffer<image::Rgb<_>, Vec<u8>> = ImageBuffer::from_raw(
+    //     1024, 
+    //     1024, 
+    //     bytes).expect("Failed to create ImageBuffer");
 
-    w.render();
-    let bytes = w.get_image();
-    let buffer: ImageBuffer<image::Bgra<_>, Vec<u8>> = ImageBuffer::from_raw(
-        1024, 
-        1024, 
-        bytes).expect("Failed to create ImageBuffer");
+    // let dynamic_image: DynamicImage = DynamicImage::ImageRgb8(buffer);
+    // dynamic_image.save("sdl2_world.jpg").expect("Failed to save image");
 
-    let dynamic_image: DynamicImage = DynamicImage::ImageBgra8(buffer);
-    dynamic_image.save("image.jpg").expect("Failed to save image");
-
-    w.ctx.quit_requested = true;
-
-    let w = World::default();
-
-    // for _ in 0..100 {
-    //     w.render();
-    //     let image = w.get_image();
-    // }
 }

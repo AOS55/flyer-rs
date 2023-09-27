@@ -1,12 +1,15 @@
 #![warn(clippy::all)]
 
 extern crate nalgebra as na;
-use ggez::glam::Vec2;
+use image::io::Reader;
+use image::DynamicImage;
 use na::DMatrix;
+
 use rand::prelude::*;
 use rand::distributions::Distribution;
 use rand::distributions::uniform::Uniform;
 use rand_chacha::ChaCha8Rng;
+
 use kiddo::KdTree;
 use kiddo::distance::squared_euclidean;
 use noise::{OpenSimplex, NoiseFn};
@@ -14,8 +17,7 @@ use noise::{OpenSimplex, NoiseFn};
 use std::collections::HashMap;
 use std::path::PathBuf;
 
-use ggez::Context;
-use ggez::graphics::Image;
+use glam::Vec2;
 
 #[allow(dead_code)] 
 pub struct TerrainConfig {
@@ -28,6 +30,8 @@ pub struct TerrainConfig {
     orchard_tree_density: f32,
     orchard_flower_density: f32
 }
+
+use crate::utils::image_to_array;
 
 impl TerrainConfig {
 
@@ -222,18 +226,18 @@ impl Terrain {
         land_map
     }
 
-    pub fn load_assets(&self, ctx: &mut Context, assets: Vec<PathBuf>) -> HashMap<String, Image> {
-        let mut asset_map: HashMap<String, Image> = HashMap::new();
+    pub fn load_assets(&self, assets: Vec<PathBuf>) -> HashMap<String, Vec<Vec<[u8; 3]>>> {
+        let mut asset_map: HashMap<String, Vec<Vec<[u8; 3]>>> = HashMap::new();
         for path in assets {
             let path_str = path.to_str().unwrap_or_default().to_string();
-            match Image::from_path(ctx, &path) {
+            match Reader::open(path) {
                 Ok(image) => {
                     let name: Vec<&str> = path_str.split('/').collect();
                     let name = name[2].to_string();
                     let name: Vec<&str> = name.split('.').collect();
                     let name = name[0].to_string();
                     // println!("name: {}", name);
-                    asset_map.insert(name, image);
+                    asset_map.insert(name, image_to_array(image.decode().unwrap()));
                 }
                 Err(err) => {
                     println!("Path is: {}", path_str);
