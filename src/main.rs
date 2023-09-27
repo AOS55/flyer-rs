@@ -1,12 +1,7 @@
-
-use aerso::types::*;
-use image::{DynamicImage, ImageBuffer, GenericImageView};
 mod world;
 mod aircraft;
 mod terrain;
 use world::World;
-
-use std::env;
 
 fn main() {
 
