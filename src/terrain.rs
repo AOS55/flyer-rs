@@ -1,3 +1,5 @@
+#![warn(clippy::all)]
+
 extern crate nalgebra as na;
 use ggez::glam::Vec2;
 use na::DMatrix;
@@ -7,7 +9,7 @@ use rand::distributions::uniform::Uniform;
 use rand_chacha::ChaCha8Rng;
 use kiddo::KdTree;
 use kiddo::distance::squared_euclidean;
-use noise::{OpenSimplex, NoiseFn, Seedable};
+use noise::{OpenSimplex, NoiseFn};
 
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -15,6 +17,7 @@ use std::path::PathBuf;
 use ggez::Context;
 use ggez::graphics::Image;
 
+#[allow(dead_code)] 
 pub struct TerrainConfig {
     name: String,
     num_fields: usize,
@@ -23,23 +26,45 @@ pub struct TerrainConfig {
     beach_thickness: f32,
     forest_tree_density: f32,
     orchard_tree_density: f32,
-    orchard_flower_density: f32,
-    cow_density: f32 
+    orchard_flower_density: f32
+}
+
+impl TerrainConfig {
+
+    pub fn update_name(&mut self) {
+        // Update the name of the TerrainConfig to be a unique string identifier
+        
+        // Create a string made up of the first letters of each string
+        let land_letters: String = self.land_types
+            .iter()
+            .map(|s| s.chars().next().unwrap_or_default())
+            .collect();
+
+        self.name = format!("nf{}lt{}wc{}bt{}ftd{}otd{}ofd{}",
+            self.num_fields.to_string(), 
+            land_letters,
+            self.water_cutoff.to_string(),
+            self.beach_thickness.to_string(),
+            self.forest_tree_density.to_string(),
+            self.orchard_tree_density.to_string(),
+            self.orchard_flower_density.to_string()
+        );
+    }
 }
 
 impl Default for TerrainConfig {
+
     fn default() -> Self {
 
         Self {
             name: "default".to_string(),
             num_fields: 10,
-            land_types: vec!["grass", "forest", "crops", "orchard"].iter().map(|x| x.to_string()).collect::<Vec<String>>(),
+            land_types: ["grass", "forest", "crops", "orchard"].iter().map(|x| x.to_string()).collect::<Vec<String>>(),
             water_cutoff: -0.1,
             beach_thickness: 0.04,
             forest_tree_density: 0.6,
             orchard_tree_density: 0.1,
-            orchard_flower_density: 0.1,
-            cow_density: 0.0  // No cows by default
+            orchard_flower_density: 0.1
         }
     }
 }
@@ -48,12 +73,6 @@ pub struct Tile {
     pub name: String,  // name of the tile to use
     pub asset: String,  // name of the asset from the tile_map
     pub pos: Vec2  // position in [m] on the map
-}
-
-impl Tile {
-    fn new(name: String, asset: String, pos: Vec2) -> Self {
-        Self {name, asset, pos}
-    }
 }
 
 pub struct StaticObject {
@@ -103,7 +122,7 @@ impl Terrain {
             for idy in 0..biome_map.ncols() {
                 let b_key = biome_map[(idx, idy)];
                 let land_name = &land_map[&b_key];
-                let position = Vec2::new((idx  as f32) * (self.scaling as f32), (idy as f32) * (self.scaling as f32));
+                let position = Vec2::new((idx  as f32) * self.scaling, (idy as f32) * self.scaling);
                 match land_name.as_str() {
                     "grass" => {
                         let tile = self.grass(position);
@@ -112,23 +131,23 @@ impl Terrain {
                     "forest" => {
                         let (tile, object) = self.forest(position);
                         tiles.push(tile);
-                        if object.is_some() {
-                            objects.push(object.unwrap());
-                        }
+                        if let Some(value) = object {
+                            objects.push(value)
+                        };
                     },
                     "crops" => {
                         let (tile, object) = self.crops(position);
                         tiles.push(tile);
-                        if object.is_some() {
-                            objects.push(object.unwrap());
-                        }
+                        if let Some(value) = object {
+                            objects.push(value)
+                        };
                     },
                     "orchard" => {
                         let (tile, object) = self.orchard(position);
                         tiles.push(tile);
-                        if object.is_some() {
-                            objects.push(object.unwrap());
-                        }
+                        if let Some(value) = object {
+                            objects.push(value)
+                        };
                     },
                     "water" => tiles.push(self.water(position)),
                     "sand" => tiles.push(self.sand(position)),
@@ -137,7 +156,7 @@ impl Terrain {
             }
         }
 
-        return (tiles, objects)
+        (tiles, objects)
     }
 
     fn generate_biome_map(&self) -> DMatrix<usize> {
@@ -171,7 +190,7 @@ impl Terrain {
         }
         
         // println!("{}", biome_map);
-        return biome_map
+        biome_map
 
     }
 
@@ -189,18 +208,18 @@ impl Terrain {
             let value = v_sampler.sample(&mut rng);
             tree.add(&[x, y], value);
         };
-        return tree
+        tree
     }
 
     fn generate_land_map(&self) -> HashMap<usize, String> {
 
         let mut land_map: HashMap<usize, String> = HashMap::new();
         for (index, value) in self.config.land_types.iter().enumerate() {
-            land_map.insert(index as usize, value.clone());
+            land_map.insert(index, value.clone());
         }
         land_map.insert(self.config.land_types.len()+1, "water".to_string());
         land_map.insert(self.config.land_types.len()+2, "sand".to_string());
-        return land_map
+        land_map
     }
 
     pub fn load_assets(&self, ctx: &mut Context, assets: Vec<PathBuf>) -> HashMap<String, Image> {
@@ -209,11 +228,11 @@ impl Terrain {
             let path_str = path.to_str().unwrap_or_default().to_string();
             match Image::from_path(ctx, &path) {
                 Ok(image) => {
-                    let name: Vec<&str> = path_str.split("/").collect();
+                    let name: Vec<&str> = path_str.split('/').collect();
                     let name = name[2].to_string();
-                    let name: Vec<&str> = name.split(".").collect();
+                    let name: Vec<&str> = name.split('.').collect();
                     let name = name[0].to_string();
-                    println!("name: {}", name);
+                    // println!("name: {}", name);
                     asset_map.insert(name, image);
                 }
                 Err(err) => {
@@ -223,7 +242,7 @@ impl Terrain {
             }
         }
         
-        return asset_map
+        asset_map
     }
 
     fn grass(&self, pos: Vec2) -> Tile {
@@ -288,7 +307,7 @@ impl Terrain {
             pos
         };
 
-        return (tile, so)
+        (tile, so)
 
     }
 
@@ -332,7 +351,7 @@ impl Terrain {
             pos
         };
 
-        return (tile, so)
+        (tile, so)
 
     }
 
@@ -363,7 +382,7 @@ impl Terrain {
         let asset = if object_placement < (self.config.orchard_flower_density + self.config.orchard_tree_density) {
             let flower_type = self.random_funcs.sampler.sample(&mut self.random_funcs.rng.clone()) as f32;
             // println!("flower_type: {}", flower_type);
-            let asset = if flower_type < 0.25 {
+            if flower_type < 0.25 {
                 "1-flower".to_string()
             } else if flower_type < 0.5 {
                 "2-flowers".to_string()
@@ -371,8 +390,7 @@ impl Terrain {
                 "4-flowers".to_string()
             } else {
                 "6-flowers".to_string()
-            };
-            asset
+            }
         } else {
             "darker-grass".to_string()
         };
@@ -383,7 +401,7 @@ impl Terrain {
             pos
         };
 
-        return (tile, so)
+        (tile, so)
 
     }
 
@@ -412,7 +430,7 @@ impl Terrain {
             value /= sum as f64;
         }
 
-        return value
+        value
     }
 
 }

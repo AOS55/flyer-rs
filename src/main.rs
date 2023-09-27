@@ -1,223 +1,104 @@
-mod terrain;
-use terrain::{Terrain, TerrainConfig, Tile, RandomFuncs, StaticObject};
-
-mod utils;
-extern crate nalgebra as na;
-
-use std::{env, path};
-use std::collections::HashMap;
-use std::time::{self, Instant};
-
-use rayon::prelude::*;
-
 use ggez::{Context, ContextBuilder, GameResult, conf};
-use ggez::input::keyboard::KeyCode;
 use ggez::graphics::{self, Color, Image};
-use ggez::glam::Vec2;
-use ggez::event;
+use aerso::types::*;
+use image::{DynamicImage, ImageBuffer};
 
-struct Camera {
-    x: f32,  // camera's x-position
-    y: f32,  // camera's y-position
-    z: f32,  // camera's z-position
-    f: f32   // camera's reconstruction ratio/zoom
+// use ggez::event::{self, EventHandler};
+
+mod world;
+mod aircraft;
+mod terrain;
+
+use plotters::style::RGBAColor;
+use world::World;
+use aircraft::Aircraft;
+
+use std::fs::File;
+use std::{env, path};
+
+/// Render the image
+fn render(_ctx: &mut Context) -> GameResult {
+    
+    _ctx.gfx.begin_frame().unwrap();
+    let image = Image::from_color(
+        _ctx,
+        12,
+        12, 
+        Some(Color::BLUE));
+
+    // let canvas = graphics::Canvas::from_image(_ctx, image, Color::BLACK);
+    let mut canvas = graphics::Canvas::from_frame(_ctx, Color::RED);
+    
+    canvas.draw(&image, ggez::glam::Vec2::new(0.0, 0.0));
+
+    canvas.finish(_ctx)?;
+    _ctx.gfx.end_frame()?;
+
+    Ok(())
+    
 }
 
-struct MainState {
-    camera: Camera,
-    tiles: Vec<Tile>,
-    tile_map: HashMap<String, Image>,
-    objects: Vec<StaticObject>,
-    object_map: HashMap<String, Image>,
-    screen: graphics::ScreenImage,
-    screen_dims: Vec2,
-    scale: Vec2,
-}
+/// Use wgpu gfx context to retrieve the image data as serialized [RGBA] data
+fn get_image(_ctx: &mut Context) -> GameResult<Vec<u8>> {
 
-impl MainState {
-    
-    fn new(ctx: &mut Context) -> GameResult<MainState> {
-    
-        let screen = graphics::ScreenImage::new(ctx, graphics::ImageFormat::Rgba8UnormSrgb, 1.0, 1.0, 1);
-        let (width, height) = ctx.gfx.drawable_size();
-        let screen_dims = Vec2::new(width, height);
+    let frame_image = _ctx.gfx.frame();
+    // println!("Height: {}, Width: {}", frame_image.height(), frame_image.width());
+    let pixels = frame_image.to_pixels(_ctx)?;
+    println!("{:?}", pixels);
 
-        let t_config = TerrainConfig::default();
-        
-        let seed = 1;
-        let area = vec![256, 256]; 
-        // let scaling = width / (area[0] as f32);
-        let scaling = 25.0;
-        
-        let terrain = Terrain {
-            seed,
-            area,
-            scaling,
-            config: t_config,
-            water_present: true,
-            random_funcs: RandomFuncs::new(seed as u32)
-        };
-        
-        let (tiles, objects) = terrain.generate_map();
-        // for tile in tiles.iter() {
-        //     // println!("tile: name is {}, with asset {} at pos {}", tile.name, tile.asset, tile.pos);
-        // }
-        // for object in objects.iter() {
-        //     println!("object: name is {}, with asset {} at pos {}", object.name, object.asset, object.pos);
-        // }
-
-        let tile_dir: Vec<_> = ctx.fs.read_dir("/tiles")?.collect();
-        let so_dir: Vec<_> = ctx.fs.read_dir("/objects")?.collect();
-        let tile_map = terrain.load_assets(ctx, tile_dir);
-        let object_map = terrain.load_assets(ctx, so_dir);
-        // let land_map = terrain.generate_land_map();
-
-        for key in object_map.keys() {
-            println!("{}", key);
-        }
-    
-        // let scale_x = width / (16.0 * terrain.area[0] as f32);
-        // let scale_y = height / (16.0 * terrain.area[1] as f32);
-        let scale_x = scaling / 16.0;
-        let scale_y = scaling / 16.0;
-        let scale = Vec2::new(scale_x, scale_y);  // 1:1 scale
-
-        let camera = Camera {
-            x: 0.0,
-            y: 0.0,
-            z: 1000.0,
-            f: 1.0
-        };
-
-        let s = MainState {
-            camera,
-            tiles,
-            tile_map,
-            objects,
-            object_map,
-            screen,
-            screen_dims,
-            scale
-        };
-
-        Ok(s)   
-    }
+    Ok(pixels)
 
 }
 
-impl event::EventHandler<ggez::GameError> for MainState {
+fn main() {
 
-    fn update(&mut self, _ctx: &mut Context) -> GameResult {
-        Ok(())
-    }
+    // // Build a context for the main game window
+    // let mut cb = ContextBuilder::new("flyer-env", "ggez")
+    //     .window_mode(conf::WindowMode::default().dimensions(64.0, 64.0));
 
-    fn draw(&mut self, _ctx: &mut Context) -> GameResult {
+    // // Add resources to the main game path
+    // if let Ok(manifest_dir) = env::var("CARGO_MANIFEST_DIR") {
+    //     let mut path = path::PathBuf::from(manifest_dir);
+    //     path.push("resources");
+    //     println!("Adding path {path:?}");
+    //     cb = cb.add_resource_path(path);
+    // }
 
-        let mut canvas = graphics::Canvas::from_frame(_ctx, Color::BLACK);
+    let aircraft = Aircraft::new(
+        "TO",
+        Vector3::new(0.0, 0.0, 1000.0),
+        Vector3::new(100.0, 0.0, 0.0),
+        UnitQuaternion::from_euler_angles(0.0, 0.0, 0.0),
+        Vector3::zeros()
+    );
 
-        let center = Vec2::new(self.camera.x, self.camera.y);  // center of image in [m]
-        let reconstruction_ratio = self.camera.f * self.camera.z;  // how large the fov is
-        let scaling_ratio = Vec2::new(
-            self.screen_dims[0] / reconstruction_ratio,
-            self.screen_dims[1]/ reconstruction_ratio
-        );
+    // let (mut ctx, _) = cb.build().unwrap();
 
-        let render_results: Vec<_> = self.tiles.par_iter().filter_map(|tile| {
+    let mut w = World::default();
+    w.add_aircraft(aircraft);
+    w.create_map(
+        1,
+        Some(vec![256, 256]),
+        Some(25.0),
+        Some(true) 
+    );
 
-            let pix_pos = (tile.pos - center) * scaling_ratio;
-            let scale = self.scale * scaling_ratio;
+    w.render();
+    let bytes = w.get_image();
+    let buffer: ImageBuffer<image::Bgra<_>, Vec<u8>> = ImageBuffer::from_raw(
+        1024, 
+        1024, 
+        bytes).expect("Failed to create ImageBuffer");
 
-            if -50.0 < pix_pos[0]
-                && -50.0 < pix_pos[1] 
-                && pix_pos[0] < self.screen_dims[0]+50.0
-                && pix_pos[1] < self.screen_dims[1]+50.0 {
-                    let image = &self.tile_map[&tile.asset];
-                    let draw_param = graphics::DrawParam::new()
-                        .dest(pix_pos)
-                        .scale(scale);
-                    Some((image, draw_param))
-                } else {
-                    None
-                }
-        }).collect();
+    let dynamic_image: DynamicImage = DynamicImage::ImageBgra8(buffer);
+    dynamic_image.save("image.jpg").expect("Failed to save image");
 
-        for (image, draw_param) in render_results {
-            canvas.draw(image, draw_param);
-        }
+    w.ctx.quit_requested = true;
 
-        let render_results: Vec<_> = self.objects.par_iter().filter_map( |object|{
+    let w = World::default();
 
-            let pix_pos = (object.pos - center) * scaling_ratio;
-            let scale = self.scale * scaling_ratio;
-
-            if -50.0 < pix_pos[0] 
-                && -50.0 < pix_pos[1] 
-                && pix_pos[0] < self.screen_dims[0]+50.0 
-                && pix_pos[1] < self.screen_dims[1]+50.0 {
-                    let image = &self.object_map[&object.asset];
-                    let draw_param = graphics::DrawParam::new()
-                        .dest(pix_pos)
-                        .scale(scale);
-                    Some((image, draw_param))
-                } else {
-                    None
-                }
-        }).collect();
-
-        for (image, draw_param) in render_results {
-            canvas.draw(image, draw_param);
-        }
-
-        canvas.finish(_ctx)   
-    }
-
-    fn key_down_event(
-            &mut self,
-            ctx: &mut Context,
-            input: ggez::input::keyboard::KeyInput,
-            _repeated: bool,
-        ) -> Result<(), ggez::GameError> {
-        match input.keycode {
-            Some(KeyCode::Up) => {
-                self.camera.y -= 10.0;
-            }
-            Some(KeyCode::Down) => {
-                self.camera.y += 10.0;
-            }
-            Some(KeyCode::Left) => {
-                self.camera.x -= 10.0;
-            }
-            Some(KeyCode::Right) => {
-                self.camera.x += 10.0;
-            }
-            Some(KeyCode::PageUp) => {
-                self.camera.z += 10.0;
-            }
-            Some(KeyCode::PageDown) => {
-                self.camera.z -= 10.0;
-            }
-            _ => ()
-        }
-        Ok(())
-    }
-
-}
-
-fn main() -> GameResult {
-
-    let mut cb = ContextBuilder::new("flyer-env", "ggez")
-        .window_mode(conf::WindowMode::default().dimensions(400.0, 400.0));
-    
-    if let Ok(manifest_dir) = env::var("CARGO_MANIFEST_DIR") {
-        let mut path = path::PathBuf::from(manifest_dir);
-        path.push("resources");
-        println!("Adding path {path:?}");
-        cb = cb.add_resource_path(path);
-    }
-
-    let (mut ctx, event_loop) = cb.build()?;
-
-    let state = MainState::new(&mut ctx)?;
-    event::run(ctx, event_loop, state)
-
+    // for _ in 0..100 {
+    //     w.render();
+    //     let image = w.get_image();
+    // }
 }
