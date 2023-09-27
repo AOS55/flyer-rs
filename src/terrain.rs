@@ -43,13 +43,13 @@ impl TerrainConfig {
             .collect();
 
         self.name = format!("nf{}lt{}wc{}bt{}ftd{}otd{}ofd{}",
-            self.num_fields.to_string(), 
+            self.num_fields, 
             land_letters,
-            self.water_cutoff.to_string(),
-            self.beach_thickness.to_string(),
-            self.forest_tree_density.to_string(),
-            self.orchard_tree_density.to_string(),
-            self.orchard_flower_density.to_string()
+            self.water_cutoff,
+            self.beach_thickness,
+            self.forest_tree_density,
+            self.orchard_tree_density,
+            self.orchard_flower_density
         );
     }
 }

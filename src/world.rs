@@ -111,7 +111,7 @@ impl World {
                 .collect()
             },
             Err(_td) => {
-                eprintln!("{}", "Tiles dir not found in context");
+                eprintln!("Tiles dir not found in context");
                 std::process::exit(1);
             }
         };
@@ -123,7 +123,7 @@ impl World {
                 .collect()
             },
             Err(_so) => {
-                eprintln!("{}", "Object dir not found in context");
+                eprintln!("Object dir not found in context");
                 std::process::exit(1);
             }
         };
