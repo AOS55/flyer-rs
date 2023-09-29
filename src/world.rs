@@ -88,7 +88,7 @@ impl World {
             false
         };
         
-        let terrain = Terrain {
+        let mut terrain = Terrain {
             seed,
             area,
             scaling,
@@ -149,7 +149,7 @@ impl World {
 
     #[allow(dead_code)]
     pub fn add_aircraft(&mut self, aircraft: Aircraft) {
-        
+
         self.vehicles.push(aircraft);
     
     }
@@ -240,7 +240,7 @@ impl Default for Camera{
         Self {
             x: 0.0,
             y: 0.0, 
-            z: 2000.0,
+            z: 5000.0,
             f: 1.0
         }
     }

@@ -354,4 +354,3 @@ impl StateView for Aircraft {
         self.aff_body.statevector()
     }
 }
-

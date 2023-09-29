@@ -112,7 +112,7 @@ pub struct Terrain {
 
 impl Terrain {
 
-    pub fn generate_map(&self) -> (Vec<Tile>, Vec<StaticObject>) {
+    pub fn generate_map(&mut self) -> (Vec<Tile>, Vec<StaticObject>) {
 
         let biome_map = self.generate_biome_map();
         let land_map = self.generate_land_map();
@@ -267,8 +267,8 @@ impl Terrain {
 
     }
 
-    fn forest(&self, pos: Vec2) -> (Tile, Option<StaticObject>) {
-        let tree_probability = self.random_funcs.sampler.sample(&mut self.random_funcs.rng.clone()) as f32;
+    fn forest(&mut self, pos: Vec2) -> (Tile, Option<StaticObject>) {
+        let tree_probability = self.random_funcs.sampler.sample(&mut self.random_funcs.rng) as f32;
         let object_placement = self.noise(pos[0] as f64, pos[1] as f64, 6.0, Some(HashMap::from([(5, 1), (10, 1)])), Some(true)) as f32;
 
         let (asset, so) = if object_placement < 0.2 {
@@ -357,11 +357,11 @@ impl Terrain {
 
     }
 
-    fn orchard(&self, pos: Vec2) -> (Tile, Option<StaticObject>) {
-        let object_placement = self.random_funcs.sampler.sample(&mut self.random_funcs.rng.clone()) as f32;
+    fn orchard(&mut self, pos: Vec2) -> (Tile, Option<StaticObject>) {
+        let object_placement = self.random_funcs.sampler.sample(&mut self.random_funcs.rng) as f32;
         // println!("object_placement: {}", object_placement);
         let so = if object_placement < self.config.orchard_tree_density {
-            let tree_type = self.random_funcs.sampler.sample(&mut self.random_funcs.rng.clone()) as f32;
+            let tree_type = self.random_funcs.sampler.sample(&mut self.random_funcs.rng) as f32;
             if tree_type < 0.75 {
                 // Add apple tree
                 Some(StaticObject{
