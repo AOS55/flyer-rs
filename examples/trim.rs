@@ -38,7 +38,7 @@ impl Trim {
             Vector3::zeros()
         );
 
-        let controls = vec![u[1], 0.0, u[2], 0.0];
+        let controls = vec![0.0, u[1], u[2], 0.0];
         let mut total_cost = 0.0;
         let mut time = 0.0;
         
@@ -70,7 +70,7 @@ impl CostFunction for Trim {
 fn run() -> Result<(), Error> {
 
     let cost = Trim {
-        alt: 1000.0,
+        alt: -1000.0,
         airspeed: 100.0
     };
 
