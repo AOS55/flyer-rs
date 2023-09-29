@@ -172,7 +172,7 @@ impl AeroEffect for Aerodynamics {
             self.drag_data.c_D_0 +
             (self.drag_data.c_D_alpha * alpha) +
             (self.drag_data.c_D_alpha_q * alpha * tilde_q) +
-            (self.drag_data.c_D_alpha_deltae * alpha * input[0]) +
+            (self.drag_data.c_D_alpha_deltae * alpha * input[1]) +
             (self.drag_data.c_D_alpha2 * alpha.powf(2.0)) +
             (self.drag_data.c_D_alpha2_q * tilde_q * alpha.powf(2.0)) +
             (self.drag_data.c_D_alpha2_deltae * input[1] * alpha.powf(2.0)) +
