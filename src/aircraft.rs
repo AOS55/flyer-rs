@@ -291,11 +291,8 @@ impl Aircraft {
                initial_attitude: UnitQuaternion<f64>,
                initial_rates: Vector3<f64>,
                data_path: Option<String>) -> Self {
-        
-        let path: Option<&str> = match data_path {
-            Some(data_path) => Some(data_path.as_str()),
-            None => None
-        };
+
+        let path = data_path.as_deref();
 
         let aero = Aerodynamics::from_json(aircraft_name, path);
         let power = PowerPlant::pt6();
@@ -336,7 +333,7 @@ impl Clone for Aircraft {
         let vel = self.velocity();
         let att = self.attitude();
         let rates = self.rates();
-        let data_path = self.data_path;
+        let data_path = self.data_path.clone();
         let ac = Aircraft::new(&name, pos, vel, att, rates, data_path);
 
         Self {
