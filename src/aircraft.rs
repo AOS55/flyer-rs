@@ -121,8 +121,16 @@ impl Aerodynamics {
                 Some(data_path) => [data_path, aircraft_name, ".yaml"].concat(),
                 None => ["data/", aircraft_name, ".yaml"].concat()
             };
+
+        let mut file: File = match File::open(file_name.clone()) {
+            Ok(file) => {file},
+            Err(_e) => {
+                eprintln!("No file Found! File is: {}", file_name);
+                std::process::exit(1);
+            }  
+        };
         
-        let mut file = File::open(file_name).expect("Failed to open file");
+
         let mut yaml_data = String::new();
         file.read_to_string(&mut yaml_data)
             .expect("Failed to read file");
