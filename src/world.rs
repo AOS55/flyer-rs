@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use crate::terrain::{Tile, StaticObject, TerrainConfig, Terrain, RandomFuncs};
 use crate::aircraft::Aircraft;
 
-use std::fs;
+use std::{fs, path::PathBuf};
 
 use glam::Vec2;
 use tiny_skia::*;
@@ -20,7 +20,8 @@ pub struct World {
     pub object_map: HashMap<String, Pixmap>,
     pub screen_dims: Vec2,
     pub scale: f32,
-    pub settings: Settings
+    pub settings: Settings,
+    pub assets_dir: PathBuf
 }
 
 impl Default for World{
@@ -37,7 +38,8 @@ impl Default for World{
             object_map: HashMap::new(),
             screen_dims: Vec2::new(1024.0, 1024.0),
             scale: 25.0,
-            settings: Settings::default()
+            settings: Settings::default(),
+            assets_dir: [r"assets"].iter().collect()
         }
     }
 
@@ -103,27 +105,32 @@ impl World {
 
         // Build up the TileMap from the context fs, only part that uses ctx from GGEZ
 
+        let mut path = PathBuf::from(&self.assets_dir);
+        path.push("tiles");
 
-        let tile_dir: Vec<_> = match fs::read_dir("assets/tiles") {
+        let tile_dir: Vec<_> = match fs::read_dir(&path) {
             Ok(td) => {
                 td
                 .filter_map(|entry| Some(entry.ok()?.path()))
                 .collect()
             },
             Err(_td) => {
-                eprintln!("Tiles dir not found in context");
+                eprintln!("Tiles dir not found in context, path is: {}", path.as_path().display());
                 std::process::exit(1);
             }
         };
+        
+        let mut path = PathBuf::from(&self.assets_dir);
+        path.push("objects");
 
-        let so_dir: Vec<_> = match fs::read_dir("assets/objects") {
+        let so_dir: Vec<_> = match fs::read_dir(&path) {
             Ok(so) => {
                 so
                 .filter_map(|entry| Some(entry.ok()?.path()))
                 .collect()
             },
             Err(_so) => {
-                eprintln!("Object dir not found in context");
+                eprintln!("Object dir not found in context, path is: {}", path.as_path().display());
                 std::process::exit(1);
             }
         };
@@ -152,6 +159,13 @@ impl World {
 
         self.vehicles.push(aircraft);
     
+    }
+
+    #[allow(dead_code)]
+    pub fn set_assets_dir(&mut self,
+        assets_dir: PathBuf
+    ) {
+        self.assets_dir = assets_dir;
     }
 
 }
