@@ -115,8 +115,13 @@ pub struct YawData {
 impl Aerodynamics {
 
     #[inline]
-    pub fn from_json(aircraft_name: &str) -> Self {
-        let file_name = ["data/", aircraft_name, ".yaml"].concat();
+    pub fn from_json(aircraft_name: &str, data_path: Option<&str>) -> Self {
+        
+        let file_name = match data_path {
+                Some(data_path) => [data_path, aircraft_name, ".yaml"].concat(),
+                None => ["data/", aircraft_name, ".yaml"].concat()
+            };
+        
         let mut file = File::open(file_name).expect("Failed to open file");
         let mut yaml_data = String::new();
         file.read_to_string(&mut yaml_data)
@@ -274,6 +279,7 @@ impl AeroEffect for PowerPlant {
 pub struct Aircraft {
     pub name: String,
     pub aff_body: AffectedBody<Vec<f64>, f64, ConstantWind<f64>, ConstantDensity>,
+    pub data_path: Option<String>
 }
 
 impl Aircraft {
@@ -283,9 +289,15 @@ impl Aircraft {
                initial_position: Vector3<f64>,
                initial_velocity: Vector3<f64>,
                initial_attitude: UnitQuaternion<f64>,
-               initial_rates: Vector3<f64>) -> Self {
+               initial_rates: Vector3<f64>,
+               data_path: Option<String>) -> Self {
         
-        let aero = Aerodynamics::from_json(aircraft_name);
+        let path: Option<&str> = match data_path {
+            Some(data_path) => Some(data_path.as_str()),
+            None => None
+        };
+
+        let aero = Aerodynamics::from_json(aircraft_name, path);
         let power = PowerPlant::pt6();
 
         let k_body = Body::new(
@@ -304,7 +316,7 @@ impl Aircraft {
             effectors: vec![Box::new(aero), Box::new(power)],
         };
 
-        Self {name: aircraft_name.to_string(), aff_body}
+        Self {name: aircraft_name.to_string(), aff_body, data_path}
     }
 
     #[allow(dead_code)]
@@ -319,16 +331,18 @@ impl Aircraft {
 impl Clone for Aircraft {
     fn clone(&self) -> Self {
 
-        let name = self.name.clone();
+        let name: String = self.name.clone();
         let pos = self.position();
         let vel = self.velocity();
         let att = self.attitude();
         let rates = self.rates();
-        let ac = Aircraft::new(&name, pos, vel, att, rates);
+        let data_path = self.data_path;
+        let ac = Aircraft::new(&name, pos, vel, att, rates, data_path);
 
         Self {
             name: ac.name,
-            aff_body: ac.aff_body
+            aff_body: ac.aff_body,
+            data_path: ac.data_path
         }       
     }
 }
