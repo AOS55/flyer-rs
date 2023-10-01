@@ -231,7 +231,7 @@ impl Terrain {
             match Pixmap::load_png(path) {
                 Ok(pixmap) => {
                     let name: Vec<&str> = path_str.split('/').collect();
-                    let name = name[2].to_string();
+                    let name = name[name.len()-1].to_string();
                     let name: Vec<&str> = name.split('.').collect();
                     let name = name[0].to_string();
                     // println!("name: {}", name);
