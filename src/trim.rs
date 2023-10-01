@@ -28,7 +28,8 @@ impl Trim {
             Vector3::new(0.0, 0.0, self.alt),
             Vector3::new(self.airspeed, 0.0, 0.0),
             UnitQuaternion::from_euler_angles(0.0, u[0], 0.0),
-            Vector3::zeros()
+            Vector3::zeros(),
+            None
         );
 
         let controls = vec![0.0, u[1], u[2], 0.0];
