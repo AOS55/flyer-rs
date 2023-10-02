@@ -343,8 +343,19 @@ impl Aircraft {
 
     /// Step the simulation
     pub fn step(&mut self, dt: f64) {
-        let controls: Vec<_> = self.controls.values().cloned().collect();
-        self.aff_body.step(dt, &controls); 
+        
+
+        // HashMaps aren't ordered so we need to make sure everything comes out in the correct sequence
+        let control_keys = vec!["aileron", "elevator", "tla", "rudder"];
+        let mut control_in: Vec<f64> = Vec::new();
+
+        for key in control_keys {
+            control_in.push(self.controls[key]);
+        }
+
+        // let controls: Vec<_> = self.controls.values().cloned().collect();
+        println!("controls: {:?}", control_in);
+        self.aff_body.step(dt, &control_in); 
     }
 
 }
