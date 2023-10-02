@@ -354,7 +354,6 @@ impl Aircraft {
         }
 
         // let controls: Vec<_> = self.controls.values().cloned().collect();
-        println!("controls: {:?}", control_in);
         self.aff_body.step(dt, &control_in); 
     }
 
