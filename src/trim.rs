@@ -29,6 +29,7 @@ impl Trim {
             Vector3::new(self.airspeed, 0.0, 0.0),
             UnitQuaternion::from_euler_angles(0.0, u[0], 0.0),
             Vector3::zeros(),
+            None,
             None
         );
 

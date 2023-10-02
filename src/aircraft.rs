@@ -4,7 +4,7 @@ use aerso::density_models::ConstantDensity;
 use aerso::wind_models::*;
 use aerso::*;
 use aerso::types::*;
-use std::{fs::File, io::Read, f64::consts::PI};
+use std::{fs::File, io::Read, f64::consts::PI, collections::HashMap};
 use serde::{Deserialize, Serialize};
 
 pub struct Aerodynamics {
@@ -287,6 +287,7 @@ impl AeroEffect for PowerPlant {
 pub struct Aircraft {
     pub name: String,
     pub aff_body: AffectedBody<Vec<f64>, f64, ConstantWind<f64>, ConstantDensity>,
+    pub controls: HashMap<String, f64>,
     pub data_path: Option<String>
 }
 
@@ -298,6 +299,7 @@ impl Aircraft {
                initial_velocity: Vector3<f64>,
                initial_attitude: UnitQuaternion<f64>,
                initial_rates: Vector3<f64>,
+               controls: Option<HashMap<String, f64>>,
                data_path: Option<String>) -> Self {
 
         let path = data_path.as_deref();
@@ -321,15 +323,29 @@ impl Aircraft {
             effectors: vec![Box::new(aero), Box::new(power)],
         };
 
-        Self {name: aircraft_name.to_string(), aff_body, data_path}
+        let controls = match controls {
+            Some(controls) => controls,
+            None =>  HashMap::from([
+                        ("aileron".to_string(), 0.0),
+                        ("elevator".to_string(), 0.0),
+                        ("tla".to_string(), 0.0),
+                        ("rudder".to_string(), 0.0)
+                    ])
+        };
+
+        Self {name: aircraft_name.to_string(), aff_body, controls, data_path}
     }
 
-    #[allow(dead_code)]
-    pub fn update(&mut self,
-        dt: f64,
-        input_state: Vec<f64>) {
-            self.aff_body.step(dt, &input_state);
-        }
+    /// Set the controls
+    pub fn act(&mut self, controls: HashMap<String, f64>) {
+        self.controls = controls;
+    }
+
+    /// Step the simulation
+    pub fn step(&mut self, dt: f64) {
+        let controls: Vec<_> = self.controls.values().cloned().collect();
+        self.aff_body.step(dt, &controls); 
+    }
 
 }
 
@@ -341,12 +357,14 @@ impl Clone for Aircraft {
         let vel = self.velocity();
         let att = self.attitude();
         let rates = self.rates();
+        let controls = self.controls.clone();
         let data_path = self.data_path.clone();
-        let ac = Aircraft::new(&name, pos, vel, att, rates, data_path);
+        let ac = Aircraft::new(&name, pos, vel, att, rates, Some(controls), data_path);
 
         Self {
             name: ac.name,
             aff_body: ac.aff_body,
+            controls: ac.controls,
             data_path: ac.data_path
         }       
     }
