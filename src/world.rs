@@ -285,6 +285,12 @@ impl Camera {
 
     }
 
+    pub fn move_camera(&mut self, pos: Vec<f64>) {
+        self.x = pos[0];
+        self.y = pos[1];
+        self.z = -1.0 * pos[2];
+    }
+
 }
 
 pub struct Settings {
