@@ -20,6 +20,7 @@ pub struct World {
     pub object_map: HashMap<String, Pixmap>,
     pub screen_dims: Vec2,
     pub scale: f32,
+    origin: Vec2,
     pub settings: Settings,
     pub assets_dir: PathBuf
 }
@@ -38,6 +39,7 @@ impl Default for World{
             object_map: HashMap::new(),
             screen_dims: Vec2::new(1024.0, 1024.0),
             scale: 25.0,
+            origin: Vec2::new(0.0, 0.0),
             settings: Settings::default(),
             assets_dir: [r"assets"].iter().collect()
         }
@@ -77,7 +79,7 @@ impl World {
             } else {
                 vec![256, 256]
             };
-         
+
         let scaling = if let Some(scale) = scaling {
             scale
         } else {
@@ -89,6 +91,10 @@ impl World {
         } else {
             false
         };
+
+
+        // Set origin of the map to be in the center
+        self.origin = Vec2::new(self.scale * (area[0] as f32 / 2.0), self.scale * (area[1] as f32 / 2.0));
         
         let mut terrain = Terrain {
             seed,
@@ -179,7 +185,9 @@ impl World {
         let mut canvas = Pixmap::new(self.screen_dims[0] as u32, self.screen_dims[1] as u32).unwrap();
         let paint = PixmapPaint::default();
 
-        let center = Vec2::new(self.camera.x as f32, self.camera.y as f32);  // center of image in [m]
+        println!("Origin: {}", &self.origin);
+
+        let center = Vec2::new(self.camera.x as f32 + self.origin[0], self.camera.y as f32 + self.origin[1]);  // center of image in [m]
         let reconstruction_ratio = self.camera.f * self.camera.z;  // how large the fov is
 
         let scaling_ratio = Vec2::new(
@@ -187,9 +195,10 @@ impl World {
             self.screen_dims[1]/ reconstruction_ratio as f32
         );
 
-        let render_results = self.tiles.par_iter().filter_map(|tile: &Tile| {
-
-            let pix_pos = (tile.pos - center) * scaling_ratio;
+        let render_results: Vec<(Pixmap, Transform)> = self.tiles.par_iter().filter_map(|tile: &Tile| {
+            let pos = tile.pos - center;
+            let pix_pos = pos * scaling_ratio;
+            let pix_pos = pix_pos + self.screen_dims/2.0;
             let scale = self.scale * scaling_ratio;
             if -50.0 < pix_pos[0]
                 && -50.0 < pix_pos[1] 
@@ -208,8 +217,9 @@ impl World {
         }
 
         let render_results = self.objects.par_iter().filter_map(|object: &StaticObject| {
-
-            let pix_pos = (object.pos - center) * scaling_ratio;
+            let pos = object.pos - center;
+            let pix_pos = pos * scaling_ratio;
+            let pix_pos = pix_pos + self.screen_dims/2.0;
             let scale = self.scale * scaling_ratio;
             if -50.0 < pix_pos[0]
                 && -50.0 < pix_pos[1] 
