@@ -1,14 +1,24 @@
-use std::collections::HashMap;
-
 use crate::terrain::{Tile, StaticObject, TerrainConfig, Terrain, RandomFuncs};
 use crate::aircraft::Aircraft;
+use crate::runway::Runway;
 
 use std::{fs, path::PathBuf};
+use std::collections::HashMap;
+use std::time::Instant;
+use std::io::{Read, Write};
+use std::fs::File;
 
+use serde::{Serialize, Deserialize};
 use glam::Vec2;
 use tiny_skia::*;
 
 use rayon::prelude::*;
+
+#[derive(Serialize, Deserialize)]
+struct TerrainData {
+    tiles: Vec<Tile>,
+    objects: Vec<StaticObject>
+}
 
 pub struct World {
     pub vehicles: Vec<Aircraft>,
@@ -22,7 +32,9 @@ pub struct World {
     pub scale: f32,
     origin: Vec2,
     pub settings: Settings,
-    pub assets_dir: PathBuf
+    pub assets_dir: PathBuf,
+    pub terrain_data_dir: PathBuf,
+    pub runway: Option<Runway>
 }
 
 impl Default for World{
@@ -41,12 +53,13 @@ impl Default for World{
             scale: 25.0,
             origin: Vec2::new(0.0, 0.0),
             settings: Settings::default(),
-            assets_dir: [r"assets"].iter().collect()
+            assets_dir: [r"assets"].iter().collect(),
+            terrain_data_dir: [r"terrain_data"].iter().collect(),
+            runway: None
         }
     }
 
 }
-
 
 impl World {
 
@@ -104,10 +117,54 @@ impl World {
             water_present,
             random_funcs: RandomFuncs::new(seed as u32)
         };
+        
 
+        let now = Instant::now();
+        
         // Create the TerrainMap
+        let name = terrain.get_name();
+        let mut config_path = PathBuf::from(&self.terrain_data_dir);
+        config_path.push(name);
+        config_path.set_extension("json");
+        let (tiles, objects) = match fs::File::open(&config_path) {
+            Ok(mut file) => {
+                println!("Found File!");
+                let mut json_data = String::new();
+                file.read_to_string(&mut json_data).expect("Failed to read file");
+                println!("read: {:.2?}", now.elapsed());
+                let t_data: Result<TerrainData, serde_json::Error> = serde_json::from_str(&json_data);
+                println!("serde_json: {:.2?}", now.elapsed());
+                let t_data = t_data.unwrap();
+                (t_data.tiles, t_data.objects)
+            },
+            Err(_e) => {
+                let (tiles, objects) = terrain.generate_map();
+                // TODO: Save the tiles and objects
+                let instance = TerrainData {
+                    tiles: tiles,
+                    objects: objects
+                };
+                let serialized = serde_json::to_string(&instance).unwrap();
+                let mut file = File::create(&config_path).unwrap();
+                file.write_all(serialized.as_bytes()).unwrap();
+
+                println!("config_path: {}", config_path.display());
+                let mut file = fs::File::open(&config_path).unwrap();
+                let mut json_data = String::new(); 
+                file.read_to_string(&mut json_data).expect("Failed to read file");
+                let t_data: Result<TerrainData, serde_json::Error> = serde_json::from_str(&json_data);
+                let t_data = t_data.unwrap();
+                (t_data.tiles, t_data.objects)    
+            }
+        };
+
+
         // TODO: Find a way to workout if the map can be loaded from storage or need to generate
-        let (tiles, objects) = terrain.generate_map();
+        // let (tiles, objects) = terrain.generate_map();
+        
+         
+        println!("generate_map: time: {:.2?}", now.elapsed());
+        let now = Instant::now();
 
         // Build up the TileMap from the context fs, only part that uses ctx from GGEZ
 
@@ -125,7 +182,7 @@ impl World {
                 std::process::exit(1);
             }
         };
-        
+
         let mut path = PathBuf::from(&self.assets_dir);
         path.push("objects");
 
@@ -141,8 +198,12 @@ impl World {
             }
         };
 
+        println!("Got directory: time: {:.2?}", now.elapsed());
+
         let tile_map = terrain.load_assets(tile_dir);
         let object_map = terrain.load_assets(so_dir);
+
+        println!("Made maps: time: {:.2?}", now.elapsed());
 
         self.tiles = tiles;
         self.objects = objects;
@@ -174,29 +235,39 @@ impl World {
         self.assets_dir = assets_dir;
     }
 
+    #[allow(dead_code)]
+    pub fn set_terrain_data_dir(&mut self,
+        terrain_data_dir: PathBuf
+    ) {
+        self.terrain_data_dir = terrain_data_dir;
+    }
+
+    pub fn create_runway(&mut self) {
+        let runway = Runway::default();
+        self.runway = Some(runway);
+    }
+
 }
 
 impl World {
 
     pub fn render(&mut self) -> Pixmap {
 
-        // TODO: Test this out
-
+        // Create the canvas to render onto
         let mut canvas = Pixmap::new(self.screen_dims[0] as u32, self.screen_dims[1] as u32).unwrap();
         let paint = PixmapPaint::default();
 
-        println!("Origin: {}", &self.origin);
-
+        // Calcuate the center of the screen and how much to transform each pixel by
         let center = Vec2::new(self.camera.x as f32 + self.origin[0], self.camera.y as f32 + self.origin[1]);  // center of image in [m]
         let reconstruction_ratio = self.camera.f * self.camera.z;  // how large the fov is
-
         let scaling_ratio = Vec2::new(
             self.screen_dims[0] / reconstruction_ratio as f32,
             self.screen_dims[1]/ reconstruction_ratio as f32
         );
 
+        // Render tiles
         let render_results: Vec<(Pixmap, Transform)> = self.tiles.par_iter().filter_map(|tile: &Tile| {
-            let pos = tile.pos - center;
+            let pos = Vec2::new(tile.pos[0] - center[0], tile.pos[1] - center[1]);
             let pix_pos = pos * scaling_ratio;
             let pix_pos = pix_pos + self.screen_dims/2.0;
             let scale = self.scale * scaling_ratio;
@@ -211,13 +282,14 @@ impl World {
                     None
                 }
         }).collect::<Vec<(Pixmap, Transform)>>();
-
+        
         for (pixmap, transform) in render_results {
             canvas.draw_pixmap(0, 0, pixmap.as_ref(), &paint, transform, None);
         }
 
+        // Render objects 
         let render_results = self.objects.par_iter().filter_map(|object: &StaticObject| {
-            let pos = object.pos - center;
+            let pos = Vec2::new(object.pos[0] - center[0], object.pos[1] - center[1]);
             let pix_pos = pos * scaling_ratio;
             let pix_pos = pix_pos + self.screen_dims/2.0;
             let scale = self.scale * scaling_ratio;
@@ -235,6 +307,39 @@ impl World {
 
         for (pixmap, transform) in render_results {
             canvas.draw_pixmap(0, 0, pixmap.as_ref(), &paint, transform, None);
+        }
+
+        // Render runway if available
+        match &self.runway {
+            Some(runway) => {
+                let mut runway_corner = runway.pos - (runway.dims / 2.0);
+                runway_corner[0] = runway_corner[0] - self.camera.x as f32;
+                runway_corner[1] = runway_corner[1] - self.camera.y as f32;
+                println!("runway.pos: {}, runway.dims: {}, runway_center: {}", runway.pos, runway.dims, runway_corner);
+                
+    
+                let screen_center = self.screen_dims/2.0;
+
+                let pix_pos_corner = runway_corner * scaling_ratio;
+                let pix_pos_corner = pix_pos_corner + screen_center;
+
+                let mut runway_center = runway.pos;
+                runway_center[0] = runway_center[0] - self.camera.x as f32;
+                runway_center[1] = runway_center[1] - self.camera.y as f32;
+                
+
+                let pix_pos_center = runway_center * scaling_ratio;
+                let pix_pos_center: Vec2 = pix_pos_center + screen_center;
+                
+                let scale = Vec2::new(scaling_ratio[0] * (runway.dims[0] / 33.0), scaling_ratio[1] * (runway.dims[1] / 1500.0));  // [33.0, 1500.0] comes from the native image dimensions
+                let object = &self.object_map[&runway.asset];
+                let transform: Transform = Transform::from_row(scale[0], 0.0, 0.0, scale[1], pix_pos_corner[0], pix_pos_corner[1]);
+                let transform = transform.post_rotate_at(90.0 + runway.heading, pix_pos_center[0], pix_pos_center[1]);
+                canvas.draw_pixmap(0, 0, object.as_ref(), &paint, transform, None);
+
+
+            },
+            None => () 
         }
 
         canvas
