@@ -337,11 +337,13 @@ impl Aircraft {
     }
 
     /// Set the controls
+    #[allow(dead_code)]
     pub fn act(&mut self, controls: HashMap<String, f64>) {
         self.controls = controls;
     }
 
     /// Step the simulation
+    #[allow(dead_code)]
     pub fn step(&mut self, dt: f64) {
         
 
