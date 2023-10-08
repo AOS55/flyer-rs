@@ -12,6 +12,8 @@ use kiddo::KdTree;
 use kiddo::distance::squared_euclidean;
 use noise::{OpenSimplex, NoiseFn};
 
+use serde::{Serialize, Deserialize};
+
 use std::collections::HashMap;
 use std::path::PathBuf;
 
@@ -21,7 +23,7 @@ use tiny_skia::*;
 #[allow(dead_code)] 
 pub struct TerrainConfig {
     name: String,
-    num_fields: usize,
+    field_density: f32,
     land_types: Vec<String>,
     water_cutoff: f32,
     beach_thickness: f32,
@@ -33,7 +35,7 @@ pub struct TerrainConfig {
 impl TerrainConfig {
 
     #[allow(dead_code)]
-    pub fn update_name(&mut self) {
+    pub fn update_name(&mut self){
         // Update the name of the TerrainConfig to be a unique string identifier
         
         // Create a string made up of the first letters of each string
@@ -42,8 +44,8 @@ impl TerrainConfig {
             .map(|s| s.chars().next().unwrap_or_default())
             .collect();
 
-        self.name = format!("nf{}lt{}wc{}bt{}ftd{}otd{}ofd{}",
-            self.num_fields, 
+        self.name = format!("fd{}lt{}wc{}bt{}ftd{}otd{}ofd{}",
+            self.field_density, 
             land_letters,
             self.water_cutoff,
             self.beach_thickness,
@@ -60,7 +62,7 @@ impl Default for TerrainConfig {
 
         Self {
             name: "default".to_string(),
-            num_fields: 10,
+            field_density: 0.001,
             land_types: ["grass", "forest", "crops", "orchard"].iter().map(|x| x.to_string()).collect::<Vec<String>>(),
             water_cutoff: -0.1,
             beach_thickness: 0.04,
@@ -71,12 +73,14 @@ impl Default for TerrainConfig {
     }
 }
 
+#[derive(Serialize, Deserialize)]
 pub struct Tile {
     pub name: String,  // name of the tile to use
     pub asset: String,  // name of the asset from the tile_map
     pub pos: Vec2  // position in [m] on the map
 }
 
+#[derive(Serialize, Deserialize)]
 pub struct StaticObject {
     pub name: String,  // name of the static object
     pub asset: String, // name of the asset from the static object map
@@ -111,6 +115,22 @@ pub struct Terrain {
 }
 
 impl Terrain {
+
+    pub fn get_name(&mut self) -> String {
+        
+        self.config.update_name();
+        let config_name = &self.config.name;
+
+        let name = format!("seed{}_area0{}1{}_scaling{}_tconfig{}_wp{}",
+            self.seed,
+            self.area[0],
+            self.area[1],
+            self.scaling,
+            config_name,
+            self.water_present    
+        );
+        name
+    }
 
     pub fn generate_map(&mut self) -> (Vec<Tile>, Vec<StaticObject>) {
 
@@ -165,7 +185,9 @@ impl Terrain {
 
         let mut biome_map = DMatrix::zeros(self.area[0], self.area[1]);
 
-        let kd_tree = self.random_kd_tree_clustering(self.config.num_fields);
+        let n_fields = ((self.area[0] * self.area[1]) as f32 * self.config.field_density) as usize;
+
+        let kd_tree = self.random_kd_tree_clustering(n_fields);
         // let test_point = kd_tree.nearest_one(&[0.0, 0.0], &squared_euclidean);
         
         // Generate biome_map from kdtrees
