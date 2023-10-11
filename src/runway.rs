@@ -47,10 +47,10 @@ impl Runway {
     pub fn approach_points(&self) -> HashMap<String, Vec<f32>> {
         
         let touchdown_fraction = 0.8;  // fraction of runway that is landable, used to determine touchdown point
-        let faf_dist = 3000.0;  // distance from final approach fix to touchdown_point [m]
-        let inaf_dist = 2000.0; // distance from intermediate fix to touchdown point [m]
-        let iaf_dist = 2000.0; // distance from initial approach fix to the intermediate approach fix
-        let intercept_angle = 30.0 * PI/180.0;  //
+        let faf_dist = 3000.0*5.0;  // distance from final approach fix to touchdown_point [m]
+        let inaf_dist = 2000.0*5.0; // distance from intermediate fix to touchdown point [m]
+        let iaf_dist = 2000.0*5.0; // distance from initial approach fix to the intermediate approach fix [m]
+        let intercept_angle = 30.0 * PI/180.0;  // angle to intercept the final approach track [rads]
 
         let faf_rot_vec = Vec2::from_angle(self.heading.to_radians() - PI);
         let touchdown_point = faf_rot_vec.rotate(Vec2::new(self.dims[1] * (touchdown_fraction/2.0), 0.0)) + self.pos;
