@@ -119,7 +119,7 @@ impl World {
         };
         
 
-        let now = Instant::now();
+        // let now = Instant::now();
         
         // Create the TerrainMap
         let name = terrain.get_name();
@@ -128,12 +128,12 @@ impl World {
         config_path.set_extension("json");
         let (tiles, objects) = match fs::File::open(&config_path) {
             Ok(mut file) => {
-                println!("Found File!");
+                // println!("Found File!");
                 let mut json_data = String::new();
                 file.read_to_string(&mut json_data).expect("Failed to read file");
-                println!("read: {:.2?}", now.elapsed());
+                // println!("read: {:.2?}", now.elapsed());
                 let t_data: Result<TerrainData, serde_json::Error> = serde_json::from_str(&json_data);
-                println!("serde_json: {:.2?}", now.elapsed());
+                // println!("serde_json: {:.2?}", now.elapsed());
                 let t_data = t_data.unwrap();
                 (t_data.tiles, t_data.objects)
             },
@@ -148,7 +148,7 @@ impl World {
                 let mut file = match File::create(&config_path) {
                     Ok(file_object) => {file_object},
                     Err(_e) => {
-                        eprintln!("Config path: {}", config_path.display());
+                        // eprintln!("Config path: {}", config_path.display());
                         fs::create_dir(&self.terrain_data_dir).unwrap();
                         File::create(&config_path).unwrap()
                     }
@@ -170,8 +170,8 @@ impl World {
         // let (tiles, objects) = terrain.generate_map();
         
          
-        println!("generate_map: time: {:.2?}", now.elapsed());
-        let now = Instant::now();
+        // println!("generate_map: time: {:.2?}", now.elapsed());
+        // let now = Instant::now();
 
         // Build up the TileMap from the context fs, only part that uses ctx from GGEZ
 
@@ -205,12 +205,12 @@ impl World {
             }
         };
 
-        println!("Got directory: time: {:.2?}", now.elapsed());
+        // println!("Got directory: time: {:.2?}", now.elapsed());
 
         let tile_map = terrain.load_assets(tile_dir);
         let object_map = terrain.load_assets(so_dir);
 
-        println!("Made maps: time: {:.2?}", now.elapsed());
+        // println!("Made maps: time: {:.2?}", now.elapsed());
 
         self.tiles = tiles;
         self.objects = objects;
