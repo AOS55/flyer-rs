@@ -145,7 +145,14 @@ impl World {
                     objects: objects
                 };
                 let serialized = serde_json::to_string(&instance).unwrap();
-                let mut file = File::create(&config_path).unwrap();
+                let mut file = match File::create(&config_path) {
+                    Ok(file_object) => {file_object},
+                    Err(_e) => {
+                        eprintln!("Config path: {}", config_path.display());
+                        fs::create_dir(&self.terrain_data_dir).unwrap();
+                        File::create(&config_path).unwrap()
+                    }
+                };
                 file.write_all(serialized.as_bytes()).unwrap();
 
                 println!("config_path: {}", config_path.display());
