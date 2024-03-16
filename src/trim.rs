@@ -1,6 +1,7 @@
 use crate::aircraft::Aircraft;
 
 use aerso::types::*;
+use std::{env, path::PathBuf};
 
 extern crate nalgebra as na;
 use argmin::core::{CostFunction, Error};
@@ -23,6 +24,13 @@ impl Trim {
 
         let dt = 1.0/Self::FPS as f64;
 
+        // This allows the trim to run in test suite without placing data files at root dir
+        let f_path = if env::current_dir().unwrap().file_name().unwrap() == PathBuf::from("flyer-env") {
+            Some(String::from("flyer_env/envs/data/"))
+        } else {
+            None
+        };
+
         let mut aircraft = Aircraft::new(
             "TO",
             Vector3::new(0.0, 0.0, self.alt),
@@ -30,7 +38,7 @@ impl Trim {
             UnitQuaternion::from_euler_angles(0.0, u[0], 0.0),
             Vector3::zeros(),
             None,
-            None
+            f_path
         );
 
         let controls = vec![0.0, u[1], u[2], 0.0];
