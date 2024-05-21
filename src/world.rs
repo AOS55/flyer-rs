@@ -6,9 +6,11 @@ use std::{fs, path::PathBuf};
 use std::collections::HashMap;
 use std::io::{Read, Write};
 use std::fs::File;
+use std::time::Instant;
 
+use aerso::types::StateView;
 use serde::{Serialize, Deserialize};
-use glam::Vec2;
+use glam::{Vec2, Vec3};
 use tiny_skia::*;
 
 use rayon::prelude::*;
@@ -33,7 +35,9 @@ pub struct World {
     pub settings: Settings,
     pub assets_dir: PathBuf,
     pub terrain_data_dir: PathBuf,
-    pub runway: Option<Runway>
+    pub runway: Option<Runway>,
+    pub render_type: String,
+    pos_log: Vec<Vec3>
 }
 
 impl Default for World{
@@ -54,7 +58,9 @@ impl Default for World{
             settings: Settings::default(),
             assets_dir: [r"assets"].iter().collect(),
             terrain_data_dir: [r"terrain_data"].iter().collect(),
-            runway: None
+            runway: None,
+            render_type: String::from("world"),
+            pos_log: Vec::new()
         }
     }
 
@@ -229,9 +235,12 @@ impl World {
 
     #[allow(dead_code)]
     pub fn add_aircraft(&mut self, aircraft: Aircraft) {
-
         self.vehicles.push(aircraft);
-    
+    }
+
+    #[allow(dead_code)]
+    pub fn update_aircraft(&mut self, aircraft: Aircraft, id: usize) {
+        self.vehicles[id] = aircraft;
     }
 
     #[allow(dead_code)]
@@ -259,6 +268,17 @@ impl World {
 
     pub fn render(&mut self) -> Pixmap {
 
+        match self.render_type.as_str() {
+            "world" => self.world_render(),
+            "aircraft" => self.aircraft_render(),
+            _ => {
+                println!("{} not a recognized render type, using world render", self.render_type);
+                self.world_render()  // Use world render method
+            }
+        }
+    } 
+
+    fn world_render(&mut self) -> Pixmap {
         // Create the canvas to render onto
         let mut canvas = Pixmap::new(self.screen_dims[0] as u32, self.screen_dims[1] as u32).unwrap();
         let paint = PixmapPaint::default();
@@ -322,7 +342,6 @@ impl World {
                 runway_corner[0] = runway_corner[0] - self.camera.x as f32;
                 runway_corner[1] = runway_corner[1] - self.camera.y as f32;
                 println!("runway.pos: {}, runway.dims: {}, runway_center: {}", runway.pos, runway.dims, runway_corner);
-                
     
                 let screen_center = self.screen_dims/2.0;
 
@@ -343,14 +362,113 @@ impl World {
                 let transform = transform.post_rotate_at(90.0 + runway.heading, pix_pos_center[0], pix_pos_center[1]);
                 canvas.draw_pixmap(0, 0, object.as_ref(), &paint, transform, None);
 
-
             },
             None => () 
         }
-
         canvas
+    }
 
-    } 
+    fn aircraft_render(&mut self) -> Pixmap {
+
+        let now = Instant::now();
+        let mut canvas = Pixmap::new(self.screen_dims[0] as u32, self.screen_dims[1] as u32).unwrap();
+        let pixmap_paint = PixmapPaint::default();
+        
+        // let center = Vec2::new(self.camera.x as f32 + self.origin[0], self.camera.y as f32 + self.origin[1]);  // center of image in [m]
+        let screen_center = self.screen_dims/2.0;
+        let split_fraction = 0.66;
+
+        // Split the image in 2, the top portion is 3/4 of the image and lower half 1/4
+        let split_point = self.screen_dims[1] * split_fraction;
+        let split_path = {
+            let mut pb = PathBuilder::new();
+            pb.move_to(0.0, split_point);
+            pb.line_to(self.screen_dims[0], split_point);
+            pb.finish().unwrap()
+        };
+        let mut stroke = Stroke::default();
+        stroke.width = 3.0;
+        stroke.line_cap = LineCap::Round;
+        let mut split_paint = Paint::default();
+        split_paint.set_color_rgba8(255, 255, 255, 200);
+        split_paint.anti_alias = true;
+        canvas.stroke_path(&split_path, &split_paint, &stroke, Transform::identity(), None); 
+        
+        let t_canvas_setup = now.elapsed();
+        println!("Canvas Setup: {:?}", t_canvas_setup);
+
+        // Get positions for aircraft objects
+        let horizontal_screen_center = Vec2::new(screen_center[0], (split_fraction/2.0) * self.screen_dims[1]);
+        let vertical_screen_center = Vec2::new(screen_center[0], (1.0 - ((1.0 - split_fraction)/2.0)) * self.screen_dims[1]);
+
+        // TODO: Zoom out on aircraft
+        // Add planar aircraft
+        let horizontal_object = &self.object_map["t67h"];
+        let heading = self.vehicles[0].attitude().euler_angles().2;
+        let horizontal_pixel_x_pos = horizontal_screen_center.x - horizontal_object.width() as f32 /2.0;
+        let horizontal_pixel_y_pos= horizontal_screen_center.y - horizontal_object.height() as f32 /2.0;
+        let horizontal_transform = Transform::from_row(1.0, 0.0, 0.0, 1.0, horizontal_pixel_x_pos, horizontal_pixel_y_pos);
+        let horizontal_transform = horizontal_transform.post_rotate_at(heading as f32 * 180.0 / std::f32::consts::PI, horizontal_screen_center.x, horizontal_screen_center.y);
+        
+        // Add vertical aircraft
+        let vertical_object = &self.object_map["t67v"];
+        let pitch = -1.0 * self.vehicles[0].attitude().euler_angles().1;
+        let vertical_transform = Transform::from_row(1.0, 0.0, 0.0, 1.0, vertical_screen_center.x - vertical_object.width() as f32 /2.0, vertical_screen_center.y - vertical_object.height() as f32 /2.0);
+        let vertical_transform = vertical_transform.post_rotate_at(pitch as f32 * 180.0 / std::f32::consts::PI, vertical_screen_center.x, vertical_screen_center.y);
+        
+        let t_aircraft_setup = now.elapsed();
+        println!("Aircraft Setup: {:?}", t_aircraft_setup);
+
+        // Add position traces to track aircraft
+        let mut trace_paint = Paint::default();
+        trace_paint.set_color_rgba8(255, 0, 0, 200);
+        trace_paint.anti_alias = true;
+        let mut idt = 0.0;
+        for pos in self.pos_log.iter().rev() {
+            idt += 1.0;
+            // println!("x: {}, y: {}, z: {}", pos.x, pos.y, pos.z);
+            let horizontal_path_x_pos = horizontal_screen_center.x - (self.camera.y as f32 - pos.y);
+            let horizontal_path_y_pos = horizontal_screen_center.y - (pos.x - self.camera.x as f32); 
+            // Stop line breaking outside split point
+            if horizontal_path_y_pos < split_point {
+                let horizontal_point = PathBuilder::from_circle(
+                    horizontal_path_x_pos,
+                    horizontal_path_y_pos,
+                    3.0).unwrap();
+                canvas.fill_path(&horizontal_point, &trace_paint, FillRule::Winding, Transform::identity(), None);
+            }
+            // println!("self.camera.z: {}, pos.z: {}, idt: {}", self.camera.z, pos.z, idt);
+            let horizontal_path_y_pos = (self.camera.z as f32 - pos.z) + vertical_screen_center.y;
+            if horizontal_path_y_pos > split_point {
+                let vertical_point = PathBuilder::from_circle(
+                    vertical_screen_center.x - idt,
+                    horizontal_path_y_pos,
+                    3.0).unwrap();
+                canvas.fill_path(&vertical_point, &trace_paint, FillRule::Winding, Transform::identity(), None);
+            }
+        }
+
+        let t_path_setup = now.elapsed();
+        println!("Path Setup: {:?}", t_path_setup);
+        // Add current position to pos_log
+        self.pos_log.push(Vec3::new(self.camera.x as f32, self.camera.y as f32, self.camera.z as f32));
+        // Save Some memory by dropping points once outside viewport, 400 seems enough
+        if self.pos_log.len() > 400 {
+            self.pos_log.remove(0);
+        }
+
+        // println!("heading: {:?}", self.vehicles[0].aff_body.body.attitude().euler_angles());
+        // println!("center: {}", screen_center);
+        // println!("camera: {}, {}, {}", self.camera.x, self.camera.y, self.camera.z);
+        // println!("aircraft attitude: {:?}", self.vehicles[0].attitude().euler_angles());
+        // println!("Heading: {}", heading as f32 * 180.0 / std::f32::consts::PI);
+        // println!("Pitch: {}", pitch as f32 * 180.0 / std::f32::consts::PI);
+
+        canvas.draw_pixmap(0, 0, horizontal_object.as_ref(), &pixmap_paint, horizontal_transform, None);
+        canvas.draw_pixmap(0, 0, vertical_object.as_ref(), &pixmap_paint, vertical_transform, None);
+        // canvas.save_png("ac_render.png").unwrap();
+        canvas
+    }
 
     // pub fn get_image(&mut self) -> Vec<u8> {
 
