@@ -341,7 +341,7 @@ impl World {
                 let mut runway_corner = runway.pos - (runway.dims / 2.0);
                 runway_corner[0] = runway_corner[0] - self.camera.x as f32;
                 runway_corner[1] = runway_corner[1] - self.camera.y as f32;
-                println!("runway.pos: {}, runway.dims: {}, runway_center: {}", runway.pos, runway.dims, runway_corner);
+                // println!("runway.pos: {}, runway.dims: {}, runway_center: {}", runway.pos, runway.dims, runway_corner);
     
                 let screen_center = self.screen_dims/2.0;
 
