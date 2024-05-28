@@ -36,8 +36,10 @@ pub struct World {
     pub assets_dir: PathBuf,
     pub terrain_data_dir: PathBuf,
     pub runway: Option<Runway>,
+    pub goal: Option<Vec3>,
     pub render_type: String,
-    pos_log: Vec<Vec3>
+    pos_log: Vec<Vec3>,
+    area: Vec<usize>
 }
 
 impl Default for World{
@@ -59,8 +61,10 @@ impl Default for World{
             assets_dir: [r"assets"].iter().collect(),
             terrain_data_dir: [r"terrain_data"].iter().collect(),
             runway: None,
+            goal: None,
             render_type: String::from("world"),
-            pos_log: Vec::new()
+            pos_log: Vec::new(),
+            area: vec![256, 256]
         }
     }
 
@@ -223,6 +227,8 @@ impl World {
         self.tile_map = tile_map;
         self.object_map = object_map;
 
+        self.area = terrain.area;
+
     }
 
     #[allow(dead_code)]
@@ -257,6 +263,10 @@ impl World {
         self.terrain_data_dir = terrain_data_dir;
     }
 
+    pub fn set_goal(&mut self, points: Vec3) {
+        self.goal = Some(points);
+    }
+
     pub fn create_runway(&mut self) {
         let runway = Runway::default();
         self.runway = Some(runway);
@@ -271,6 +281,7 @@ impl World {
         match self.render_type.as_str() {
             "world" => self.world_render(),
             "aircraft" => self.aircraft_render(),
+            "aircraft_fixed" => self.fixed_aircraft_render(),
             _ => {
                 println!("{} not a recognized render type, using world render", self.render_type);
                 self.world_render()  // Use world render method
@@ -468,6 +479,50 @@ impl World {
         canvas.draw_pixmap(0, 0, vertical_object.as_ref(), &pixmap_paint, vertical_transform, None);
         // canvas.save_png("ac_render.png").unwrap();
         canvas
+    }
+
+    fn fixed_aircraft_render(&mut self) -> Pixmap {
+        
+        // Setup canvas
+        let mut canvas = Pixmap::new(self.screen_dims[0] as u32, self.screen_dims[1] as u32).unwrap();
+        let pixmap_paint = PixmapPaint::default();
+        let screen_center = self.screen_dims / 2.0;
+        // let map_center = Vec2::new(self.area[0] as f32 / 2.0, self.area[1] as f32 / 2.0);
+        let scale = Vec2::new(self.screen_dims[0] / (self.area[0] as f32 * 16.0), self.screen_dims[1] / (self.area[1] as f32 * 16.0));
+        let ac_pix_x_pos = (self.camera.x as f32 * scale.x) + screen_center.x;
+        let ac_pix_y_pos = (self.camera.y as f32 * scale.y) + screen_center.y;
+        
+        // Add aircraft
+        let aircraft = &self.object_map["t67h"];
+        let heading = self.vehicles[0].attitude().euler_angles().2;
+        let aircraft_pixel_x_pos = ac_pix_x_pos - (aircraft.width() as f32 / 2.0);
+        let aircraft_pixel_y_pos= ac_pix_y_pos - (aircraft.height() as f32 / 2.0);
+        println!("camera: {}, {}", self.camera.x, self.camera.y);
+        println!("scale: {}, {}, area: {:?}", scale.x, scale.y, self.area);
+        println!("horizontal_pixel_x_pos: {}, horizontal_pixel_y_pos: {}", aircraft_pixel_x_pos, aircraft_pixel_y_pos);
+        let horizontal_transform = Transform::from_row(1.0, 0.0, 0.0, 1.0, aircraft_pixel_x_pos, aircraft_pixel_y_pos);
+        let horizontal_transform = horizontal_transform.post_rotate_at((heading as f32 * 180.0 / std::f32::consts::PI) + 90.0, aircraft_pixel_x_pos, aircraft_pixel_y_pos);
+        canvas.draw_pixmap(0, 0, aircraft.as_ref(), &pixmap_paint, horizontal_transform, None);
+
+        // Add goal if present
+        match &self.goal {
+            Some(goal) => {
+                let goal_pix_x_pos = (goal.x * scale.x) + screen_center.x;
+                let goal_pix_y_pos = (goal.y * scale.y) + screen_center.y;
+                let mut goal_paint = Paint::default();
+                goal_paint.set_color_rgba8(0, 255, 0, 200);
+                goal_paint.anti_alias = true;
+                let goal_point = PathBuilder::from_circle(
+                    goal_pix_x_pos,
+                    goal_pix_y_pos,
+                    10.0).unwrap();
+                canvas.fill_path(&goal_point, &goal_paint, FillRule::Winding, Transform::identity(), None);
+            },
+            None => ()
+        }
+
+        canvas
+
     }
 
     // pub fn get_image(&mut self) -> Vec<u8> {
