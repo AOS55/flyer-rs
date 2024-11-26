@@ -1,2 +1,60 @@
-/target
-/terrain_data
+# Rust build directory
+/target/
+
+# Cargo lock file (uncomment if this is a library)
+# Cargo.lock
+
+# Generated test images
+image.png
+image-test.png
+ac_render.png
+plot.png
+
+# Terrain data files
+/terrain_data/
+
+# IDE specific files
+.vscode/
+.idea/
+*.iml
+*.swp
+.DS_Store
+
+# Debug files
+*.pdb
+
+# Environment variables
+.env
+
+# Local development configuration
+config.local.toml
+
+# Generated documentation
+/doc/
+
+# Test coverage data
+coverage/
+*.profraw
+
+# Backup files
+*.bak
+*.backup
+*~
+
+# Log files
+*.log
+
+# Python virtual environments (if using PyO3 or other Python integrations)
+.env/
+.venv/
+env/
+venv/
+
+# Binary files
+*.exe
+*.dll
+*.so
+*.dylib
+
+# Generated assets
+/dist/

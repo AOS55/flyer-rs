@@ -1,11 +1,13 @@
-mod terrain;
 mod aircraft;
-mod world;
-mod trim;
 mod runway;
+mod terrain;
+mod trim;
+pub mod utils;
+mod world;
 
-pub use terrain::{Terrain, TerrainConfig, Tile, RandomFuncs, StaticObject};
 pub use aircraft::Aircraft;
-pub use world::{World, Camera, Settings};
-pub use trim::Trim;
 pub use runway::Runway;
+pub use terrain::{RandomFuncs, StaticObject, Terrain, TerrainConfig, Tile};
+pub use trim::Trim;
+pub use utils::AircraftError;
+pub use world::{Camera, Settings, World};
