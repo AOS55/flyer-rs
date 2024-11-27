@@ -1,5 +1,4 @@
 use glam::Vec2;
-use rayon::prelude::*;
 use std::collections::HashMap;
 use std::path::Path;
 use tiny_skia::*;
@@ -9,7 +8,7 @@ use crate::rendering::types::{RenderConfig, RenderState, RenderType};
 use crate::rendering::{TerrainRenderer, VehicleRenderer};
 use crate::utils::errors::SimError;
 use crate::vehicles::Vehicle;
-use crate::world::camera::Camera;
+use crate::world::systems::camera::Camera;
 
 pub struct Renderer {
     config: RenderConfig,

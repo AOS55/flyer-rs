@@ -1,59 +1,116 @@
+   Compiling uuid v0.8.2
    Compiling flyer-rs v0.1.0 (/Users/base_camp/Developer/PhD/Research/FlyerEnv/pyflyer-rs/flyer-rs)
-error: unmatched angle bracket
- --> src/world/state.rs:8:118
+error: unknown start of token: \
+ --> src/world/mod.rs:1:1
   |
-8 |     pub vehicles:  Vec<Box<dyn Vehicle<State = AircraftState, Controls = AircraftControls, Config = AircraftConfig>>>>,
-  |                                                                                                                      ^
-  |
-help: remove extra angle bracket
-  |
-8 -     pub vehicles:  Vec<Box<dyn Vehicle<State = AircraftState, Controls = AircraftControls, Config = AircraftConfig>>>>,
-8 +     pub vehicles:  Vec<Box<dyn Vehicle<State = AircraftState, Controls = AircraftControls, Config = AircraftConfig>>>,
-  |
+1 | \pub mod asset;
+  | ^
 
-error[E0432]: unresolved import `super::TerrainData`
- --> src/world/terrain_management.rs:2:5
-  |
-2 | use super::TerrainData;
-  |     ^^^^^^^^^^^^^^^^^^ no `TerrainData` in `world`
-  |
-help: consider importing this struct instead
-  |
-2 | use crate::environment::terrain::TerrainData;
-  |     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+error[E0432]: unresolved import `crate::world::camera`
+  --> src/rendering/renderer.rs:12:19
+   |
+12 | use crate::world::camera::Camera;
+   |                   ^^^^^^ could not find `camera` in `world`
 
-error[E0412]: cannot find type `AircraftState` in this scope
- --> src/world/state.rs:8:48
+error[E0432]: unresolved import `crate::world::camera`
+ --> src/rendering/terrain_renderer.rs:5:19
   |
-8 |     pub vehicles:  Vec<Box<dyn Vehicle<State = AircraftState, Controls = AircraftControls, Config = AircraftConfig>>>>,
-  |                                                ^^^^^^^^^^^^^ not found in this scope
-  |
-help: consider importing this struct through its public re-export
-  |
-1 + use crate::AircraftState;
-  |
+5 | use crate::world::camera::Camera;
+  |                   ^^^^^^ could not find `camera` in `world`
 
-error[E0412]: cannot find type `AircraftControls` in this scope
- --> src/world/state.rs:8:74
-  |
-8 |     pub vehicles:  Vec<Box<dyn Vehicle<State = AircraftState, Controls = AircraftControls, Config = AircraftConfig>>>>,
-  |                                                                          ^^^^^^^^^^^^^^^^ not found in this scope
-  |
-help: consider importing this struct through its public re-export
-  |
-1 + use crate::AircraftControls;
-  |
+error[E0432]: unresolved import `crate::world::camera`
+  --> src/rendering/vehicle_renderer.rs:11:19
+   |
+11 | use crate::world::camera::Camera;
+   |                   ^^^^^^ could not find `camera` in `world`
 
-error[E0412]: cannot find type `AircraftConfig` in this scope
- --> src/world/state.rs:8:101
+error[E0432]: unresolved import `crate::vehicles::traits`
+ --> src/world/core/state.rs:9:22
   |
-8 |     pub vehicles:  Vec<Box<dyn Vehicle<State = AircraftState, Controls = AircraftControls, Config = AircraftConfig>>>>,
-  |                                                                                                     ^^^^^^^^^^^^^^ not found in this scope
+9 | use crate::vehicles::traits::Vehicle;
+  |                      ^^^^^^ could not find `traits` in `vehicles`
+
+error[E0432]: unresolved imports `vehicles::aircraft::AircraftControls`, `vehicles::traits`
+  --> src/lib.rs:28:32
+   |
+28 |     aircraft::{AircraftConfig, AircraftControls, AircraftState},
+   |                                ^^^^^^^^^^^^^^^^
+   |                                |
+   |                                no `AircraftControls` in `vehicles::aircraft`
+   |                                help: a similar name exists in the module: `AircraftConfig`
+29 |     traits::{Controls, Vehicle, VehicleState},
+   |     ^^^^^^ could not find `traits` in `vehicles`
+   |
+note: struct `crate::vehicles::aircraft::state::AircraftControls` exists but is inaccessible
+  --> src/vehicles/aircraft/state.rs:17:1
+   |
+17 | pub struct AircraftControls {
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^ not accessible
+
+error[E0433]: failed to resolve: unresolved import
+ --> src/world/core/state.rs:7:12
   |
-help: consider importing this struct through its public re-export
-  |
-1 + use crate::AircraftConfig;
-  |
+7 | use crate::systems::camera::Camera;
+  |            ^^^^^^^
+  |            |
+  |            unresolved import
+  |            help: a similar path exists: `world::systems`
+
+error[E0432]: unresolved imports `world::settings`, `world::state`, `world::traits`
+  --> src/lib.rs:33:5
+   |
+33 |     settings::SimulationSettings,
+   |     ^^^^^^^^ could not find `settings` in `world`
+34 |     state::WorldState,
+   |     ^^^^^ could not find `state` in `world`
+35 |     traits::{World, WorldSettings},
+   |     ^^^^^^ could not find `traits` in `world`
+
+error[E0412]: cannot find type `Result` in module `crate::utils::errors`
+  --> src/world/core/mod.rs:13:60
+   |
+13 |     fn update(&mut self, dt: f64) -> crate::utils::errors::Result<()>;
+   |                                                            ^^^^^^ not found in `crate::utils::errors`
+   |
+help: consider importing one of these items
+   |
+4  + use std::fmt::Result;
+   |
+4  + use std::io::Result;
+   |
+4  + use std::result::Result;
+   |
+4  + use std::thread::Result;
+   |
+     and 4 other candidates
+help: if you import `Result`, refer to it directly
+   |
+13 -     fn update(&mut self, dt: f64) -> crate::utils::errors::Result<()>;
+13 +     fn update(&mut self, dt: f64) -> Result<()>;
+   |
+
+error[E0412]: cannot find type `Result` in module `crate::utils::errors`
+  --> src/world/core/mod.rs:22:32
+   |
+22 |     ) -> crate::utils::errors::Result<()>;
+   |                                ^^^^^^ not found in `crate::utils::errors`
+   |
+help: consider importing one of these items
+   |
+4  + use std::fmt::Result;
+   |
+4  + use std::io::Result;
+   |
+4  + use std::result::Result;
+   |
+4  + use std::thread::Result;
+   |
+     and 4 other candidates
+help: if you import `Result`, refer to it directly
+   |
+22 -     ) -> crate::utils::errors::Result<()>;
+22 +     ) -> Result<()>;
+   |
 
 warning: unused imports: `NoiseFn` and `OpenSimplex`
  --> src/environment/terrain/generator.rs:4:13
@@ -63,886 +120,19 @@ warning: unused imports: `NoiseFn` and `OpenSimplex`
   |
   = note: `#[warn(unused_imports)]` on by default
 
-warning: unused import: `AeroEffect`
- --> src/physics/traits.rs:4:13
-  |
-4 | use aerso::{AeroEffect, AirState}; // Import necessary types
-  |             ^^^^^^^^^^
-
 warning: unused import: `Transform`
  --> src/rendering/vehicle_renderer.rs:2:16
   |
 2 | use nalgebra::{Transform, Vector3};
   |                ^^^^^^^^^
 
-warning: unused import: `VehicleState`
-  --> src/rendering/vehicle_renderer.rs:10:32
-   |
-10 | use crate::vehicles::{Vehicle, VehicleState};
-   |                                ^^^^^^^^^^^^
-
-warning: unused imports: `Aerodynamics`, `Inertia`, and `PowerPlant`
-  --> src/vehicles/aircraft/mod.rs:11:26
-   |
-11 | pub(crate) use systems::{Aerodynamics, Inertia, PowerPlant};
-   |                          ^^^^^^^^^^^^  ^^^^^^^  ^^^^^^^^^^
-
-warning: unused import: `std::collections::HashMap`
- --> src/world/state.rs:5:5
+warning: unused import: `LoadableAsset`
+ --> src/world/systems/terrain.rs:4:41
   |
-5 | use std::collections::HashMap;
-  |     ^^^^^^^^^^^^^^^^^^^^^^^^^
-
-warning: unused import: `Runway`
- --> src/world/traits.rs:1:26
-  |
-1 | use crate::environment::{Runway, Terrain};
-  |                          ^^^^^^
-
-warning: unused imports: `Runway` and `TerrainConfig`
-  --> src/world/mod.rs:14:26
-   |
-14 | use crate::environment::{Runway, Terrain, TerrainConfig};
-   |                          ^^^^^^           ^^^^^^^^^^^^^
-
-warning: unused import: `crate::rendering::RenderType`
-  --> src/world/mod.rs:15:5
-   |
-15 | use crate::rendering::RenderType;
-   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-error[E0191]: the value of the associated types `State` and `Parameters` in `PhysicsModel` must be specified
-  --> src/vehicles/traits.rs:13:46
-   |
-13 |     fn update_state(&mut self, physics: &dyn PhysicsModel);
-   |                                              ^^^^^^^^^^^^ help: specify the associated types: `PhysicsModel<State = Type, Parameters = Type>`
-   |
-  ::: src/physics/traits.rs:7:5
-   |
-7  |     type State;
-   |     ---------- `State` defined here
-8  |     type Parameters;
-   |     --------------- `Parameters` defined here
-
-error[E0191]: the value of the associated types `Controls`, `State` and `Config` in `Vehicle` must be specified
- --> src/world/traits.rs:8:48
-  |
-8 |     fn add_vehicle(&mut self, vehicle: Box<dyn Vehicle>);
-  |                                                ^^^^^^^ help: specify the associated types: `Vehicle<State = Type, Controls = Type, Config = Type>`
-  |
- ::: src/vehicles/traits.rs:6:5
-  |
-6 |     type State;
-  |     ---------- `State` defined here
-7 |     type Controls;
-  |     ------------- `Controls` defined here
-8 |     type Config;
-  |     ----------- `Config` defined here
-
-error[E0191]: the value of the associated types `Controls`, `State` and `Config` in `Vehicle` must be specified
- --> src/world/traits.rs:9:51
-  |
-9 |     fn update_vehicle(&mut self, vehicle: Box<dyn Vehicle>, id: usize);
-  |                                                   ^^^^^^^ help: specify the associated types: `Vehicle<State = Type, Controls = Type, Config = Type>`
-  |
- ::: src/vehicles/traits.rs:6:5
-  |
-6 |     type State;
-  |     ---------- `State` defined here
-7 |     type Controls;
-  |     ------------- `Controls` defined here
-8 |     type Config;
-  |     ----------- `Config` defined here
-
-error[E0277]: the trait bound `Box<(dyn aerso::WindModel + 'static)>: aerso::WindModel` is not satisfied
-  --> src/physics/aerso/adapter.rs:16:16
-   |
-16 |     aero_body: AffectedBody<Vec<f64>, f64, Box<dyn WindModel<f64>>, Box<dyn DensityModel<f64>>>,
-   |                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ the trait `aerso::WindModel` is not implemented for `Box<(dyn aerso::WindModel + 'static)>`
-   |
-   = help: the following other types implement trait `aerso::WindModel<T>`:
-             LogWind<T>
-             PowerWind<T>
-             aerso::wind_models::ConstantWind<T>
-note: required by a bound in `aerso::AffectedBody`
-  --> /Users/base_camp/.cargo/git/checkouts/aerso-eaee7f985c87ed74/9f726de/src/effectors.rs:25:84
-   |
-25 | ...tRepr>, T: Float = DefaultFloatRepr, W: WindModel<T> = ConstantWind<T>, D: DensityModel<T> = StandardDensity> {
-   |                                            ^^^^^^^^^^^^ required by this bound in `AffectedBody`
-
-error[E0277]: the trait bound `Box<(dyn DensityModel + 'static)>: DensityModel` is not satisfied
-  --> src/physics/aerso/adapter.rs:16:16
-   |
-16 |     aero_body: AffectedBody<Vec<f64>, f64, Box<dyn WindModel<f64>>, Box<dyn DensityModel<f64>>>,
-   |                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ the trait `DensityModel` is not implemented for `Box<(dyn DensityModel + 'static)>`
-   |
-   = help: the following other types implement trait `DensityModel<T>`:
-             ConstantDensity
-             StandardDensity
-note: required by a bound in `aerso::AffectedBody`
-  --> /Users/base_camp/.cargo/git/checkouts/aerso-eaee7f985c87ed74/9f726de/src/effectors.rs:25:119
-   |
-25 | ... W: WindModel<T> = ConstantWind<T>, D: DensityModel<T> = StandardDensity> {
-   |                                           ^^^^^^^^^^^^^^^ required by this bound in `AffectedBody`
-
-error[E0046]: not all trait items implemented, missing: `get_timestep`
-  --> src/physics/aerso/adapter.rs:24:1
-   |
-24 | impl PhysicsModel for AersoPhysics {
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ missing `get_timestep` in implementation
-   |
-  ::: src/physics/traits.rs:14:5
-   |
-14 |     fn get_timestep(&self) -> f64;
-   |     ------------------------------ `get_timestep` from trait
-
-error[E0191]: the value of the associated types `Controls`, `State` and `Config` in `Vehicle` must be specified
-  --> src/rendering/renderer.rs:67:29
-   |
-67 |         vehicles: &[Box<dyn Vehicle>],
-   |                             ^^^^^^^ help: specify the associated types: `Vehicle<State = Type, Controls = Type, Config = Type>`
-   |
-  ::: src/vehicles/traits.rs:6:5
-   |
-6  |     type State;
-   |     ---------- `State` defined here
-7  |     type Controls;
-   |     ------------- `Controls` defined here
-8  |     type Config;
-   |     ----------- `Config` defined here
-
-error[E0191]: the value of the associated types `Controls`, `State` and `Config` in `Vehicle` must be specified
-  --> src/rendering/renderer.rs:80:29
-   |
-80 |         vehicles: &[Box<dyn Vehicle>],
-   |                             ^^^^^^^ help: specify the associated types: `Vehicle<State = Type, Controls = Type, Config = Type>`
-   |
-  ::: src/vehicles/traits.rs:6:5
-   |
-6  |     type State;
-   |     ---------- `State` defined here
-7  |     type Controls;
-   |     ------------- `Controls` defined here
-8  |     type Config;
-   |     ----------- `Config` defined here
-
-error[E0191]: the value of the associated types `Controls`, `State` and `Config` in `Vehicle` must be specified
-   --> src/rendering/renderer.rs:104:29
-    |
-104 |         vehicles: &[Box<dyn Vehicle>],
-    |                             ^^^^^^^ help: specify the associated types: `Vehicle<State = Type, Controls = Type, Config = Type>`
-    |
-   ::: src/vehicles/traits.rs:6:5
-    |
-6   |     type State;
-    |     ---------- `State` defined here
-7   |     type Controls;
-    |     ------------- `Controls` defined here
-8   |     type Config;
-    |     ----------- `Config` defined here
-
-error[E0191]: the value of the associated types `Controls`, `State` and `Config` in `Vehicle` must be specified
-   --> src/rendering/renderer.rs:141:29
-    |
-141 |         vehicles: &[Box<dyn Vehicle>],
-    |                             ^^^^^^^ help: specify the associated types: `Vehicle<State = Type, Controls = Type, Config = Type>`
-    |
-   ::: src/vehicles/traits.rs:6:5
-    |
-6   |     type State;
-    |     ---------- `State` defined here
-7   |     type Controls;
-    |     ------------- `Controls` defined here
-8   |     type Config;
-    |     ----------- `Config` defined here
-
-error[E0191]: the value of the associated types `Controls`, `State` and `Config` in `Vehicle` must be specified
-  --> src/rendering/vehicle_renderer.rs:79:29
-   |
-79 |         vehicles: &[Box<dyn Vehicle>],
-   |                             ^^^^^^^ help: specify the associated types: `Vehicle<State = Type, Controls = Type, Config = Type>`
-   |
-  ::: src/vehicles/traits.rs:6:5
-   |
-6  |     type State;
-   |     ---------- `State` defined here
-7  |     type Controls;
-   |     ------------- `Controls` defined here
-8  |     type Config;
-   |     ----------- `Config` defined here
-
-error[E0191]: the value of the associated types `Controls`, `State` and `Config` in `Vehicle` must be specified
-  --> src/rendering/vehicle_renderer.rs:95:29
-   |
-95 |         vehicles: &[Box<dyn Vehicle>],
-   |                             ^^^^^^^ help: specify the associated types: `Vehicle<State = Type, Controls = Type, Config = Type>`
-   |
-  ::: src/vehicles/traits.rs:6:5
-   |
-6  |     type State;
-   |     ---------- `State` defined here
-7  |     type Controls;
-   |     ------------- `Controls` defined here
-8  |     type Config;
-   |     ----------- `Config` defined here
-
-error[E0191]: the value of the associated types `Controls`, `State` and `Config` in `Vehicle` must be specified
-   --> src/rendering/vehicle_renderer.rs:148:29
-    |
-148 |         vehicles: &[Box<dyn Vehicle>],
-    |                             ^^^^^^^ help: specify the associated types: `Vehicle<State = Type, Controls = Type, Config = Type>`
-    |
-   ::: src/vehicles/traits.rs:6:5
-    |
-6   |     type State;
-    |     ---------- `State` defined here
-7   |     type Controls;
-    |     ------------- `Controls` defined here
-8   |     type Config;
-    |     ----------- `Config` defined here
-
-error[E0191]: the value of the associated types `Controls`, `State` and `Config` in `Vehicle` must be specified
-   --> src/rendering/vehicle_renderer.rs:248:29
-    |
-248 |         vehicles: &[Box<dyn Vehicle>],
-    |                             ^^^^^^^ help: specify the associated types: `Vehicle<State = Type, Controls = Type, Config = Type>`
-    |
-   ::: src/vehicles/traits.rs:6:5
-    |
-6   |     type State;
-    |     ---------- `State` defined here
-7   |     type Controls;
-    |     ------------- `Controls` defined here
-8   |     type Config;
-    |     ----------- `Config` defined here
-
-error[E0191]: the value of the associated types `State` and `Parameters` in `PhysicsModel` must be specified
-  --> src/vehicles/aircraft/aircraft.rs:93:46
-   |
-93 |     fn update_state(&mut self, physics: &dyn PhysicsModel) {
-   |                                              ^^^^^^^^^^^^ help: specify the associated types: `PhysicsModel<State = Type, Parameters = Type>`
-   |
-  ::: src/physics/traits.rs:7:5
-   |
-7  |     type State;
-   |     ---------- `State` defined here
-8  |     type Parameters;
-   |     --------------- `Parameters` defined here
-
-error[E0191]: the value of the associated types `Controls`, `State` and `Config` in `Vehicle` must be specified
-  --> src/world/world_core.rs:24:52
-   |
-24 |     pub fn add_vehicle(&mut self, vehicle: Box<dyn Vehicle>) {
-   |                                                    ^^^^^^^ help: specify the associated types: `Vehicle<State = Type, Controls = Type, Config = Type>`
-   |
-  ::: src/vehicles/traits.rs:6:5
-   |
-6  |     type State;
-   |     ---------- `State` defined here
-7  |     type Controls;
-   |     ------------- `Controls` defined here
-8  |     type Config;
-   |     ----------- `Config` defined here
-
-error[E0191]: the value of the associated types `Controls`, `State` and `Config` in `Vehicle` must be specified
-  --> src/world/world_core.rs:28:55
-   |
-28 |     pub fn update_vehicle(&mut self, vehicle: Box<dyn Vehicle>, id: usize) {
-   |                                                       ^^^^^^^ help: specify the associated types: `Vehicle<State = Type, Controls = Type, Config = Type>`
-   |
-  ::: src/vehicles/traits.rs:6:5
-   |
-6  |     type State;
-   |     ---------- `State` defined here
-7  |     type Controls;
-   |     ------------- `Controls` defined here
-8  |     type Config;
-   |     ----------- `Config` defined here
-
-error[E0599]: no method named `load_tile_assets` found for struct `TerrainGenerator` in the current scope
-  --> src/environment/terrain/mod.rs:57:34
-   |
-57 |         let tile_map = generator.load_tile_assets(&assets_dir);
-   |                                  ^^^^^^^^^^^^^^^^
-   |
-  ::: src/environment/terrain/generator.rs:19:1
-   |
-19 | pub struct TerrainGenerator {
-   | --------------------------- method `load_tile_assets` not found for this struct
-   |
-help: there is a method `load_assets` with a similar name
-   |
-57 |         let tile_map = generator.load_assets(&assets_dir);
-   |                                  ~~~~~~~~~~~
-
-error[E0599]: no method named `load_object_assets` found for struct `TerrainGenerator` in the current scope
-  --> src/environment/terrain/mod.rs:58:36
-   |
-58 |         let object_map = generator.load_object_assets(&assets_dir);
-   |                                    ^^^^^^^^^^^^^^^^^^
-   |
-  ::: src/environment/terrain/generator.rs:19:1
-   |
-19 | pub struct TerrainGenerator {
-   | --------------------------- method `load_object_assets` not found for this struct
-   |
-help: there is a method `load_assets` with a similar name
-   |
-58 |         let object_map = generator.load_assets(&assets_dir);
-   |                                    ~~~~~~~~~~~
-
-error[E0616]: field `area` of struct `TerrainGenerator` is private
-  --> src/environment/terrain/mod.rs:70:24
-   |
-70 |         self.generator.area[0]
-   |                        ^^^^ private field
-
-error[E0616]: field `area` of struct `TerrainGenerator` is private
-  --> src/environment/terrain/mod.rs:74:24
-   |
-74 |         self.generator.area[1]
-   |                        ^^^^ private field
-
-error[E0599]: no method named `create_aerodynamics` found for struct `AersoConfig` in the current scope
-  --> src/physics/aerso/adapter.rs:30:27
-   |
-30 |         let aero = params.create_aerodynamics()?;
-   |                           ^^^^^^^^^^^^^^^^^^^ method not found in `AersoConfig`
-   |
-  ::: src/physics/aerso/config.rs:9:1
-   |
-9  | pub struct AersoConfig {
-   | ---------------------- method `create_aerodynamics` not found for this struct
-
-error[E0599]: no method named `create_powerplant` found for struct `AersoConfig` in the current scope
-  --> src/physics/aerso/adapter.rs:31:28
-   |
-31 |         let power = params.create_powerplant()?;
-   |                            ^^^^^^^^^^^^^^^^^ method not found in `AersoConfig`
-   |
-  ::: src/physics/aerso/config.rs:9:1
-   |
-9  | pub struct AersoConfig {
-   | ---------------------- method `create_powerplant` not found for this struct
-
-error[E0308]: `match` arms have incompatible types
-  --> src/physics/aerso/adapter.rs:49:18
-   |
-42 |           let wind_model = Box::new(match params.wind_model {
-   |  ___________________________________-
-43 | |             WindModelConfig::Constant(wind) => ConstantWind::new(wind),
-   | |                                                ----------------------- this is found to be of type `aerso::wind_models::ConstantWind<f64>`
-44 | |             WindModelConfig::LogWind {
-45 | |                 d,
-...  |
-49 | |             } => Box::new(LogWind::new(d, z0, u_star, bearing)),
-   | |                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ expected `ConstantWind<f64>`, found `Box<LogWind<f64>>`
-...  |
-55 | |             } => Box::new(PowerWind::new_with_alpha(u_r, z_r, bearing, alpha)),
-56 | |         });
-   | |_________- `match` arms have incompatible types
-   |
-   = note: expected struct `aerso::wind_models::ConstantWind<f64>`
-              found struct `Box<LogWind<f64>>`
-
-error[E0560]: struct `aerso::AffectedBody<_, f64, aerso::wind_models::ConstantWind<f64>, ConstantDensity>` has no field named `wind_model`
-  --> src/physics/aerso/adapter.rs:66:13
-   |
-66 |             wind_model,
-   |             ^^^^^^^^^^ `aerso::AffectedBody<_, _, _, _>` does not have this field
-   |
-   = note: all struct fields are already assigned
-
-error[E0560]: struct `aerso::AffectedBody<_, f64, aerso::wind_models::ConstantWind<f64>, ConstantDensity>` has no field named `density_model`
-  --> src/physics/aerso/adapter.rs:67:13
-   |
-67 |             density_model,
-   |             ^^^^^^^^^^^^^ `aerso::AffectedBody<_, _, _, _>` does not have this field
-   |
-   = note: all struct fields are already assigned
-
-error[E0277]: the trait bound `Box<(dyn aerso::WindModel + 'static)>: aerso::WindModel` is not satisfied
-  --> src/physics/aerso/adapter.rs:71:13
-   |
-71 |             aero_body,
-   |             ^^^^^^^^^ the trait `aerso::WindModel` is not implemented for `Box<(dyn aerso::WindModel + 'static)>`
-   |
-   = help: the following other types implement trait `aerso::WindModel<T>`:
-             LogWind<T>
-             PowerWind<T>
-             aerso::wind_models::ConstantWind<T>
-note: required by a bound in `aerso::AffectedBody`
-  --> /Users/base_camp/.cargo/git/checkouts/aerso-eaee7f985c87ed74/9f726de/src/effectors.rs:25:84
-   |
-25 | ...tRepr>, T: Float = DefaultFloatRepr, W: WindModel<T> = ConstantWind<T>, D: DensityModel<T> = StandardDensity> {
-   |                                            ^^^^^^^^^^^^ required by this bound in `AffectedBody`
-
-error[E0277]: the trait bound `Box<(dyn DensityModel + 'static)>: DensityModel` is not satisfied
-  --> src/physics/aerso/adapter.rs:71:13
-   |
-71 |             aero_body,
-   |             ^^^^^^^^^ the trait `DensityModel` is not implemented for `Box<(dyn DensityModel + 'static)>`
-   |
-   = help: the following other types implement trait `DensityModel<T>`:
-             ConstantDensity
-             StandardDensity
-note: required by a bound in `aerso::AffectedBody`
-  --> /Users/base_camp/.cargo/git/checkouts/aerso-eaee7f985c87ed74/9f726de/src/effectors.rs:25:119
-   |
-25 | ... W: WindModel<T> = ConstantWind<T>, D: DensityModel<T> = StandardDensity> {
-   |                                           ^^^^^^^^^^^^^^^ required by this bound in `AffectedBody`
-
-error[E0308]: mismatched types
-  --> src/physics/aerso/adapter.rs:71:13
-   |
-71 |             aero_body,
-   |             ^^^^^^^^^ expected `AffectedBody<Vec<...>, ..., ..., ...>`, found `AffectedBody<_, f64, ..., ...>`
-   |
-   = note: expected struct `aerso::AffectedBody<Vec<f64>, _, Box<(dyn aerso::WindModel + 'static)>, Box<(dyn DensityModel + 'static)>>`
-              found struct `aerso::AffectedBody<_, _, aerso::wind_models::ConstantWind<f64>, ConstantDensity>`
-
-error[E0599]: the method `set_state` exists for struct `AffectedBody<Vec<f64>, f64, Box<dyn WindModel>, Box<dyn DensityModel>>`, but its trait bounds were not satisfied
-   --> src/physics/aerso/adapter.rs:83:24
-    |
-83  |           self.aero_body.set_state(aerso_state.into());
-    |                          ^^^^^^^^^ method cannot be called due to unsatisfied trait bounds
-    |
-   ::: /Users/base_camp/.rustup/toolchains/stable-x86_64-apple-darwin/lib/rustlib/src/rust/library/alloc/src/boxed.rs:235:1
-    |
-235 | / pub struct Box<
-236 | |     T: ?Sized,
-237 | |     #[unstable(feature = "allocator_api", issue = "32838")] A: Allocator = Global,
-238 | | >(Unique<T>, A);
-    | |_- doesn't satisfy `Box<(dyn DensityModel + 'static)>: DensityModel` or `_: WindModel`
-    |
-    = note: the following trait bounds were not satisfied:
-            `Box<(dyn aerso::WindModel + 'static)>: aerso::WindModel`
-            `Box<(dyn DensityModel + 'static)>: DensityModel`
-
-error[E0277]: the trait bound `AersoState: From<&mut dyn vehicles::traits::VehicleState>` is not satisfied
-  --> src/physics/aerso/adapter.rs:80:45
-   |
-80 |         let aerso_state: AersoState = state.into();
-   |                                             ^^^^ the trait `From<&mut dyn vehicles::traits::VehicleState>` is not implemented for `AersoState`, which is required by `&mut dyn vehicles::traits::VehicleState: Into<_>`
-   |
-   = help: the trait `From<&AircraftState>` is implemented for `AersoState`
-   = note: required for `&mut dyn vehicles::traits::VehicleState` to implement `Into<AersoState>`
-
-error[E0599]: the method `step` exists for struct `AffectedBody<Vec<f64>, f64, Box<dyn WindModel>, Box<dyn DensityModel>>`, but its trait bounds were not satisfied
-   --> src/physics/aerso/adapter.rs:89:24
-    |
-89  |           self.aero_body.step(dt, &controls);
-    |                          ^^^^ method cannot be called due to unsatisfied trait bounds
-    |
-   ::: /Users/base_camp/.rustup/toolchains/stable-x86_64-apple-darwin/lib/rustlib/src/rust/library/alloc/src/boxed.rs:235:1
-    |
-235 | / pub struct Box<
-236 | |     T: ?Sized,
-237 | |     #[unstable(feature = "allocator_api", issue = "32838")] A: Allocator = Global,
-238 | | >(Unique<T>, A);
-    | |_- doesn't satisfy `Box<(dyn DensityModel + 'static)>: DensityModel` or `_: WindModel`
-    |
-    = note: the following trait bounds were not satisfied:
-            `Box<(dyn aerso::WindModel + 'static)>: aerso::WindModel`
-            `Box<(dyn DensityModel + 'static)>: DensityModel`
-    = help: items from traits can only be used if the trait is implemented and in scope
-    = note: the following traits define an item `step`, perhaps you need to implement one of them:
-            candidate #1: `PhysicsModel`
-            candidate #2: `world::traits::World`
-
-error[E0599]: the method `acceleration` exists for struct `AffectedBody<Vec<f64>, f64, Box<dyn WindModel>, Box<dyn DensityModel>>`, but its trait bounds were not satisfied
-   --> src/physics/aerso/adapter.rs:93:52
-    |
-93  |           self.cached_accelerations = self.aero_body.acceleration();
-    |                                                      ^^^^^^^^^^^^ method cannot be called due to unsatisfied trait bounds
-    |
-   ::: /Users/base_camp/.rustup/toolchains/stable-x86_64-apple-darwin/lib/rustlib/src/rust/library/alloc/src/boxed.rs:235:1
-    |
-235 | / pub struct Box<
-236 | |     T: ?Sized,
-237 | |     #[unstable(feature = "allocator_api", issue = "32838")] A: Allocator = Global,
-238 | | >(Unique<T>, A);
-    | |_- doesn't satisfy `Box<dyn DensityModel>: DensityModel` or `Box<dyn aerso::WindModel>: aerso::WindModel`
-    |
-    = note: the following trait bounds were not satisfied:
-            `Box<dyn aerso::WindModel>: aerso::WindModel`
-            `Box<dyn DensityModel>: DensityModel`
-
-error[E0599]: the method `get_airstate` exists for struct `AffectedBody<Vec<f64>, f64, Box<dyn WindModel>, Box<dyn DensityModel>>`, but its trait bounds were not satisfied
-   --> src/physics/aerso/adapter.rs:121:24
-    |
-121 |           self.aero_body.get_airstate()
-    |                          ^^^^^^^^^^^^ method cannot be called due to unsatisfied trait bounds
-    |
-   ::: /Users/base_camp/.rustup/toolchains/stable-x86_64-apple-darwin/lib/rustlib/src/rust/library/alloc/src/boxed.rs:235:1
-    |
-235 | / pub struct Box<
-236 | |     T: ?Sized,
-237 | |     #[unstable(feature = "allocator_api", issue = "32838")] A: Allocator = Global,
-238 | | >(Unique<T>, A);
-    | |_- doesn't satisfy `Box<dyn DensityModel>: DensityModel` or `Box<dyn aerso::WindModel>: aerso::WindModel`
-    |
-    = note: the following trait bounds were not satisfied:
-            `Box<dyn aerso::WindModel>: aerso::WindModel`
-            `Box<dyn DensityModel>: DensityModel`
-
-error[E0599]: no method named `downcast_mut` found for mutable reference `&mut dyn vehicles::traits::VehicleState` in the current scope
-   --> src/physics/aerso/adapter.rs:137:45
-    |
-137 |         if let Some(aircraft_state) = state.downcast_mut::<AircraftState>() {
-    |                                             ^^^^^^^^^^^^ method not found in `&mut dyn VehicleState`
-
-error[E0599]: no method named `position` found for struct `aerso::AffectedBody` in the current scope
-   --> src/physics/aerso/adapter.rs:138:54
-    |
-138 |             aircraft_state.position = self.aero_body.position();
-    |                                                      ^^^^^^^^ method not found in `AffectedBody<Vec<f64>, f64, Box<dyn WindModel>, Box<dyn DensityModel>>`
-    |
-    = help: items from traits can only be used if the trait is implemented and in scope
-note: `vehicles::traits::VehicleState` defines an item `position`, perhaps you need to implement it
-   --> src/vehicles/traits.rs:19:1
-    |
-19  | pub trait VehicleState {
-    | ^^^^^^^^^^^^^^^^^^^^^^
-
-error[E0599]: no method named `velocity` found for struct `aerso::AffectedBody` in the current scope
-   --> src/physics/aerso/adapter.rs:139:54
-    |
-139 |             aircraft_state.velocity = self.aero_body.velocity();
-    |                                                      ^^^^^^^^ method not found in `AffectedBody<Vec<f64>, f64, Box<dyn WindModel>, Box<dyn DensityModel>>`
-    |
-    = help: items from traits can only be used if the trait is implemented and in scope
-note: `vehicles::traits::VehicleState` defines an item `velocity`, perhaps you need to implement it
-   --> src/vehicles/traits.rs:19:1
-    |
-19  | pub trait VehicleState {
-    | ^^^^^^^^^^^^^^^^^^^^^^
-
-error[E0599]: no method named `attitude` found for struct `aerso::AffectedBody` in the current scope
-   --> src/physics/aerso/adapter.rs:140:54
-    |
-140 |             aircraft_state.attitude = self.aero_body.attitude();
-    |                                                      ^^^^^^^^ method not found in `AffectedBody<Vec<f64>, f64, Box<dyn WindModel>, Box<dyn DensityModel>>`
-    |
-    = help: items from traits can only be used if the trait is implemented and in scope
-note: `vehicles::traits::VehicleState` defines an item `attitude`, perhaps you need to implement it
-   --> src/vehicles/traits.rs:19:1
-    |
-19  | pub trait VehicleState {
-    | ^^^^^^^^^^^^^^^^^^^^^^
-
-error[E0599]: no method named `rates` found for struct `aerso::AffectedBody` in the current scope
-   --> src/physics/aerso/adapter.rs:141:51
-    |
-141 |             aircraft_state.rates = self.aero_body.rates();
-    |                                                   ^^^^^ method not found in `AffectedBody<Vec<f64>, f64, Box<dyn WindModel>, Box<dyn DensityModel>>`
-    |
-    = help: items from traits can only be used if the trait is implemented and in scope
-note: `vehicles::traits::VehicleState` defines an item `rates`, perhaps you need to implement it
-   --> src/vehicles/traits.rs:19:1
-    |
-19  | pub trait VehicleState {
-    | ^^^^^^^^^^^^^^^^^^^^^^
-
-error[E0599]: the method `get_airstate` exists for struct `AffectedBody<Vec<f64>, f64, Box<dyn WindModel>, Box<dyn DensityModel>>`, but its trait bounds were not satisfied
-   --> src/physics/aerso/adapter.rs:144:43
-    |
-144 |               let airstate = self.aero_body.get_airstate();
-    |                                             ^^^^^^^^^^^^ method cannot be called due to unsatisfied trait bounds
-    |
-   ::: /Users/base_camp/.rustup/toolchains/stable-x86_64-apple-darwin/lib/rustlib/src/rust/library/alloc/src/boxed.rs:235:1
-    |
-235 | / pub struct Box<
-236 | |     T: ?Sized,
-237 | |     #[unstable(feature = "allocator_api", issue = "32838")] A: Allocator = Global,
-238 | | >(Unique<T>, A);
-    | |_- doesn't satisfy `Box<dyn DensityModel>: DensityModel` or `Box<dyn aerso::WindModel>: aerso::WindModel`
-    |
-    = note: the following trait bounds were not satisfied:
-            `Box<dyn aerso::WindModel>: aerso::WindModel`
-            `Box<dyn DensityModel>: DensityModel`
-
-error[E0599]: no method named `get_runway` found for reference `&Terrain` in the current scope
-  --> src/rendering/renderer.rs:91:39
-   |
-91 |         if let Some(runway) = terrain.get_runway() {
-   |                                       ^^^^^^^^^^ method not found in `&Terrain`
-
-error[E0599]: no method named `render_runway` found for mutable reference `&mut renderer::Renderer` in the current scope
-  --> src/rendering/renderer.rs:92:18
-   |
-92 |             self.render_runway(&mut canvas, runway, camera)?;
-   |                  ^^^^^^^^^^^^^ method not found in `&mut Renderer`
-
-error[E0599]: no method named `draw_aircraft_views` found for mutable reference `&mut renderer::Renderer` in the current scope
-   --> src/rendering/renderer.rs:133:18
-    |
-133 |             self.draw_aircraft_views(&mut canvas, vehicle, horizontal_center, vertical_center)?;
-    |                  ^^^^^^^^^^^^^^^^^^^ method not found in `&mut Renderer`
-
-error[E0599]: no method named `get_area` found for struct `terrain_renderer::TerrainRenderer` in the current scope
-   --> src/rendering/renderer.rs:154:64
-    |
-154 |             self.config.screen_dims.x / (self.terrain_renderer.get_area()[0] as f32 * 16.0),
-    |                                                                ^^^^^^^^ method not found in `TerrainRenderer`
-    |
-   ::: src/rendering/terrain_renderer.rs:14:1
-    |
-14  | pub struct TerrainRenderer {
-    | -------------------------- method `get_area` not found for this struct
-
-error[E0599]: no method named `get_area` found for struct `terrain_renderer::TerrainRenderer` in the current scope
-   --> src/rendering/renderer.rs:155:64
-    |
-155 |             self.config.screen_dims.y / (self.terrain_renderer.get_area()[1] as f32 * 16.0),
-    |                                                                ^^^^^^^^ method not found in `TerrainRenderer`
-    |
-   ::: src/rendering/terrain_renderer.rs:14:1
-    |
-14  | pub struct TerrainRenderer {
-    | -------------------------- method `get_area` not found for this struct
-
-error[E0599]: no method named `draw_fixed_aircraft` found for mutable reference `&mut renderer::Renderer` in the current scope
-   --> src/rendering/renderer.rs:160:18
-    |
-160 |             self.draw_fixed_aircraft(&mut canvas, vehicle, camera, screen_center, scale)?;
-    |                  ^^^^^^^^^^^^^^^^^^^
-    |
-help: there is a method `render_fixed_aircraft` with a similar name, but with different arguments
-   --> src/rendering/renderer.rs:139:5
-    |
-139 | /     fn render_fixed_aircraft(
-140 | |         &mut self,
-141 | |         vehicles: &[Box<dyn Vehicle>],
-142 | |         camera: &Camera,
-143 | |     ) -> Result<Pixmap, SimError> {
-    | |_________________________________^
-
-error[E0609]: no field `goal` on type `RenderState`
-   --> src/rendering/renderer.rs:164:40
-    |
-164 |         if let Some(goal) = self.state.goal {
-    |                                        ^^^^ unknown field
-    |
-    = note: available fields are: `origin`, `canvas`, `asset_map`
-
-error[E0609]: no field `camera` on type `&renderer::Renderer`
-   --> src/rendering/renderer.rs:232:65
-    |
-232 |             let horizontal_path_x = horizontal_center.x - (self.camera.y as f32 - pos[1]);
-    |                                                                 ^^^^^^ unknown field
-    |
-    = note: available fields are: `config`, `state`, `terrain_renderer`, `vehicle_renderer`, `position_log`
-
-error[E0609]: no field `camera` on type `&renderer::Renderer`
-   --> src/rendering/renderer.rs:233:74
-    |
-233 |             let horizontal_path_y = horizontal_center.y - (pos[0] - self.camera.x as f32);
-    |                                                                          ^^^^^^ unknown field
-    |
-    = note: available fields are: `config`, `state`, `terrain_renderer`, `vehicle_renderer`, `position_log`
-
-error[E0609]: no field `camera` on type `&renderer::Renderer`
-   --> src/rendering/renderer.rs:248:41
-    |
-248 |             let vertical_path_y = (self.camera.z as f32 - pos[2]) + vertical_center.y;
-    |                                         ^^^^^^ unknown field
-    |
-    = note: available fields are: `config`, `state`, `terrain_renderer`, `vehicle_renderer`, `position_log`
-
-error[E0609]: no field `origin` on type `&rendering::types::RenderConfig`
-   --> src/rendering/terrain_renderer.rs:101:38
-    |
-101 |             camera.x as f32 + config.origin.x,
-    |                                      ^^^^^^ unknown field
-    |
-    = note: available fields are: `screen_dims`, `scale`, `render_type`
-
-error[E0609]: no field `origin` on type `&rendering::types::RenderConfig`
-   --> src/rendering/terrain_renderer.rs:102:38
-    |
-102 |             camera.y as f32 + config.origin.y,
-    |                                      ^^^^^^ unknown field
-    |
-    = note: available fields are: `screen_dims`, `scale`, `render_type`
-
-error[E0609]: no field `position` on type `&<dyn Vehicle as Vehicle>::State`
-   --> src/rendering/vehicle_renderer.rs:106:42
-    |
-106 |             let pos = Vector3::new(state.position.x, state.position.y, state.position.z);
-    |                                          ^^^^^^^^ unknown field
-
-error[E0609]: no field `position` on type `&<dyn Vehicle as Vehicle>::State`
-   --> src/rendering/vehicle_renderer.rs:106:60
-    |
-106 |             let pos = Vector3::new(state.position.x, state.position.y, state.position.z);
-    |                                                            ^^^^^^^^ unknown field
-
-error[E0609]: no field `position` on type `&<dyn Vehicle as Vehicle>::State`
-   --> src/rendering/vehicle_renderer.rs:106:78
-    |
-106 |             let pos = Vector3::new(state.position.x, state.position.y, state.position.z);
-    |                                                                              ^^^^^^^^ unknown field
-
-error[E0609]: no field `attitude` on type `&<dyn Vehicle as Vehicle>::State`
-   --> src/rendering/vehicle_renderer.rs:110:37
-    |
-110 |             let (_, _, yaw) = state.attitude.euler_angles();
-    |                                     ^^^^^^^^ unknown field
-
-error[E0609]: no field `position` on type `&<dyn Vehicle as Vehicle>::State`
-   --> src/rendering/vehicle_renderer.rs:135:23
-    |
-135 |                 state.position.x as f32,
-    |                       ^^^^^^^^ unknown field
-
-error[E0609]: no field `position` on type `&<dyn Vehicle as Vehicle>::State`
-   --> src/rendering/vehicle_renderer.rs:136:23
-    |
-136 |                 state.position.y as f32,
-    |                       ^^^^^^^^ unknown field
-
-error[E0609]: no field `position` on type `&<dyn Vehicle as Vehicle>::State`
-   --> src/rendering/vehicle_renderer.rs:137:23
-    |
-137 |                 state.position.z as f32,
-    |                       ^^^^^^^^ unknown field
-
-error[E0609]: no field `attitude` on type `&<dyn Vehicle as Vehicle>::State`
-   --> src/rendering/vehicle_renderer.rs:183:44
-    |
-183 |             let (roll, pitch, yaw) = state.attitude.euler_angles();
-    |                                            ^^^^^^^^ unknown field
-
-error[E0609]: no field `position` on type `&<dyn Vehicle as Vehicle>::State`
-   --> src/rendering/vehicle_renderer.rs:235:23
-    |
-235 |                 state.position.x as f32,
-    |                       ^^^^^^^^ unknown field
-
-error[E0609]: no field `position` on type `&<dyn Vehicle as Vehicle>::State`
-   --> src/rendering/vehicle_renderer.rs:236:23
-    |
-236 |                 state.position.y as f32,
-    |                       ^^^^^^^^ unknown field
-
-error[E0609]: no field `position` on type `&<dyn Vehicle as Vehicle>::State`
-   --> src/rendering/vehicle_renderer.rs:237:23
-    |
-237 |                 state.position.z as f32,
-    |                       ^^^^^^^^ unknown field
-
-error[E0609]: no field `attitude` on type `&<dyn Vehicle as Vehicle>::State`
-   --> src/rendering/vehicle_renderer.rs:257:37
-    |
-257 |             let (_, _, yaw) = state.attitude.euler_angles();
-    |                                     ^^^^^^^^ unknown field
-
-error[E0277]: the trait bound `Matrix<f64, Const<3>, Const<1>, ArrayStorage<f64, 3, 1>>: From<glam::Vec2>` is not satisfied
-  --> src/world/terrain_management.rs:18:10
-   |
-18 |         .into();
-   |          ^^^^ the trait `From<glam::Vec2>` is not implemented for `Matrix<f64, Const<3>, Const<1>, ArrayStorage<f64, 3, 1>>`, which is required by `glam::Vec2: Into<_>`
-   |
-   = help: the following other types implement trait `From<T>`:
-             `Matrix<T, <Const<D> as DimNameAdd<Const<1>>>::Output, <Const<D> as DimNameAdd<Const<1>>>::Output, <DefaultAllocator as nalgebra::allocator::Allocator<T, <Const<D> as DimNameAdd<Const<1>>>::Output, <Const<D> as DimNameAdd<Const<1>>>::Output>>::Buffer>` implements `From<Isometry<T, R, D>>`
-             `Matrix<T, <Const<D> as DimNameAdd<Const<1>>>::Output, <Const<D> as DimNameAdd<Const<1>>>::Output, <DefaultAllocator as nalgebra::allocator::Allocator<T, <Const<D> as DimNameAdd<Const<1>>>::Output, <Const<D> as DimNameAdd<Const<1>>>::Output>>::Buffer>` implements `From<Similarity<T, R, D>>`
-             `Matrix<T, <Const<D> as DimNameAdd<Const<1>>>::Output, <Const<D> as DimNameAdd<Const<1>>>::Output, <DefaultAllocator as nalgebra::allocator::Allocator<T, <Const<D> as DimNameAdd<Const<1>>>::Output, <Const<D> as DimNameAdd<Const<1>>>::Output>>::Buffer>` implements `From<Translation<T, D>>`
-             `Matrix<T, <Const<D> as DimNameAdd<Const<1>>>::Output, <Const<D> as DimNameAdd<Const<1>>>::Output, <DefaultAllocator as nalgebra::allocator::Allocator<T, <Const<D> as DimNameAdd<Const<1>>>::Output, <Const<D> as DimNameAdd<Const<1>>>::Output>>::Buffer>` implements `From<nalgebra::Transform<T, C, D>>`
-             `Matrix<T, <D as DimNameAdd<Const<1>>>::Output, Const<1>, <DefaultAllocator as nalgebra::allocator::Allocator<T, <D as DimNameAdd<Const<1>>>::Output>>::Buffer>` implements `From<OPoint<T, D>>`
-             `Matrix<T, Const<1>, Const<D>, ArrayStorage<T, 1, D>>` implements `From<[T; D]>`
-             `Matrix<T, Const<2>, Const<2>, ArrayStorage<T, 2, 2>>` implements `From<Rotation<T, 2>>`
-             `Matrix<T, Const<2>, Const<2>, ArrayStorage<T, 2, 2>>` implements `From<nalgebra::Unit<Complex<T>>>`
-           and 29 others
-   = note: required for `glam::Vec2` to implement `Into<Matrix<f64, Const<3>, Const<1>, ArrayStorage<f64, 3, 1>>>`
-
-error[E0599]: no function or associated item named `from_data` found for struct `Terrain` in the current scope
-  --> src/world/terrain_management.rs:21:39
-   |
-21 |         self.state.terrain = Terrain::from_data(terrain_data);
-   |                                       ^^^^^^^^^ function or associated item not found in `Terrain`
-   |
-  ::: src/environment/terrain/mod.rs:23:1
-   |
-23 | pub struct Terrain {
-   | ------------------ function or associated item `from_data` not found for this struct
-   |
-note: if you're trying to build a new `Terrain`, consider using `Terrain::new` which returns `Terrain`
-  --> src/environment/terrain/mod.rs:46:5
-   |
-46 | /     pub fn new(
-47 | |         seed: u64,
-48 | |         area: Vec<usize>,
-49 | |         scaling: f32,
-...  |
-53 | |         terrain_data_dir: PathBuf,
-54 | |     ) -> Self {
-   | |_____________^
-
-warning: unused import: `rayon::prelude`
- --> src/rendering/renderer.rs:2:5
-  |
-2 | use rayon::prelude::*;
-  |     ^^^^^^^^^^^^^^
-
-warning: unused import: `crate::vehicles::traits::VehicleState`
- --> src/vehicles/aircraft/aircraft.rs:1:5
-  |
-1 | use crate::vehicles::traits::VehicleState;
-  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-error[E0596]: cannot borrow `*self` as mutable, as it is behind a `&` reference
-  --> src/environment/terrain/generator.rs:60:39
-   |
-60 |         let name = format!("{}.json", self.get_name());
-   |                                       ^^^^ `self` is a `&` reference, so the data it refers to cannot be borrowed as mutable
-   |
-help: consider changing this to be a mutable reference
-   |
-57 |         &mut self,
-   |         ~~~~~~~~~
-
-warning: unused variable: `state`
-   --> src/physics/aerso/adapter.rs:114:31
-    |
-114 |     fn get_aero_forces(&self, state: &dyn VehicleState) -> Vec<Force<f64>> {
-    |                               ^^^^^ help: if this is intentional, prefix it with an underscore: `_state`
-    |
-    = note: `#[warn(unused_variables)]` on by default
-
-warning: variable does not need to be mutable
-   --> src/physics/aerso/adapter.rs:152:13
-    |
-152 |         let mut forces = Vec::new();
-    |             ----^^^^^^
-    |             |
-    |             help: remove this `mut`
-    |
-    = note: `#[warn(unused_mut)]` on by default
-
-warning: unused variable: `camera`
-   --> src/rendering/vehicle_renderer.rs:381:9
-    |
-381 |         camera: &Camera,
-    |         ^^^^^^ help: if this is intentional, prefix it with an underscore: `_camera`
-
-error[E0382]: borrow of moved value: `state`
-   --> src/vehicles/aircraft/aircraft.rs:140:13
-    |
-125 |     fn reset(&mut self, state: Self::State) {
-    |                         ----- move occurs because `state` has type `AircraftState`, which does not implement the `Copy` trait
-126 |         self.state = state;
-    |                      ----- value moved here
-...
-140 |             state.rates[0],
-    |             ^^^^^^^^^^^ value borrowed here after move
-    |
-help: consider cloning the value if the performance cost is acceptable
-    |
-126 |         self.state = state.clone();
-    |                           ++++++++
-
-Some errors have detailed explanations: E0046, E0191, E0277, E0308, E0382, E0412, E0432, E0560, E0596...
-For more information about an error, try `rustc --explain E0046`.
-warning: `flyer-rs` (lib) generated 14 warnings
-error: could not compile `flyer-rs` (lib) due to 73 previous errors; 14 warnings emitted
+4 | use crate::world::asset::{AssetManager, LoadableAsset};
+  |                                         ^^^^^^^^^^^^^
+
+Some errors have detailed explanations: E0412, E0432, E0433.
+For more information about an error, try `rustc --explain E0412`.
+warning: `flyer-rs` (lib) generated 3 warnings
+error: could not compile `flyer-rs` (lib) due to 10 previous errors; 3 warnings emitted

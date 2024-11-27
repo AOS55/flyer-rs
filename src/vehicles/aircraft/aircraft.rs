@@ -1,306 +1,140 @@
-use crate::vehicles::traits::VehicleState;
-use aerso::density_models::ConstantDensity;
-use aerso::types::*;
-use aerso::wind_models::*;
-use aerso::*;
 use nalgebra::{UnitQuaternion, Vector3};
-use std::collections::HashMap;
 
-use crate::physics::traits::PhysicsModel;
-use crate::utils::errors::SimError;
-use crate::vehicles::traits::Vehicle;
-
-use super::{
-    config::AircraftConfig,
-    controls::AircraftControls,
-    state::AircraftState,
-    systems::{Aerodynamics, PowerPlant},
+use crate::physics::aerso::{
+    AersoConfig, AersoPhysics, AersoPhysicsState, AtmosphereModel, WindModelConfig,
 };
+use crate::rendering::RenderError;
+use crate::state::{StateError, StateManager};
+use crate::utils::errors::SimError;
+use crate::vehicles::Vehicle;
+
+use super::config::AircraftConfig;
+use super::state::AircraftState;
 
 pub struct Aircraft {
-    pub name: String,
-    pub state: AircraftState,
-    pub controls: HashMap<String, f64>,
-    pub data_path: Option<String>,
-    pub aff_body: AffectedBody<Vec<f64>, f64, ConstantWind<f64>, ConstantDensity>,
+    state: AircraftState,
+    config: AircraftConfig,
+    physics: AersoPhysics,
 }
 
-impl Vehicle for Aircraft {
-    type State = AircraftState;
-    type Controls = AircraftControls;
-    type Config = AircraftConfig;
-
-    fn new(config: Self::Config) -> Result<Self, SimError> {
-        // Initialize aerodynamics and powerplant from config
-        let aero = Aerodynamics::from_json(&config.name, None)?;
-        let power = PowerPlant::pt6();
-
-        // Create initial kinematic body
-        let k_body = Body::new(
-            config.mass,
-            config.inertia,
-            Vector3::zeros(),
-            Vector3::zeros(),
-            UnitQuaternion::identity(),
-            Vector3::zeros(),
-        );
-
-        let a_body = AeroBody::new(k_body);
-
-        let aff_body = AffectedBody {
-            body: a_body,
-            effectors: vec![Box::new(aero), Box::new(power)],
+impl Aircraft {
+    pub fn new(config: AircraftConfig) -> Result<Self, SimError> {
+        // Convert AircraftConfig to AersoConfig
+        let aerso_config = AersoConfig {
+            mass: config.mass,
+            inertia: config.inertia,
+            aero_coefficients: config.aero.into(),
+            engine_params: config.propulsion.into(),
+            atmosphere_model: AtmosphereModel::Standard,
+            wind_model: WindModelConfig::Constant(Vector3::zeros()),
         };
 
-        // Initialize default controls
-        let controls = HashMap::from([
-            ("aileron".to_string(), 0.0),
-            ("elevator".to_string(), 0.0),
-            ("tla".to_string(), 0.0),
-            ("rudder".to_string(), 0.0),
-        ]);
-
-        let state = AircraftState {
-            position: Vector3::zeros(),
-            velocity: Vector3::zeros(),
-            attitude: UnitQuaternion::identity(),
-            rates: Vector3::zeros(),
-            air_speed: 0.0,
-            ground_speed: 0.0,
-            altitude: 0.0,
-            heading: 0.0,
-            flight_path_angle: 0.0,
-        };
+        // Initialize with default state and physics
+        let state = AircraftState::default();
+        let physics = AersoPhysics::new(&config)?;
 
         Ok(Self {
-            name: config.name,
             state,
-            controls,
-            data_path: None,
-            aff_body,
+            config,
+            physics,
         })
     }
 
-    fn set_controls(&mut self, controls: Self::Controls) {
-        self.controls
-            .insert("aileron".to_string(), controls.aileron);
-        self.controls
-            .insert("elevator".to_string(), controls.elevator);
-        self.controls.insert("tla".to_string(), controls.throttle);
-        self.controls.insert("rudder".to_string(), controls.rudder);
+    pub fn new_with_state(
+        config: AircraftConfig,
+        position: Vector3<f64>,
+        velocity: Vector3<f64>,
+        attitude: UnitQuaternion<f64>,
+        angular_velocity: Vector3<f64>,
+    ) -> Result<Self, SimError> {
+        let mut aircraft = AircraftState::default();
+        aircraft.state.spatial.position = position;
+        aircraft.state.spatial.velocity = velocity;
+        aircraft.state.spatial.attitude = attitude;
+        aircraft.state.spatial.angular_velocity = angular_velocity;
+
+        Ok(aircraft)
     }
 
-    fn update_state(&mut self, physics: &dyn PhysicsModel) {
-        // Extract current controls in correct order
-        let control_keys = vec!["aileron", "elevator", "tla", "rudder"];
-        let mut control_in: Vec<f64> = Vec::new();
-
-        for key in control_keys {
-            control_in.push(self.controls[key]);
-        }
-
-        // Step the physics
-        self.aff_body.step(physics.get_timestep(), &control_in);
-
-        // Update our state
-        self.state.position = self.aff_body.position();
-        self.state.velocity = self.aff_body.velocity();
-        self.state.attitude = self.aff_body.attitude();
-        self.state.rates = self.aff_body.rates();
-
-        let airstate = self.aff_body.get_airstate();
-        self.state.air_speed = airstate.airspeed;
-        self.state.ground_speed = self.state.velocity.norm();
-        self.state.altitude = -self.state.position.z;
-
-        let (_, pitch, yaw) = self.state.attitude.euler_angles();
-        self.state.heading = yaw;
-        self.state.flight_path_angle = pitch;
+    // Convert AircraftState to AersoPhysicsState
+    fn convert_to_physics_state(&self) -> AersoPhysicsState {
+        let mut physics_state = AersoPhysicsState::new(self.config.mass)?;
+        physics_state.spatial = self.state.spatial.clone();
+        physics_state.controls = self.state.controls.clone().into();
+        physics_state
     }
+}
+
+impl StateManager for Aircraft {
+    type State = AircraftState;
 
     fn get_state(&self) -> &Self::State {
         &self.state
     }
 
-    fn reset(&mut self, state: Self::State) {
-        self.state = state;
+    fn get_state_mut(&mut self) -> &mut Self::State {
+        &mut self.state
+    }
 
-        // Reset aerso physics state
-        self.aff_body.set_state(StateVector::from_vec(vec![
-            state.position[0],
-            state.position[1],
-            state.position[2],
-            state.velocity[0],
-            state.velocity[1],
-            state.velocity[2],
-            state.attitude[0],
-            state.attitude[1],
-            state.attitude[2],
-            state.attitude[3],
-            state.rates[0],
-            state.rates[1],
-            state.rates[2],
-        ]));
+    fn update_state(&mut self, new_state: Self::State) -> Result<(), StateError> {
+        // Basic validation of new state
+        new_state
+            .validate()
+            .map_err(|e| StateError::ValidationFailed(e.to_string()))?;
 
-        // Reset controls
-        for (_, value) in self.controls.iter_mut() {
-            *value = 0.0;
-        }
+        self.state = new_state;
+        Ok(())
     }
 }
 
-impl Aircraft {
-    pub fn new_with_state(
-        aircraft_name: &str,
-        initial_position: Vector3<f64>,
-        initial_velocity: Vector3<f64>,
-        initial_attitude: UnitQuaternion<f64>,
-        initial_rates: Vector3<f64>,
-        controls: Option<HashMap<String, f64>>,
-        data_path: Option<String>,
-    ) -> Result<Self, SimError> {
-        let aero = Aerodynamics::from_json(aircraft_name, data_path.as_deref())?;
-        let power = PowerPlant::pt6();
+impl Vehicle for Aircraft {
+    fn update(&mut self, dt: f64) -> Result<(), SimError> {
+        // Convert current state to physics state
+        let mut physics_state = self.convert_to_physics_state();
 
-        let k_body = Body::new(
-            aero.mass,
-            aero.inertia,
-            initial_position,
-            initial_velocity,
-            initial_attitude,
-            initial_rates,
+        // Step physics simulation
+        self.physics
+            .step(&mut physics_state, dt)
+            .map_err(|e| SimError::PhysicsError(e.to_string()))?;
+
+        // Update aircraft state from physics
+        self.state.update_from_physics(
+            physics_state.spatial.position,
+            physics_state.spatial.velocity,
+            physics_state.spatial.attitude,
+            physics_state.spatial.angular_velocity,
         );
 
-        let a_body = AeroBody::new(k_body);
+        // Update controls with limits
+        self.apply_control_limits();
 
-        let aff_body = AffectedBody {
-            body: a_body,
-            effectors: vec![Box::new(aero), Box::new(power)],
-        };
-
-        let controls = match controls {
-            Some(controls) => controls,
-            None => HashMap::from([
-                ("aileron".to_string(), 0.0),
-                ("elevator".to_string(), 0.0),
-                ("tla".to_string(), 0.0),
-                ("rudder".to_string(), 0.0),
-            ]),
-        };
-
-        let state = AircraftState {
-            position: initial_position,
-            velocity: initial_velocity,
-            attitude: initial_attitude,
-            rates: initial_rates,
-            air_speed: initial_velocity.norm(),
-            ground_speed: initial_velocity.norm(),
-            altitude: -initial_position.z,
-            heading: initial_attitude.euler_angles().2,
-            flight_path_angle: initial_attitude.euler_angles().1,
-        };
-
-        Ok(Self {
-            name: aircraft_name.to_string(),
-            state,
-            controls,
-            data_path,
-            aff_body,
-        })
+        Ok(())
     }
 
-    pub fn clone_with_state(
-        &self,
-        position: Vector3<f64>,
-        velocity: Vector3<f64>,
-        attitude: UnitQuaternion<f64>,
-        rates: Vector3<f64>,
-    ) -> Result<Self, SimError> {
-        Aircraft::new_with_state(
-            &self.name,
-            position,
-            velocity,
-            attitude,
-            rates,
-            Some(self.controls.clone()),
-            self.data_path.clone(),
-        )
-    }
-
-    pub fn step(&mut self, dt: f64) {
-        // Extract controls in correct order
-        let control_keys = vec!["aileron", "elevator", "tla", "rudder"];
-        let mut control_in: Vec<f64> = Vec::new();
-
-        for key in control_keys {
-            control_in.push(self.controls[key]);
-        }
-
-        // Step physics
-        self.aff_body.step(dt, &control_in);
-
-        // Update state
-        self.state.position = self.aff_body.position();
-        self.state.velocity = self.aff_body.velocity();
-        self.state.attitude = self.aff_body.attitude();
-        self.state.rates = self.aff_body.rates();
-
-        let airstate = self.aff_body.get_airstate();
-        self.state.air_speed = airstate.airspeed;
-        self.state.ground_speed = self.state.velocity.norm();
-        self.state.altitude = -self.state.position.z;
-
-        let (_, pitch, yaw) = self.state.attitude.euler_angles();
-        self.state.heading = yaw;
-        self.state.flight_path_angle = pitch;
-    }
-
-    pub fn set_data_path(&mut self, data_path: String) {
-        self.data_path = Some(data_path);
-    }
-
-    fn get_control_vector(&self) -> Vec<f64> {
-        vec![
-            self.controls["aileron"],
-            self.controls["elevator"],
-            self.controls["tla"],
-            self.controls["rudder"],
-        ]
+    fn render(&self) -> Result<(), RenderError> {
+        // Implement rendering logic or return Ok if not needed
+        Ok(())
     }
 }
 
-impl Clone for Aircraft {
-    fn clone(&self) -> Self {
-        let name = self.name.clone();
-        let pos = self.state.position;
-        let vel = self.state.velocity;
-        let att = self.state.attitude;
-        let rates = self.state.rates;
-        let controls = self.controls.clone();
-        let data_path = self.data_path.clone();
+// Private helper methods
+impl Aircraft {
+    fn apply_control_limits(&mut self) {
+        let controls = &mut self.state.controls;
 
-        Aircraft::new_with_state(&name, pos, vel, att, rates, Some(controls), data_path).unwrap()
+        // Clamp control surfaces to their limits
+        controls.aileron = controls.aileron.clamp(-1.0, 1.0);
+        controls.elevator = controls.elevator.clamp(-1.0, 1.0);
+        controls.rudder = controls.rudder.clamp(-1.0, 1.0);
+        controls.throttle = controls.throttle.clamp(0.0, 1.0);
+        controls.flaps = controls.flaps.clamp(0.0, 1.0);
+        controls.brake = controls.brake.clamp(0.0, 1.0);
     }
 }
 
-impl StateView for Aircraft {
-    fn position(&self) -> Vector3<f64> {
-        self.aff_body.position()
-    }
-
-    fn velocity_in_frame(&self, frame: Frame) -> Vector3<f64> {
-        self.aff_body.velocity_in_frame(frame)
-    }
-
-    fn attitude(&self) -> UnitQuaternion<f64> {
-        self.aff_body.attitude()
-    }
-
-    fn rates_in_frame(&self, frame: Frame) -> Vector3<f64> {
-        self.aff_body.rates_in_frame(frame)
-    }
-
-    fn statevector(&self) -> StateVector<f64> {
-        self.aff_body.statevector()
+impl Default for Aircraft {
+    fn default() -> Self {
+        let config = AircraftConfig::default();
+        Self::new(config).expect("Failed to create default aircraft")
     }
 }

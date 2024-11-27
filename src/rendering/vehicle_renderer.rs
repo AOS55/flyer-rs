@@ -1,5 +1,5 @@
 use glam::Vec2;
-use nalgebra::{Transform, Vector3};
+use nalgebra::Vector3;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use tiny_skia::Transform as SkiaTransform;
@@ -7,8 +7,8 @@ use tiny_skia::*;
 
 use crate::rendering::types::{RenderConfig, RenderType};
 use crate::utils::errors::SimError;
-use crate::vehicles::{Vehicle, VehicleState};
-use crate::world::camera::Camera;
+use crate::vehicles::Vehicle;
+use crate::world::systems::camera::Camera;
 
 /// Handles rendering of all vehicle types in different view modes
 pub struct VehicleRenderer {

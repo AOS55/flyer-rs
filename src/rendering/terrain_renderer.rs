@@ -2,7 +2,7 @@ use crate::environment::runway::Runway;
 use crate::environment::terrain::{StaticObject, Terrain, Tile};
 use crate::rendering::types::RenderConfig;
 use crate::utils::errors::SimError;
-use crate::world::camera::Camera;
+use crate::world::systems::camera::Camera;
 
 use glam::Vec2;
 use rayon::prelude::*;

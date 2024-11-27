@@ -1,7 +1,11 @@
-pub mod aircraft;
-pub mod common;
-pub mod traits;
+use crate::rendering::RenderError;
+use crate::state::StateError;
+use crate::state::StateManager;
 
-pub use aircraft::{Aircraft, AircraftConfig, AircraftControls, AircraftState};
-pub use common::VehicleState;
-pub use traits::{Controls, Vehicle};
+pub mod aircraft;
+pub mod state;
+
+pub trait Vehicle: StateManager {
+    fn update(&mut self, dt: f64) -> Result<(), StateError>;
+    fn render(&self) -> Result<(), RenderError>;
+}

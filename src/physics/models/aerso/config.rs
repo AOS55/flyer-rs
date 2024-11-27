@@ -1,4 +1,4 @@
-use crate::vehicles::aircraft::systems::aerodynamics::{
+use crate::vehicles::aircraft::systems::{
     DragData, LiftData, PitchData, RollData, SideForceData, YawData,
 };
 
@@ -24,7 +24,6 @@ pub struct AersoConfig {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AeroCoefficients {
-    // All the coefficient data from the original aerodynamics.rs
     pub drag_data: DragData,
     pub side_force_data: SideForceData,
     pub lift_data: LiftData,

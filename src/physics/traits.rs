@@ -1,27 +1,24 @@
-use crate::utils::errors::SimError;
-use crate::vehicles::traits::VehicleState;
-use aerso::types::{Force, Vector3};
-use aerso::{AeroEffect, AirState}; // Import necessary types
+use crate::physics::components::ForceSystem;
+use crate::physics::error::PhysicsError;
+use crate::state::SimState;
+use nalgebra::Vector3;
+
+pub trait PhysicsState: SimState {
+    fn mass(&self) -> f64;
+    fn add_force(&mut self, force: Vector3<f64>);
+    fn add_moment(&mut self, moment: Vector3<f64>);
+    fn clear_forces(&mut self);
+}
 
 pub trait PhysicsModel {
-    type State;
-    type Parameters;
+    type State: PhysicsState;
+    type Config;
 
-    fn new(params: Self::Parameters) -> Result<Self, SimError>
+    fn new(config: Self::Config) -> Result<Self, PhysicsError>
     where
         Self: Sized;
-    fn step(&mut self, state: &mut dyn VehicleState, dt: f64);
-    fn get_timestep(&self) -> f64;
+
+    fn step(&mut self, state: &mut Self::State, dt: f64) -> Result<(), PhysicsError>;
     fn reset(&mut self);
-    fn get_forces(&self) -> Vec<Force>;
-    fn get_accelerations(&self) -> Vector3<f64>;
-}
-
-pub trait SimplifiedPhysics: PhysicsModel {
-    fn update_kinematics(&mut self, state: &mut dyn VehicleState, dt: f64);
-}
-
-pub trait AerodynamicsModel: PhysicsModel {
-    fn get_aero_forces(&self, state: &dyn VehicleState) -> Vec<Force>;
-    fn get_air_data(&self, state: &dyn VehicleState) -> AirState;
+    fn get_force_system(&self) -> &ForceSystem;
 }

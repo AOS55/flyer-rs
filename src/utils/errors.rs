@@ -2,6 +2,16 @@ use std::io;
 use thiserror::Error;
 
 #[derive(Error, Debug)]
+pub enum StateError {
+    #[error("Invalid state transition: {0}")]
+    InvalidTransition(String),
+    #[error("State validation failed: {0}")]
+    ValidationFailed(String),
+    #[error("State synchronization error: {0}")]
+    SyncError(String),
+}
+
+#[derive(Error, Debug)]
 pub enum SimError {
     #[error("IO error: {0}")]
     Io(#[from] io::Error),
