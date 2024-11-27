@@ -1,13 +1,36 @@
-mod aircraft;
-mod runway;
-mod terrain;
-mod trim;
+pub mod environment;
+pub mod physics;
+pub mod rendering;
 pub mod utils;
-mod world;
+pub mod vehicles;
+pub mod world;
 
-pub use aircraft::Aircraft;
-pub use runway::Runway;
-pub use terrain::{RandomFuncs, StaticObject, Terrain, TerrainConfig, Tile};
-pub use trim::Trim;
-pub use utils::AircraftError;
-pub use world::{Camera, Settings, World};
+pub use environment::{
+    runway::Runway,
+    terrain::{Terrain, TerrainConfig},
+};
+
+pub use physics::{
+    aerso::{AersoConfig, AersoPhysics},
+    traits::PhysicsModel,
+};
+
+pub use rendering::{RenderConfig, RenderType, Renderer};
+
+pub use utils::{
+    constants::*,
+    errors::SimError,
+    types::{AirData, Position},
+};
+
+pub use vehicles::{
+    aircraft::{AircraftConfig, AircraftControls, AircraftState},
+    traits::{Controls, Vehicle, VehicleState},
+};
+
+pub use world::{
+    settings::SimulationSettings,
+    state::WorldState,
+    traits::{World, WorldSettings},
+    SimWorld,
+};

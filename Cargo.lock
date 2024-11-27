@@ -380,6 +380,7 @@ dependencies = [
  "serde",
  "serde_json",
  "serde_yaml",
+ "thiserror",
  "tiny-skia",
 ]
 
@@ -618,6 +619,7 @@ dependencies = [
  "num-complex 0.4.6",
  "num-rational 0.4.2",
  "num-traits",
+ "serde",
  "simba 0.6.0",
  "typenum",
 ]
