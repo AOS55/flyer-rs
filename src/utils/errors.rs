@@ -45,4 +45,7 @@ pub enum SimError {
 
     #[error("Render error: {0}")]
     RenderError(String),
+
+    #[error("Entity error: {0}")]
+    InvalidEntity(String),
 }
