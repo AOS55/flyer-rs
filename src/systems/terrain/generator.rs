@@ -423,7 +423,7 @@ mod tests {
             zoom: 1.0,
             ..Default::default()
         };
-        world.add_resource(camera).unwrap();
+        world.add_resource(camera);
 
         // Add terrain component
         let terrain_entity = world.spawn();

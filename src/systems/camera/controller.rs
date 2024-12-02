@@ -80,7 +80,7 @@ mod tests {
         let camera_entity = world.spawn();
         let camera = CameraComponent::default();
         world.add_component(camera_entity, camera).unwrap();
-        world.add_resource(1.0f32).unwrap(); // Add dt resource
+        world.add_resource(1.0f32); // Add dt resource
         (world, camera_entity)
     }
 

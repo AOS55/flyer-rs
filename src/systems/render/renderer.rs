@@ -1,6 +1,6 @@
 use crate::components::{CameraComponent, RenderComponent};
 use crate::ecs::{EcsError, Result, System, World};
-use crate::resources::{AssetManager, RenderConfig, TimeManager};
+use crate::resources::{AssetError, AssetManager, AssetType, RenderConfig};
 use crate::systems::camera::CameraControllerSystem;
 use glam::{Vec2, Vec4};
 use std::cmp::Ordering;
@@ -165,7 +165,6 @@ impl RenderSystem {
     }
 
     fn execute_render_commands(&mut self, world: &World) -> Result<()> {
-        // Get AssetManager - already returns a Result
         let assets = world.get_resource::<AssetManager>()?;
 
         // Clear screen
@@ -173,11 +172,16 @@ impl RenderSystem {
 
         // Execute all render commands in order
         while let Some(cmd) = self.render_commands.pop() {
-            if let Some(texture) = assets.get_texture(&cmd.texture_id) {
-                self.render_sprite(&texture, &cmd);
-            } else {
-                // Print missing texture but continue rendering
-                println!("Texture not found: {}", cmd.texture_id);
+            match assets.load(&cmd.texture_id, AssetType::Texture, |path| {
+                Pixmap::load_png(path).map_err(|e| AssetError::LoadError(e.to_string()))
+            }) {
+                Ok(texture) => {
+                    self.render_sprite(&texture, &cmd);
+                }
+                Err(e) => {
+                    // Log error but continue rendering
+                    println!("Failed to load texture {}: {}", cmd.texture_id, e);
+                }
             }
         }
         Ok(())
@@ -251,9 +255,9 @@ mod tests {
         let asset_manager = AssetManager::new(PathBuf::from("test_assets"));
         let time_manager = TimeManager::new();
 
-        world.add_resource(render_config.clone()).unwrap();
-        world.add_resource(asset_manager).unwrap();
-        world.add_resource(time_manager).unwrap();
+        world.add_resource(render_config.clone());
+        world.add_resource(asset_manager);
+        world.add_resource(time_manager);
 
         let render_system = RenderSystem::new(&render_config);
 
@@ -494,10 +498,8 @@ mod tests {
         let mut system = RenderSystem::new(&config);
 
         // Add required resources but no camera
-        world
-            .add_resource(AssetManager::new(PathBuf::from("test_assets")))
-            .unwrap();
-        world.add_resource(TimeManager::new()).unwrap();
+        world.add_resource(AssetManager::new(PathBuf::from("test_assets")));
+        world.add_resource(TimeManager::new());
 
         // This should handle the missing camera gracefully
         let result = system.run(&mut world);

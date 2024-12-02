@@ -2,14 +2,14 @@ use super::error::{EcsError, Result};
 use crate::ecs::component::{Component, ComponentManager};
 use crate::ecs::entity::{EntityId, EntityManager, Generation};
 use crate::ecs::query::{Query, QueryItem, QueryMut};
-use crate::ecs::resource::{Resource, ResourceManager};
 use crate::ecs::system::SystemManager;
+use crate::resources::ResourceSystem;
 
 pub struct World {
     entities: EntityManager,
     components: ComponentManager,
     systems: SystemManager,
-    resources: ResourceManager,
+    resources: ResourceSystem,
 }
 
 impl World {
@@ -18,7 +18,18 @@ impl World {
             entities: EntityManager::new(),
             components: ComponentManager::new(),
             systems: SystemManager::new(),
-            resources: ResourceManager::new(),
+            resources: ResourceSystem::builder()
+                .build()
+                .expect("Failed to create resource system"),
+        }
+    }
+
+    pub fn with_resources(resources: ResourceSystem) -> Self {
+        Self {
+            entities: EntityManager::new(),
+            components: ComponentManager::new(),
+            systems: SystemManager::new(),
+            resources,
         }
     }
 
@@ -30,8 +41,6 @@ impl World {
         if !self.entities.is_alive(entity) {
             return Err(EcsError::InvalidEntity(entity));
         }
-        // Note: We would need to implement a way to remove all components
-        // This is a simplified version
         self.entities.remove_entity(entity);
         Ok(())
     }
@@ -77,18 +86,20 @@ impl World {
             .ok_or_else(|| EcsError::ComponentError("Component not found".to_string()))
     }
 
-    pub fn get_resource<T: Resource + 'static>(&self) -> Result<&T> {
-        self.resources.get_resource::<T>().map_err(EcsError::from)
+    pub fn get_resource<T: 'static>(&self) -> Result<&T> {
+        self.resources.get().map_err(|e| EcsError::ResourceError(e))
     }
 
-    pub fn get_resource_mut<T: Resource + 'static>(&mut self) -> Result<&mut T> {
-        self.resources.get_mut::<T>().map_err(EcsError::from)
-    }
-
-    pub fn add_resource<T: Resource + 'static>(&mut self, resource: T) -> Result<()> {
+    pub fn get_resource_mut<T: 'static>(&mut self) -> Result<&mut T> {
         self.resources
-            .insert_resource(resource)
-            .map_err(EcsError::from)
+            .get_mut()
+            .map_err(|e| EcsError::ResourceError(e))
+    }
+
+    pub fn add_resource<T: 'static + Send + Sync>(&mut self, resource: T) {
+        self.resources
+            .insert(resource)
+            .expect("Failed to insert resource"); // Or handle more gracefully if preferred
     }
 
     pub fn step(&mut self, _dt: f64) -> Result<()> {
@@ -126,7 +137,9 @@ impl World {
 
 impl Default for World {
     fn default() -> Self {
-        Self::new()
+        Self::with_resources(
+            ResourceSystem::new().expect("Failed to create default resource system"),
+        )
     }
 }
 
@@ -241,7 +254,7 @@ mod tests {
         let mut world = World::new();
 
         let state = GameState { score: 100 };
-        world.add_resource(state).unwrap();
+        world.add_resource(state);
 
         let retrieved = world.get_resource::<GameState>().unwrap();
         assert_eq!(retrieved.score, 100);

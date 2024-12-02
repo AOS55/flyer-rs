@@ -1,5 +1,5 @@
 use crate::ecs::entity::EntityId;
-use crate::ecs::resource::ResourceError;
+use crate::resources::ResourceError;
 use std::error::Error;
 use std::fmt;
 

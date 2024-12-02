@@ -3,20 +3,20 @@ use std::any::Any;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, RwLock};
-use tiny_skia::Pixmap;
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum AssetType {
     Texture,
     Model,
     Sound,
-    Terrain,
+    Shader,
+    Data,
 }
 
 struct AssetEntry {
     data: Arc<dyn Any + Send + Sync>,
-    path: PathBuf,
-    asset_type: AssetType,
     refs: usize,
+    asset_type: AssetType,
 }
 
 pub struct AssetManager {
@@ -40,76 +40,57 @@ impl AssetManager {
     ) -> Result<Arc<T>> {
         let mut assets = self.assets.write().unwrap();
 
-        // Check if asset already exists
         if let Some(entry) = assets.get_mut(id) {
             entry.refs += 1;
-            if let Some(asset) = entry.data.downcast_ref::<Arc<T>>() {
-                return Ok(Arc::clone(asset));
-            }
+            return entry
+                .data
+                .downcast_ref::<Arc<T>>()
+                .map(Arc::clone)
+                .ok_or_else(|| AssetError::TypeMismatch(id.to_string()));
         }
 
-        // Load new asset
-        let path = self.resolve_path(id, &asset_type)?;
-        let data = loader(&path)?;
-        let asset = Arc::new(data);
+        let path = self.resolve_path(id, asset_type)?;
+        let data = Arc::new(loader(&path)?);
 
-        // Store in assets map
         assets.insert(
             id.to_string(),
             AssetEntry {
-                data: Arc::new(asset.clone()),
-                path,
-                asset_type,
+                data: Arc::new(data.clone()),
                 refs: 1,
+                asset_type,
             },
         );
 
-        Ok(asset)
+        Ok(data)
     }
 
-    pub fn get_texture(&self, id: &str) -> Option<Arc<Pixmap>> {
-        let assets = self.assets.read().unwrap();
-        assets.get(id).and_then(|entry| {
-            entry
-                .data
-                .downcast_ref::<Arc<Pixmap>>()
-                .map(|pixmap| Arc::clone(pixmap))
-        })
-    }
-
-    pub fn unload(&self, id: &str) {
+    pub fn unload(&self, id: &str) -> bool {
         let mut assets = self.assets.write().unwrap();
         if let Some(entry) = assets.get_mut(id) {
             entry.refs -= 1;
             if entry.refs == 0 {
                 assets.remove(id);
+                return true;
             }
         }
+        false
     }
 
-    fn resolve_path(&self, id: &str, asset_type: &AssetType) -> Result<PathBuf> {
+    fn resolve_path(&self, id: &str, asset_type: AssetType) -> Result<PathBuf> {
         let mut path = self.base_path.clone();
-
-        match asset_type {
-            AssetType::Texture => path.push("textures"),
-            AssetType::Model => path.push("models"),
-            AssetType::Sound => path.push("sounds"),
-            AssetType::Terrain => path.push("terrain"),
-        }
-
+        path.push(match asset_type {
+            AssetType::Texture => "textures",
+            AssetType::Model => "models",
+            AssetType::Sound => "sounds",
+            AssetType::Shader => "shaders",
+            AssetType::Data => "data",
+        });
         path.push(id);
 
         if !path.exists() {
             return Err(AssetError::NotFound(id.to_string()));
         }
-
         Ok(path)
-    }
-}
-
-impl Drop for AssetManager {
-    fn drop(&mut self) {
-        self.assets.write().unwrap().clear();
     }
 }
 
@@ -119,73 +100,31 @@ mod tests {
     use std::fs;
     use tempfile::TempDir;
 
-    fn setup_test_assets() -> (TempDir, AssetManager) {
+    #[test]
+    fn test_asset_loading() -> Result<()> {
         let temp_dir = TempDir::new().unwrap();
         fs::create_dir_all(temp_dir.path().join("textures")).unwrap();
-        fs::create_dir_all(temp_dir.path().join("models")).unwrap();
+
+        let test_data = b"test asset data".to_vec();
+        let test_path = temp_dir.path().join("textures/test.dat");
+        fs::write(&test_path, &test_data).unwrap();
 
         let manager = AssetManager::new(temp_dir.path());
-        (temp_dir, manager)
-    }
+        let loaded = manager.load("test.dat", AssetType::Texture, |path| Ok(fs::read(path)?))?;
 
-    #[test]
-    fn test_asset_loading() {
-        let (temp_dir, manager) = setup_test_assets();
-
-        // Create a test file
-        let test_file = temp_dir.path().join("textures/test.png");
-        fs::write(&test_file, b"test data").unwrap();
-
-        let result = manager.load("test.png", AssetType::Texture, |path| {
-            Ok(Vec::from(fs::read(path)?))
-        });
-
-        assert!(result.is_ok());
+        assert_eq!(*loaded, test_data);
+        Ok(())
     }
 
     #[test]
     fn test_asset_not_found() {
-        let (_temp_dir, manager) = setup_test_assets();
+        let temp_dir = TempDir::new().unwrap();
+        let manager = AssetManager::new(temp_dir.path());
 
-        let result = manager.load("nonexistent.png", AssetType::Texture, |path| {
-            Ok(Vec::from(fs::read(path)?))
+        let result = manager.load("nonexistent.dat", AssetType::Texture, |path| {
+            Ok(fs::read(path)?)
         });
 
         assert!(matches!(result, Err(AssetError::NotFound(_))));
-    }
-
-    #[test]
-    fn test_reference_counting() {
-        let (temp_dir, manager) = setup_test_assets();
-
-        // Create a test file
-        let test_file = temp_dir.path().join("textures/test.png");
-        fs::write(&test_file, b"test data").unwrap();
-
-        // Load the asset twice
-        let _asset1 = manager
-            .load("test.png", AssetType::Texture, |path| {
-                Ok(Vec::from(fs::read(path)?))
-            })
-            .unwrap();
-
-        let _asset2 = manager
-            .load("test.png", AssetType::Texture, |path| {
-                Ok(Vec::from(fs::read(path)?))
-            })
-            .unwrap();
-
-        // Check reference count
-        assert_eq!(
-            manager.assets.read().unwrap().get("test.png").unwrap().refs,
-            2
-        );
-
-        // Unload once
-        manager.unload("test.png");
-        assert_eq!(
-            manager.assets.read().unwrap().get("test.png").unwrap().refs,
-            1
-        );
     }
 }

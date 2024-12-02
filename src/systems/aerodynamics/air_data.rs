@@ -150,7 +150,7 @@ mod tests {
         };
 
         let env = EnvironmentResource::new(&env_config);
-        world.add_resource(env).unwrap();
+        world.add_resource(env);
 
         world
     }
@@ -219,7 +219,7 @@ mod tests {
             atmosphere_config: AtmosphereConfig::default(),
         };
         let env = EnvironmentResource::new(&env_config);
-        world.add_resource(env).unwrap();
+        world.add_resource(env);
 
         // Create aircraft at two different altitudes
         // Note: For the wind calculation, we'll let the EnvironmentResource handle the z-coordinate conversion

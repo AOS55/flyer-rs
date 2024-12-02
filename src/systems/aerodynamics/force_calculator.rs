@@ -133,7 +133,7 @@ mod tests {
 
         // Add environment resource to world
         let env = EnvironmentResource::new(&env_config);
-        world.add_resource(env).unwrap();
+        world.add_resource(env);
 
         world
     }
