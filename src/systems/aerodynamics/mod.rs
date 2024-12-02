@@ -26,7 +26,7 @@ impl System for AerodynamicsSystemGroup {
         "Aerodynamics System Group"
     }
 
-    fn run(&self, world: &mut World) -> Result<()> {
+    fn run(&mut self, world: &mut World) -> Result<()> {
         // Execute systems in order
         self.air_data.run(world)?;
         self.force_calculator.run(world)?;

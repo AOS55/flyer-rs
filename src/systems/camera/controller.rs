@@ -1,192 +1,176 @@
-use nalgebra::{Unit, UnitQuaternion, Vector3};
-use std::f64::consts::PI;
+use crate::components::CameraComponent;
+use crate::ecs::{Result, System, World};
 
-use crate::components::{CameraComponent, SpatialComponent};
-use crate::ecs::{
-    component::ComponentManager,
-    entity::EntityId,
-    system::{System, SystemContext},
-};
-use crate::resources::config::CameraConfig;
-use crate::utils::errors::SimError;
-
-use super::CameraMode;
-
-pub struct CameraSystem {
-    mode: CameraMode,
-    smooth_factor: f64,
-    height_offset: f64,
-    orbit_radius: f64,
-    orbit_angle: f64,
+pub struct CameraControllerSystem {
+    move_speed: f32,
+    zoom_speed: f32,
+    min_zoom: f32,
+    max_zoom: f32,
 }
 
-impl CameraSystem {
-    pub fn new(config: &CameraConfig) -> Self {
+impl CameraControllerSystem {
+    pub fn new() -> Self {
         Self {
-            mode: CameraMode::Free,
-            smooth_factor: config.smooth_factor,
-            height_offset: config.height_offset,
-            orbit_radius: config.orbit_radius,
-            orbit_angle: 0.0,
+            move_speed: 500.0,
+            zoom_speed: 0.1,
+            min_zoom: 0.1,
+            max_zoom: 10.0,
         }
     }
 
-    pub fn set_mode(&mut self, mode: CameraMode) {
-        self.mode = mode;
+    pub fn get_viewport_bounds(camera: &CameraComponent) -> [f32; 4] {
+        let half_size = camera.viewport * 0.5 / camera.zoom;
+        [
+            camera.position.x - half_size.x, // left
+            camera.position.y - half_size.y, // top
+            camera.position.x + half_size.x, // right
+            camera.position.y + half_size.y, // bottom
+        ]
     }
 
-    fn update_free_camera(
-        &self,
-        camera_entity: EntityId,
-        components: &mut ComponentManager,
-    ) -> Result<(), SimError> {
-        if let (Some(camera), Some(spatial)) = (
-            components.get_mut_component::<CameraComponent>(camera_entity),
-            components.get_mut_component::<SpatialComponent>(camera_entity),
-        ) {
-            camera.update_view_matrix(&spatial.position, &spatial.attitude);
+    fn update_position(&self, camera: &mut CameraComponent, _dt: f32) {
+        if let Some(target) = camera.target {
+            let diff = target - camera.position;
+            let movement = diff * camera.interpolation_factor;
+            camera.position += movement;
         }
-        Ok(())
+
+        if let Some((min, max)) = camera.bounds {
+            camera.position.x = camera.position.x.clamp(min.x, max.x);
+            camera.position.y = camera.position.y.clamp(min.y, max.y);
+        }
     }
 
-    fn update_follow_camera(
-        &self,
-        camera_entity: EntityId,
-        target_entity: EntityId,
-        components: &mut ComponentManager,
-        dt: f64,
-    ) -> Result<(), SimError> {
-        if let (Some(camera), Some(camera_spatial), Some(target_spatial)) = (
-            components.get_mut_component::<CameraComponent>(camera_entity),
-            components.get_mut_component::<SpatialComponent>(camera_entity),
-            components.get_component::<SpatialComponent>(target_entity),
-        ) {
-            let target_pos = target_spatial.position;
-            let target_att = target_spatial.attitude;
-
-            let desired_pos =
-                target_pos + (target_att * Vector3::new(0.0, 0.0, self.height_offset));
-            let current_pos = &mut camera_spatial.position;
-
-            *current_pos += (desired_pos - *current_pos) * self.smooth_factor * dt;
-            camera.update_view_matrix(current_pos, &target_att);
-        }
-        Ok(())
-    }
-
-    fn update_fixed_target_camera(
-        &self,
-        camera_entity: EntityId,
-        target_entity: EntityId,
-        components: &mut ComponentManager,
-    ) -> Result<(), SimError> {
-        if let (Some(camera), Some(camera_spatial), Some(target_spatial)) = (
-            components.get_mut_component::<CameraComponent>(camera_entity),
-            components.get_mut_component::<SpatialComponent>(camera_entity),
-            components.get_component::<SpatialComponent>(target_entity),
-        ) {
-            let look_dir = (target_spatial.position - camera_spatial.position).normalize();
-            let up = Vector3::new(0.0, 0.0, 1.0);
-            let camera_att = UnitQuaternion::face_towards(&look_dir, &up);
-
-            camera.update_view_matrix(&camera_spatial.position, &camera_att);
-        }
-        Ok(())
-    }
-
-    fn update_orbit_camera(
-        &mut self,
-        camera_entity: EntityId,
-        target_entity: EntityId,
-        components: &mut ComponentManager,
-        dt: f64,
-    ) -> Result<(), SimError> {
-        if let (Some(camera), Some(camera_spatial), Some(target_spatial)) = (
-            components.get_mut_component::<CameraComponent>(camera_entity),
-            components.get_mut_component::<SpatialComponent>(camera_entity),
-            components.get_component::<SpatialComponent>(target_entity),
-        ) {
-            self.orbit_angle += dt * 0.5;
-            if self.orbit_angle > 2.0 * PI {
-                self.orbit_angle -= 2.0 * PI;
-            }
-
-            let orbit_pos = Vector3::new(
-                self.orbit_radius * self.orbit_angle.cos(),
-                self.orbit_radius * self.orbit_angle.sin(),
-                self.height_offset,
-            );
-
-            camera_spatial.position = target_spatial.position + orbit_pos;
-            let look_dir = (target_spatial.position - camera_spatial.position).normalize();
-            let up = Vector3::new(0.0, 0.0, 1.0);
-            let camera_att = UnitQuaternion::face_towards(&look_dir, &up);
-
-            camera.update_view_matrix(&camera_spatial.position, &camera_att);
-        }
-        Ok(())
+    fn update_zoom(&self, camera: &mut CameraComponent, zoom_delta: f32) {
+        let new_zoom =
+            (camera.zoom + zoom_delta * self.zoom_speed).clamp(self.min_zoom, self.max_zoom);
+        camera.zoom = new_zoom;
     }
 }
 
-impl System for CameraSystem {
+impl System for CameraControllerSystem {
     fn name(&self) -> &str {
-        "Camera System"
+        "Camera Controller System"
     }
 
-    fn update(&mut self, ctx: &mut SystemContext) -> Result<(), SimError> {
-        for (camera_entity, camera) in ctx.components.query::<CameraComponent>() {
-            match (self.mode, camera.target) {
-                (CameraMode::Free, _) => {
-                    self.update_free_camera(camera_entity, &mut ctx.components)?;
-                }
-                (CameraMode::Follow, Some(target)) => {
-                    self.update_follow_camera(camera_entity, target, &mut ctx.components, ctx.dt)?;
-                }
-                (CameraMode::FixedTarget, Some(target)) => {
-                    self.update_fixed_target_camera(camera_entity, target, &mut ctx.components)?;
-                }
-                (CameraMode::Orbit, Some(target)) => {
-                    self.update_orbit_camera(camera_entity, target, &mut ctx.components, ctx.dt)?;
-                }
-                (_, None) => continue,
-            }
+    fn run(&mut self, world: &mut World) -> Result<()> {
+        let dt = world.get_resource::<f32>()?.clone();
+
+        for (_, camera) in world.query_mut::<CameraComponent>() {
+            self.update_position(camera, dt);
         }
+
         Ok(())
     }
 
-    fn reset(&mut self) {
-        self.orbit_angle = 0.0;
+    fn dependencies(&self) -> Vec<&str> {
+        vec![]
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::ecs::component::ComponentManager;
-    use crate::resources::config::CameraConfig;
+    use crate::ecs::{EntityId, World};
+    use glam::Vec2;
 
-    #[test]
-    fn test_camera_system_creation() {
-        let config = CameraConfig {
-            smooth_factor: 0.1,
-            height_offset: 10.0,
-            orbit_radius: 20.0,
-        };
-        let system = CameraSystem::new(&config);
-        assert_eq!(system.smooth_factor, 0.1);
-        assert_eq!(system.height_offset, 10.0);
-        assert_eq!(system.orbit_radius, 20.0);
+    // Helper function to setup a basic world with camera
+    fn setup_world() -> (World, EntityId) {
+        let mut world = World::new();
+        let camera_entity = world.spawn();
+        let camera = CameraComponent::default();
+        world.add_component(camera_entity, camera).unwrap();
+        world.add_resource(1.0f32).unwrap(); // Add dt resource
+        (world, camera_entity)
     }
 
     #[test]
-    fn test_camera_mode_switching() {
-        let config = CameraConfig::default();
-        let mut system = CameraSystem::new(&config);
+    fn test_camera_component_default() {
+        let camera = CameraComponent::default();
+        assert_eq!(camera.position, Vec2::ZERO);
+        assert_eq!(camera.viewport, Vec2::new(1920.0, 1080.0));
+        assert_eq!(camera.zoom, 1.0);
+        assert_eq!(camera.interpolation_factor, 0.1);
+        assert!(camera.bounds.is_none());
+        assert!(camera.target.is_none());
+    }
 
-        system.set_mode(CameraMode::Follow);
-        match system.mode {
-            CameraMode::Follow => (),
-            _ => panic!("Camera mode not set correctly"),
+    #[test]
+    fn test_camera_follow_target() {
+        let (mut world, camera_entity) = setup_world();
+        let target_pos = Vec2::new(100.0, 100.0);
+        let initial_pos = Vec2::ZERO;
+
+        // Set target
+        {
+            let camera = world
+                .get_component_mut::<CameraComponent>(camera_entity)
+                .unwrap();
+            camera.target = Some(target_pos);
+            camera.position = initial_pos;
+            camera.interpolation_factor = 0.5;
         }
+
+        // Run system
+        let mut system = CameraControllerSystem::new();
+        system.run(&mut world).unwrap();
+
+        // Check position update
+        let camera = world
+            .get_component::<CameraComponent>(camera_entity)
+            .unwrap();
+        assert_ne!(camera.position, initial_pos); // Verify movement occurred
+
+        // Verify movement was in the right direction
+        let to_target = target_pos - initial_pos;
+        let movement = camera.position - initial_pos;
+        assert!(to_target.dot(movement) > 0.0); // Verify we moved toward the target
+    }
+
+    #[test]
+    fn test_camera_bounds() {
+        let (mut world, camera_entity) = setup_world();
+        let min_bounds = Vec2::new(-100.0, -100.0);
+        let max_bounds = Vec2::new(100.0, 100.0);
+
+        // Set bounds and position beyond bounds
+        {
+            let camera = world
+                .get_component_mut::<CameraComponent>(camera_entity)
+                .unwrap();
+            camera.bounds = Some((min_bounds, max_bounds));
+            camera.position = Vec2::new(200.0, 200.0); // Outside bounds
+        }
+
+        // Run system
+        let mut system = CameraControllerSystem::new();
+        system.run(&mut world).unwrap();
+
+        // Check position is clamped
+        let camera = world
+            .get_component::<CameraComponent>(camera_entity)
+            .unwrap();
+        assert_eq!(camera.position, Vec2::new(100.0, 100.0)); // Should be clamped to max bounds
+    }
+
+    #[test]
+    fn test_camera_zoom() {
+        let mut camera = CameraComponent::default();
+        let system = CameraControllerSystem::new();
+
+        // Test zoom in
+        system.update_zoom(&mut camera, 1.0);
+        assert!(camera.zoom > 1.0);
+        assert!(camera.zoom <= system.max_zoom);
+
+        // Test zoom out
+        system.update_zoom(&mut camera, -2.0);
+        assert!(camera.zoom >= system.min_zoom);
+    }
+
+    #[test]
+    fn test_camera_system_dependencies() {
+        let system = CameraControllerSystem::new();
+        assert!(system.dependencies().is_empty());
     }
 }

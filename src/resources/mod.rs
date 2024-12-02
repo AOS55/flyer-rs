@@ -54,6 +54,9 @@ impl ResourceManager {
 mod tests {
     use super::*;
 
+    #[derive(Debug, PartialEq)]
+    struct TestResource(i32);
+
     #[test]
     fn test_resource_management() {
         let mut manager = ResourceManager::new();
@@ -62,5 +65,42 @@ mod tests {
         assert_eq!(manager.get::<i32>(), Some(&42));
         assert_eq!(manager.remove::<i32>(), Some(Box::new(42)));
         assert_eq!(manager.get::<i32>(), None);
+    }
+
+    #[test]
+    fn test_resource_insertion_and_retrieval() {
+        let mut manager = ResourceManager::new();
+        manager.insert(TestResource(42));
+
+        let resource = manager.get::<TestResource>();
+        assert_eq!(resource, Some(&TestResource(42)));
+    }
+
+    #[test]
+    fn test_resource_mutation() {
+        let mut manager = ResourceManager::new();
+        manager.insert(TestResource(42));
+
+        if let Some(resource) = manager.get_mut::<TestResource>() {
+            resource.0 = 84;
+        }
+
+        assert_eq!(manager.get::<TestResource>(), Some(&TestResource(84)));
+    }
+
+    #[test]
+    fn test_resource_removal() {
+        let mut manager = ResourceManager::new();
+        manager.insert(TestResource(42));
+
+        let removed = manager.remove::<TestResource>();
+        assert_eq!(removed, Some(Box::new(TestResource(42))));
+        assert_eq!(manager.get::<TestResource>(), None);
+    }
+
+    #[test]
+    fn test_nonexistent_resource() {
+        let manager = ResourceManager::new();
+        assert_eq!(manager.get::<TestResource>(), None);
     }
 }

@@ -77,7 +77,7 @@ impl System for AeroForceSystem {
         "Aerodynamic Force Calculator"
     }
 
-    fn run(&self, world: &mut World) -> Result<()> {
+    fn run(&mut self, world: &mut World) -> Result<()> {
         let mut entity_data = Vec::new();
 
         // First collect all required components
@@ -191,7 +191,7 @@ mod tests {
         world.add_component(entity, aero.clone()).unwrap();
         world.add_component(entity, physics).unwrap();
 
-        let system = AeroForceSystem::new(aero.clone());
+        let mut system = AeroForceSystem::new(aero.clone());
         system.run(&mut world).unwrap();
 
         let physics = world.get_component::<PhysicsComponent>(entity).unwrap();
@@ -228,7 +228,7 @@ mod tests {
         world.add_component(entity, aero.clone()).unwrap();
         world.add_component(entity, physics).unwrap();
 
-        let system = AeroForceSystem::new(aero);
+        let mut system = AeroForceSystem::new(aero);
         system.run(&mut world).unwrap();
 
         let physics = world.get_component::<PhysicsComponent>(entity).unwrap();
@@ -259,7 +259,7 @@ mod tests {
         world.add_component(entity, aero.clone()).unwrap();
         world.add_component(entity, physics).unwrap();
 
-        let system = AeroForceSystem::new(aero);
+        let mut system = AeroForceSystem::new(aero);
         system.run(&mut world).unwrap();
 
         let physics = world.get_component::<PhysicsComponent>(entity).unwrap();
@@ -282,7 +282,7 @@ mod tests {
         world.add_component(entity, aero.clone()).unwrap();
         world.add_component(entity, physics).unwrap();
 
-        let system = AeroForceSystem::new(aero);
+        let mut system = AeroForceSystem::new(aero);
         system.run(&mut world).unwrap();
 
         let physics = world.get_component::<PhysicsComponent>(entity).unwrap();
@@ -324,7 +324,7 @@ mod tests {
         world.add_component(entity, aero.clone()).unwrap();
         world.add_component(entity, physics).unwrap();
 
-        let system = AeroForceSystem::new(aero);
+        let mut system = AeroForceSystem::new(aero);
         system.run(&mut world).unwrap();
 
         let physics = world.get_component::<PhysicsComponent>(entity).unwrap();

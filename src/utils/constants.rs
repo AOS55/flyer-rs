@@ -12,3 +12,6 @@ pub const MAX_LOAD_FACTOR: f64 = 10.0; // Maximum load factor
 pub const MIN_LOAD_FACTOR: f64 = -5.0; // Minimum load factor
 pub const MAX_ANGLE_OF_ATTACK: f64 = 20.0; // Maximum angle of attack (degrees)
 pub const MAX_SIDESLIP: f64 = 15.0; // Maximum sideslip angle (degrees)
+
+// Terrain constants
+pub const CHUNK_SIZE: u32 = 32; // Size of terrain chunks

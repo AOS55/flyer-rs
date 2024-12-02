@@ -47,3 +47,45 @@ impl SimulationConfig {
         Ok(())
     }
 }
+
+mod tests {
+    use super::*;
+    use std::fs;
+    use tempfile::NamedTempFile;
+
+    #[test]
+    fn test_default_config() {
+        let config = SimulationConfig::default();
+        assert_eq!(config.render.screen_width, 1920);
+        assert_eq!(config.render.screen_height, 1080);
+        assert_eq!(config.physics.time_step, 1.0 / 120.0);
+        assert!(config.assets.base_path.to_str().unwrap().contains("assets"));
+    }
+
+    #[test]
+    fn test_config_save_load() -> Result<(), Box<dyn std::error::Error>> {
+        let config = SimulationConfig::default();
+        let temp_file = NamedTempFile::new()?;
+        let path = temp_file.path().to_str().unwrap();
+
+        // Test saving
+        config.save(path)?;
+        assert!(fs::metadata(path).is_ok());
+
+        // Test loading
+        let loaded_config = SimulationConfig::load(path)?;
+        assert_eq!(
+            loaded_config.render.screen_width,
+            config.render.screen_width
+        );
+        assert_eq!(loaded_config.physics.time_step, config.physics.time_step);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_invalid_config_load() {
+        let result = SimulationConfig::load("nonexistent_file.yaml");
+        assert!(result.is_err());
+    }
+}

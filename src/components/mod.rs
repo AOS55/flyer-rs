@@ -11,9 +11,10 @@ pub use aerodynamics::{
     DragCoefficients, LiftCoefficients, PitchCoefficients, RollCoefficients, SideForceCoefficients,
     YawCoefficients,
 };
+
 pub use camera::CameraComponent;
 pub use physics::{Force, ForceCategory, Moment, PhysicsComponent, ReferenceFrame};
 pub use propulsion::{PropulsionComponent, PropulsionType};
 pub use render::RenderComponent;
 pub use spatial::SpatialComponent;
-pub use terrain::TerrainComponent;
+pub use terrain::{TerrainComponent, TerrainGenConfig};

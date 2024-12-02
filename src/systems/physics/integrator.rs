@@ -60,7 +60,7 @@ impl System for PhysicsIntegrator {
         "Physics Integrator"
     }
 
-    fn run(&self, world: &mut World) -> Result<()> {
+    fn run(&mut self, world: &mut World) -> Result<()> {
         let dt = *world.get_resource::<f64>()?;
 
         for (_, (physics, spatial)) in

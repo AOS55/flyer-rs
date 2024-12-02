@@ -62,7 +62,7 @@ impl System for ForceCalculator {
         "Force Calculator"
     }
 
-    fn run(&self, world: &mut World) -> Result<()> {
+    fn run(&mut self, world: &mut World) -> Result<()> {
         let mut spatial_data = Vec::new();
 
         // First collect all spatial components

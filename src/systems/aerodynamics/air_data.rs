@@ -65,7 +65,7 @@ impl System for AirDataSystem {
         "Air Data System"
     }
 
-    fn run(&self, world: &mut World) -> Result<()> {
+    fn run(&mut self, world: &mut World) -> Result<()> {
         // Structure to hold the calculation data
         struct UpdateData {
             entity_id: EntityId,
@@ -189,7 +189,7 @@ mod tests {
 
         let entity = create_test_entity(&mut world, position, velocity, attitude);
 
-        let system = AirDataSystem;
+        let mut system = AirDataSystem;
         system.run(&mut world).unwrap();
 
         let aero = world
@@ -246,7 +246,7 @@ mod tests {
         println!("Wind at 10m altitude: {:?}", wind1);
         println!("Wind at 100m altitude: {:?}", wind2);
 
-        let system = AirDataSystem;
+        let mut system = AirDataSystem;
         system.run(&mut world).unwrap();
 
         let aero1 = world
@@ -303,7 +303,7 @@ mod tests {
             entities.push(entity);
         }
 
-        let system = AirDataSystem;
+        let mut system = AirDataSystem;
         system.run(&mut world).unwrap();
 
         // Get densities at each altitude
@@ -359,7 +359,7 @@ mod tests {
                 UnitQuaternion::identity(),
             );
 
-            let system = AirDataSystem;
+            let mut system = AirDataSystem;
             system.run(&mut world).unwrap();
 
             let aero = world

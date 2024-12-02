@@ -40,7 +40,7 @@ impl SystemManager {
     }
 
     pub fn run_system(&mut self, id: SystemId, world: &mut World) -> Result<()> {
-        if let Some(system) = self.systems.get(&id) {
+        if let Some(system) = self.systems.get_mut(&id) {
             system.run(world).map_err(|e| {
                 EcsError::SystemError(format!("System '{}' failed: {}", system.name(), e))
             })?;
@@ -54,7 +54,7 @@ impl SystemManager {
 
         // Run each system
         for id in system_ids {
-            if let Some(system) = self.systems.get(&id) {
+            if let Some(system) = self.systems.get_mut(&id) {
                 system.run(world).map_err(|e| {
                     EcsError::SystemError(format!("System '{}' failed: {}", system.name(), e))
                 })?;

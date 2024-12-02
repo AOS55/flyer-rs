@@ -35,6 +35,7 @@ argmin-math = { version = "0.3", features = ["nalgebra_latest-serde"] }
 argmin_testfunctions = "0.1.1"
 uuid = { version = "1.11", features = ["v4"] }
 petgraph = "0.6"
+tempfile = "3.2.0"
 # plotters = "0.3.5"
 
 [dev-dependencies]

@@ -2,13 +2,7 @@ pub mod components;
 pub mod ecs;
 pub mod resources;
 pub mod systems;
-// pub mod environment;
-// pub mod physics;
-// pub mod rendering;
-// pub mod state;
 pub mod utils;
-// pub mod vehicles;
-// pub mod world;
 
 // pub use environment::{
 //     runway::Runway,

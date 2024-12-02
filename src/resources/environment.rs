@@ -50,3 +50,39 @@ impl EnvironmentResource {
         self.density_model.get_density(&ned_position)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::resources::config::environment::AtmosphereConfig;
+
+    #[test]
+    fn test_constant_wind() {
+        let config = EnvironmentConfig {
+            wind_model_config: WindModelConfig::Constant {
+                velocity: Vector3::new(1.0, 0.0, 0.0),
+            },
+            atmosphere_config: AtmosphereConfig::default(),
+        };
+
+        let env = EnvironmentResource::new(&config);
+        let position = Vector3::new(0.0, 0.0, 0.0);
+        let wind = env.get_wind(&position);
+
+        assert_eq!(wind, Vector3::new(1.0, 0.0, 0.0));
+    }
+
+    #[test]
+    fn test_density_model() {
+        let config = EnvironmentConfig::default();
+        let env = EnvironmentResource::new(&config);
+
+        let ground_position = Vector3::new(0.0, 0.0, 0.0);
+        let altitude_position = Vector3::new(0.0, 0.0, 1000.0);
+
+        let ground_density = env.get_density(&ground_position);
+        let altitude_density = env.get_density(&altitude_position);
+
+        assert!(ground_density > altitude_density);
+    }
+}

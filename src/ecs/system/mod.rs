@@ -9,7 +9,7 @@ use crate::ecs::World;
 
 pub trait System: Send + Sync {
     fn name(&self) -> &str;
-    fn run(&self, world: &mut World) -> Result<()>;
+    fn run(&mut self, world: &mut World) -> Result<()>;
     fn dependencies(&self) -> Vec<&str> {
         Vec::new()
     }

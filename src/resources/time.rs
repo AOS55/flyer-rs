@@ -59,3 +59,50 @@ impl TimeManager {
         self.frame_count = 0;
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::thread;
+    use std::time::Duration;
+
+    #[test]
+    fn test_time_manager_initialization() {
+        let time_manager = TimeManager::new();
+        assert_eq!(time_manager.delta_seconds(), 0.0);
+        assert_eq!(time_manager.frame_count, 0);
+    }
+
+    #[test]
+    fn test_time_manager_update() {
+        let mut time_manager = TimeManager::new();
+        thread::sleep(Duration::from_millis(16)); // Simulate one frame
+        time_manager.update();
+
+        assert!(time_manager.delta_seconds() > 0.0);
+        assert_eq!(time_manager.frame_count, 1);
+    }
+
+    #[test]
+    fn test_time_scale() {
+        let mut time_manager = TimeManager::new();
+        time_manager.set_time_scale(2.0);
+        thread::sleep(Duration::from_millis(16));
+        time_manager.update();
+
+        let normal_delta = time_manager.delta_time.as_secs_f64();
+        let scaled_delta = time_manager.delta_seconds();
+        assert!(scaled_delta > normal_delta);
+    }
+
+    #[test]
+    fn test_reset() {
+        let mut time_manager = TimeManager::new();
+        thread::sleep(Duration::from_millis(16));
+        time_manager.update();
+        time_manager.reset();
+
+        assert_eq!(time_manager.frame_count, 0);
+        assert_eq!(time_manager.delta_seconds(), 0.0);
+    }
+}
