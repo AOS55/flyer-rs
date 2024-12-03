@@ -1,10 +1,16 @@
-use super::{System, SystemId};
+use super::{ComponentAccess, System, SystemId};
 use crate::ecs::error::{EcsError, Result};
 use crate::ecs::World;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
+
+pub struct SystemDescriptor {
+    system: Box<dyn System>,
+    access: ComponentAccess,
+    dependencies: Vec<SystemId>,
+}
 
 pub struct SystemManager {
-    systems: HashMap<SystemId, Box<dyn System>>,
+    systems: HashMap<SystemId, SystemDescriptor>,
     next_id: usize,
 }
 
@@ -19,54 +25,99 @@ impl SystemManager {
     pub fn insert_system(&mut self, system: Box<dyn System>) -> SystemId {
         let id = SystemId(self.next_id);
         self.next_id += 1;
-        self.systems.insert(id, system);
+
+        let descriptor = SystemDescriptor {
+            access: system.component_access(),
+            dependencies: Vec::new(),
+            system,
+        };
+
+        self.systems.insert(id, descriptor);
         id
     }
 
-    pub fn remove_system(&mut self, id: SystemId) -> Option<Box<dyn System>> {
-        self.systems.remove(&id)
-    }
-
-    pub fn get_system(&self, id: SystemId) -> Option<&dyn System> {
-        self.systems.get(&id).map(|s| s.as_ref())
-    }
-
-    pub fn get_system_mut(&mut self, id: SystemId) -> Option<&mut (dyn System + '_)> {
-        if let Some(system) = self.systems.get_mut(&id) {
-            Some(system.as_mut())
-        } else {
-            None
+    pub fn add_dependency(&mut self, system_id: SystemId, depends_on: SystemId) -> Result<()> {
+        if !self.systems.contains_key(&system_id) || !self.systems.contains_key(&depends_on) {
+            return Err(EcsError::SystemError("Invalid system ID".to_string()));
         }
-    }
 
-    pub fn run_system(&mut self, id: SystemId, world: &mut World) -> Result<()> {
-        if let Some(system) = self.systems.get_mut(&id) {
-            system.run(world).map_err(|e| {
-                EcsError::SystemError(format!("System '{}' failed: {}", system.name(), e))
-            })?;
+        if let Some(descriptor) = self.systems.get_mut(&system_id) {
+            descriptor.dependencies.push(depends_on);
         }
+
         Ok(())
     }
 
     pub fn run_systems(&mut self, world: &mut World) -> Result<()> {
-        // Create a vector of system IDs to avoid borrowing issues
-        let system_ids: Vec<SystemId> = self.systems.keys().copied().collect();
+        // Create execution groups based on access patterns
+        let execution_groups = self.create_execution_groups();
 
-        // Run each system
-        for id in system_ids {
-            if let Some(system) = self.systems.get_mut(&id) {
-                system.run(world).map_err(|e| {
-                    EcsError::SystemError(format!("System '{}' failed: {}", system.name(), e))
-                })?;
+        // Run each group sequentially, systems within groups can potentially run in parallel
+        for group in execution_groups {
+            for system_id in group {
+                if let Some(descriptor) = self.systems.get_mut(&system_id) {
+                    descriptor.system.run(world).map_err(|e| {
+                        EcsError::SystemError(format!(
+                            "System '{}' failed: {}",
+                            descriptor.system.name(),
+                            e
+                        ))
+                    })?;
+                }
             }
         }
         Ok(())
     }
 
-    pub fn iter(&self) -> impl Iterator<Item = (SystemId, &dyn System)> + '_ {
+    fn create_execution_groups(&self) -> Vec<Vec<SystemId>> {
+        let mut groups = Vec::new();
+        let mut remaining: HashSet<_> = self.systems.keys().copied().collect();
+
+        while !remaining.is_empty() {
+            let mut current_group = Vec::new();
+            let mut next_remaining = remaining.clone();
+
+            for &system_id in &remaining {
+                if let Some(system) = self.systems.get(&system_id) {
+                    // Check if this system can run with current group
+                    if current_group.iter().all(|&other_id| {
+                        self.systems
+                            .get(&other_id)
+                            .map_or(true, |other| !system.access.conflicts_with(&other.access))
+                    }) {
+                        current_group.push(system_id);
+                        next_remaining.remove(&system_id);
+                    }
+                }
+            }
+
+            if !current_group.is_empty() {
+                groups.push(current_group);
+            }
+            remaining = next_remaining;
+        }
+
+        groups
+    }
+
+    pub fn get_system(&self, id: SystemId) -> Option<&(dyn System + '_)> {
         self.systems
-            .iter()
-            .map(|(id, system)| (*id, system.as_ref()))
+            .get(&id)
+            .map(|descriptor| descriptor.system.as_ref())
+    }
+
+    pub fn get_system_mut(&mut self, id: SystemId) -> Option<&mut (dyn System + '_)> {
+        self.systems
+            .get_mut(&id)
+            .map(|descriptor| descriptor.system.as_mut())
+    }
+
+    pub fn run_single_system(&mut self, id: SystemId, world: &mut World) -> Result<()> {
+        if let Some(descriptor) = self.systems.get_mut(&id) {
+            descriptor.system.run(world)
+        } else {
+            Ok(())
+        }
     }
 }
 

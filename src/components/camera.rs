@@ -1,7 +1,9 @@
 use crate::ecs::component::Component;
 use glam::Vec2;
+use serde::{Deserialize, Serialize};
 use std::any::Any;
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CameraComponent {
     pub position: Vec2,               // Current position
     pub viewport: Vec2,               // Viewport dimensions

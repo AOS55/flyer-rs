@@ -21,6 +21,12 @@ impl ComponentRegistry {
             .insert(type_id, storage_constructor);
     }
 
+    pub fn ensure_capacity(&mut self, capacity: usize) {
+        for storage in self.storages.values_mut() {
+            storage.resize(capacity);
+        }
+    }
+
     pub fn get_storage<T: 'static>(&self) -> Option<&dyn ComponentStorage> {
         self.storages.get(&TypeId::of::<T>()).map(|s| s.as_ref())
     }

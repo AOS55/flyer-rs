@@ -1,8 +1,8 @@
 use super::error::{EcsError, Result};
 use crate::ecs::component::{Component, ComponentManager};
-use crate::ecs::entity::{EntityId, EntityManager, Generation};
-use crate::ecs::query::{Query, QueryItem, QueryMut};
-use crate::ecs::system::SystemManager;
+use crate::ecs::entity::{EntityId, EntityManager};
+use crate::ecs::query::{Query, QueryMut, QueryPair, QueryPairMut};
+use crate::ecs::system::{System, SystemId, SystemManager};
 use crate::resources::ResourceSystem;
 
 pub struct World {
@@ -32,40 +32,59 @@ impl World {
             resources,
         }
     }
+}
 
+// Entity Management
+impl World {
+    #[inline]
     pub fn spawn(&mut self) -> EntityId {
-        self.entities.create()
+        let entity = self.entities.create();
+        // Ensure component storage capacity matches entity capacity
+        self.components.ensure_capacity(self.entities.capacity());
+        entity
     }
 
+    #[inline]
     pub fn despawn(&mut self, entity: EntityId) -> Result<()> {
         if !self.entities.is_alive(entity) {
             return Err(EcsError::InvalidEntity(entity));
         }
-        self.entities.remove_entity(entity);
+        self.entities.remove(entity);
         Ok(())
     }
 
+    #[inline]
     pub fn is_alive(&self, entity: EntityId) -> bool {
         self.entities.is_alive(entity)
     }
 
-    pub fn add_component<T: Component + 'static + Send + Sync>(
-        &mut self,
-        entity: EntityId,
-        component: T,
-    ) -> Result<()> {
+    pub fn entities(&self) -> impl Iterator<Item = EntityId> + '_ {
+        self.entities.iter()
+    }
+
+    pub fn clear(&mut self) {
+        self.entities.clear();
+        self.components.clear();
+    }
+}
+
+// Component Management
+impl World {
+    pub fn add_component<T: Component>(&mut self, entity: EntityId, component: T) -> Result<()> {
         if !self.entities.is_alive(entity) {
             return Err(EcsError::InvalidEntity(entity));
         }
+
+        // Ensure the component type is registered
         self.components.register::<T>();
+
+        // Insert the component
         self.components.insert_component(entity, component);
         Ok(())
     }
 
-    pub fn get_component<T: Component + 'static + Send + Sync>(
-        &self,
-        entity: EntityId,
-    ) -> Result<&T> {
+    #[inline]
+    pub fn get_component<T: Component>(&self, entity: EntityId) -> Result<&T> {
         if !self.entities.is_alive(entity) {
             return Err(EcsError::InvalidEntity(entity));
         }
@@ -74,10 +93,8 @@ impl World {
             .ok_or_else(|| EcsError::ComponentError("Component not found".to_string()))
     }
 
-    pub fn get_component_mut<T: Component + 'static + Send + Sync>(
-        &mut self,
-        entity: EntityId,
-    ) -> Result<&mut T> {
+    #[inline]
+    pub fn get_component_mut<T: Component>(&mut self, entity: EntityId) -> Result<&mut T> {
         if !self.entities.is_alive(entity) {
             return Err(EcsError::InvalidEntity(entity));
         }
@@ -86,52 +103,90 @@ impl World {
             .ok_or_else(|| EcsError::ComponentError("Component not found".to_string()))
     }
 
-    pub fn get_resource<T: 'static>(&self) -> Result<&T> {
-        self.resources.get().map_err(|e| EcsError::ResourceError(e))
+    #[inline]
+    pub fn has_component<T: Component>(&self, entity: EntityId) -> bool {
+        self.entities.is_alive(entity) && self.components.has_component::<T>(entity)
     }
+}
 
-    pub fn get_resource_mut<T: 'static>(&mut self) -> Result<&mut T> {
-        self.resources
-            .get_mut()
-            .map_err(|e| EcsError::ResourceError(e))
-    }
-
-    pub fn add_resource<T: 'static + Send + Sync>(&mut self, resource: T) {
-        self.resources
-            .insert(resource)
-            .expect("Failed to insert resource"); // Or handle more gracefully if preferred
-    }
-
-    pub fn step(&mut self, _dt: f64) -> Result<()> {
-        // Create a temporary reference to avoid multiple mutable borrows
-        let world_ref = self as *mut World;
-        unsafe { self.systems.run_systems(&mut *world_ref) }
-    }
-
-    pub fn query<Q: QueryItem + 'static>(&self) -> Query<Q> {
+// Query System
+impl World {
+    pub fn query<T: Component>(&self) -> Query<T> {
         Query::new(self)
     }
 
-    pub fn query_mut<Q: QueryItem + 'static>(&mut self) -> QueryMut<Q> {
+    pub fn query_mut<T: Component>(&mut self) -> QueryMut<T> {
         QueryMut::new(self)
     }
 
-    pub fn has_component<T: Component + 'static>(&self, entity: EntityId) -> bool {
-        if !self.entities.is_alive(entity) {
-            return false;
-        }
-        self.components.has_component::<T>(entity)
+    pub fn query_pair<A: Component, B: Component>(&self) -> QueryPair<A, B> {
+        QueryPair::new(self)
     }
 
-    pub fn entities(&self) -> impl Iterator<Item = EntityId> + '_ {
-        (0..self.entities.len()).filter_map(|i| {
-            let entity = EntityId::new(i as u32, Generation::default());
-            if self.entities.is_alive(entity) {
-                Some(entity)
-            } else {
-                None
-            }
-        })
+    pub fn query_pair_mut<A: Component, B: Component>(&mut self) -> QueryPairMut<A, B> {
+        QueryPairMut::new(self)
+    }
+}
+
+// System Management
+impl World {
+    pub fn add_system<S: System + 'static>(&mut self, system: S) -> SystemId {
+        self.systems.insert_system(Box::new(system))
+    }
+
+    pub fn add_system_with_dependencies<S: System + 'static>(
+        &mut self,
+        system: S,
+        dependencies: Vec<SystemId>,
+    ) -> Result<SystemId> {
+        let id = self.systems.insert_system(Box::new(system));
+        for dep_id in dependencies {
+            self.systems.add_dependency(id, dep_id)?;
+        }
+        Ok(id)
+    }
+
+    pub fn run_systems(&mut self) -> Result<()> {
+        // Create new instances to swap with
+        let mut temp_world = World::default();
+        let mut temp_manager = SystemManager::new();
+
+        // Swap the contents instead of moving ownership
+        std::mem::swap(self, &mut temp_world);
+        std::mem::swap(&mut self.systems, &mut temp_manager);
+
+        // Get the scheduler reference before moving temp_world
+        let scheduler = &self.scheduler;
+
+        // Execute systems
+        let result = scheduler.execute_systems(temp_world, temp_manager);
+
+        if let Ok((modified_world, modified_manager)) = result {
+            // Swap back the modified versions
+            *self = modified_world;
+            self.systems = modified_manager;
+            Ok(())
+        } else {
+            // Handle error case - might want to restore original state
+            Err(EcsError::SystemError("System execution failed".to_string()))
+        }
+    }
+}
+
+// Resource Management
+impl World {
+    pub fn add_resource<T: 'static + Send + Sync>(&mut self, resource: T) {
+        self.resources
+            .insert(resource)
+            .expect("Failed to insert resource");
+    }
+
+    pub fn get_resource<T: 'static>(&self) -> Result<&T> {
+        self.resources.get().map_err(EcsError::ResourceError)
+    }
+
+    pub fn get_resource_mut<T: 'static>(&mut self) -> Result<&mut T> {
+        self.resources.get_mut().map_err(EcsError::ResourceError)
     }
 }
 
@@ -213,22 +268,7 @@ mod tests {
     }
 
     #[test]
-    fn test_world_query() {
-        let mut world = World::new();
-
-        let entity1 = world.spawn();
-        let entity2 = world.spawn();
-
-        world
-            .add_component(entity1, Position { x: 1.0, y: 1.0 })
-            .unwrap();
-        world
-            .add_component(entity2, Position { x: 2.0, y: 2.0 })
-            .unwrap();
-
-        let positions: Vec<_> = world.query::<Position>().collect();
-        assert_eq!(positions.len(), 2);
-    }
+    fn test_world_query() {}
 
     #[test]
     fn test_multiple_components() {

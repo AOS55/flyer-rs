@@ -1,3 +1,3 @@
 pub mod query;
 
-pub use query::{ComponentPair, Query, QueryItem, QueryMut};
+pub use query::{Query, QueryMut, QueryPair, QueryPairMut};

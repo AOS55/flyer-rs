@@ -18,6 +18,10 @@ impl ComponentManager {
             .register::<T>(|| Box::new(VecStorage::<T>::new()));
     }
 
+    pub fn ensure_capacity(&mut self, capacity: usize) {
+        self.registry.ensure_capacity(capacity);
+    }
+
     pub fn insert_component<T: 'static + Send + Sync>(&mut self, entity: EntityId, component: T) {
         let storage = self.registry.get_storage_mut::<T>();
         storage
@@ -27,18 +31,16 @@ impl ComponentManager {
             .insert(entity, component);
     }
 
-    pub fn remove_component<T: 'static + Send + Sync>(&mut self, entity: EntityId) -> bool {
-        let storage = self.registry.get_storage_mut::<T>();
-        storage.remove(entity)
-    }
-
+    #[inline]
     pub fn get_component<T: 'static + Send + Sync>(&self, entity: EntityId) -> Option<&T> {
         self.registry
-            .get_storage::<T>()
-            .and_then(|storage| storage.as_any().downcast_ref::<VecStorage<T>>())
+            .get_storage::<T>()?
+            .as_any()
+            .downcast_ref::<VecStorage<T>>()
             .and_then(|storage| storage.get(entity))
     }
 
+    #[inline]
     pub fn get_component_mut<T: 'static + Send + Sync>(
         &mut self,
         entity: EntityId,
@@ -50,6 +52,12 @@ impl ComponentManager {
             .and_then(|storage| storage.get_mut(entity))
     }
 
+    pub fn remove_component<T: 'static + Send + Sync>(&mut self, entity: EntityId) -> bool {
+        let storage = self.registry.get_storage_mut::<T>();
+        storage.remove(entity)
+    }
+
+    #[inline]
     pub fn has_component<T: 'static + Send + Sync>(&self, entity: EntityId) -> bool {
         self.registry
             .get_storage::<T>()
