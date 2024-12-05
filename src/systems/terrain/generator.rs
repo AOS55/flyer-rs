@@ -1,574 +1,884 @@
-use crate::systems::terrain::noise::NoiseGenerator;
-use glam::{UVec2, Vec2};
+use bevy::prelude::*;
 use kiddo::distance::squared_euclidean;
 use kiddo::KdTree;
+use noise::{NoiseFn, OpenSimplex};
 use rand::prelude::*;
 use std::collections::HashMap;
 
 use crate::components::terrain::*;
-use crate::components::CameraComponent;
-use crate::ecs::{Result, System, World};
 
+#[derive(Resource)]
 pub struct TerrainGeneratorSystem {
-    noise_gen: NoiseGenerator,
+    noise_gen: OpenSimplex,
     rng: StdRng,
-    kd_tree: KdTree<f32, 2>,
+    field_density: f32,
+    kd_tree: Option<KdTree<f32, 2>>,
 }
 
 impl TerrainGeneratorSystem {
     pub fn new(seed: u64) -> Self {
         Self {
-            noise_gen: NoiseGenerator::new(seed),
+            noise_gen: OpenSimplex::new(seed as u32),
             rng: StdRng::seed_from_u64(seed),
-            kd_tree: KdTree::new(),
+            field_density: 0.001,
+            kd_tree: None,
         }
     }
 
-    fn generate_chunk(&mut self, pos: UVec2, terrain: &TerrainComponent) -> TerrainChunk {
-        let mut chunk = TerrainChunk::new(terrain.chunk_size);
-        let chunk_pos = Vec2::new(
-            pos.x as f32 * terrain.chunk_size as f32,
-            pos.y as f32 * terrain.chunk_size as f32,
-        );
+    fn init_kd_tree(&mut self, chunk_size: u32) {
+        let mut tree = KdTree::new();
 
-        // Generate height and moisture maps
-        let (height_map, moisture_map) =
-            self.noise_gen
-                .generate_terrain_maps(chunk_pos, terrain.chunk_size, &terrain.config);
+        // Calculate number of biome points based on chunk size and density
+        let n_points = ((chunk_size * chunk_size) as f32 * self.field_density) as usize;
 
-        chunk.height_map = height_map;
-        chunk.moisture_map = moisture_map;
+        // Generate random biome points
+        for _ in 0..n_points {
+            let x = self.rng.gen::<f32>() * chunk_size as f32;
+            let y = self.rng.gen::<f32>() * chunk_size as f32;
+            let biome = select_random_biome(&mut self.rng) as usize;
 
-        // Rest of chunk generation...
-        self.generate_biomes(&mut chunk, pos, terrain);
-        self.place_features(&mut chunk, pos, terrain);
+            tree.add(&[x, y], biome);
+        }
 
-        chunk
+        self.kd_tree = Some(tree);
+    }
+
+    fn get_biome_from_position(&self, pos: Vec2) -> BiomeType {
+        if let Some(tree) = &self.kd_tree {
+            let (_distance, biome_idx) = tree.nearest_one(&[pos.x, pos.y], &squared_euclidean);
+            match biome_idx {
+                0 => BiomeType::Grass,
+                1 => BiomeType::Forest,
+                2 => BiomeType::Crops,
+                3 => BiomeType::Orchard,
+                _ => BiomeType::Grass, // Default fallback
+            }
+        } else {
+            BiomeType::Grass // Fallback if no tree initialized
+        }
     }
 }
 
-impl TerrainGeneratorSystem {
-    fn generate_biomes(
-        &mut self,
-        chunk: &mut TerrainChunk,
-        pos: UVec2,
-        terrain: &TerrainComponent,
-    ) {
-        let size = terrain.chunk_size as usize;
-        let chunk_pos = Vec2::new(
-            pos.x as f32 * terrain.chunk_size as f32,
-            pos.y as f32 * terrain.chunk_size as f32,
-        );
-
-        // Generate biome cluster points if not already generated
-        self.ensure_biome_clusters(terrain);
-
-        // Process each tile in the chunk
-        for y in 0..size {
-            for x in 0..size {
-                let world_pos = Vec2::new(chunk_pos.x + x as f32, chunk_pos.y + y as f32);
-
-                let height = chunk.height_map[y * size + x];
-                let moisture = chunk.moisture_map[y * size + x];
-
-                // Determine biome based on height, moisture, and nearest clusters
-                chunk.biome_map[y * size + x] =
-                    self.determine_biome(world_pos, height, moisture, terrain);
-            }
-        }
-    }
-
-    fn select_weighted_biome(&mut self, config: &TerrainGenConfig) -> BiomeType {
-        let total_weight: f32 = config.biome_weights.values().sum();
-        let mut random = self.rng.gen::<f32>() * total_weight;
-
-        for (biome, weight) in &config.biome_weights {
-            random -= weight;
-            if random <= 0.0 {
-                return *biome;
-            }
-        }
-
-        BiomeType::Grass // Default fallback
-    }
-
-    fn biome_to_index(&self, biome: BiomeType) -> usize {
-        match biome {
-            BiomeType::Grass => 0,
-            BiomeType::Forest => 1,
-            BiomeType::Crops => 2,
-            BiomeType::Orchard => 3,
-            BiomeType::Water => 4,
-            BiomeType::Sand => 5,
-        }
-    }
-
-    fn index_to_biome(&self, index: usize) -> BiomeType {
-        match index {
-            0 => BiomeType::Grass,
-            1 => BiomeType::Forest,
-            2 => BiomeType::Crops,
-            3 => BiomeType::Orchard,
-            4 => BiomeType::Water,
-            5 => BiomeType::Sand,
-            _ => BiomeType::Grass, // Default fallback
-        }
-    }
-
-    fn ensure_biome_clusters(&mut self, terrain: &TerrainComponent) {
-        if self.kd_tree.size() == 0 {
-            let world_area = (terrain.world_size.x * terrain.world_size.y) as f32;
-            let n_clusters = (world_area * terrain.config.field_density) as usize;
-
-            for _ in 0..n_clusters {
-                let x = self.rng.gen_range(0.0..terrain.world_size.x as f32);
-                let y = self.rng.gen_range(0.0..terrain.world_size.y as f32);
-
-                let biome = self.select_weighted_biome(&terrain.config);
-                // Convert BiomeType to usize for KD-tree storage
-                let biome_index = self.biome_to_index(biome);
-
-                self.kd_tree.add(&[x, y], biome_index);
-            }
-        }
-    }
-
-    fn determine_biome(
-        &self,
-        world_pos: Vec2,
-        height: f32,
-        moisture: f32,
-        terrain: &TerrainComponent,
-    ) -> BiomeType {
-        // Check for water and beach first based on height
-        if height < terrain.config.water_threshold {
-            return BiomeType::Water;
-        }
-        if height < terrain.config.water_threshold + terrain.config.beach_width {
-            return BiomeType::Sand;
-        }
-
-        // Find nearest biome cluster
-        let nearest = self
-            .kd_tree
-            .nearest_one(&[world_pos.x, world_pos.y], &squared_euclidean);
-        let base_biome = self.index_to_biome(nearest.1);
-
-        // Calculate probabilities for nearby biomes
-        let mut biome_scores: HashMap<BiomeType, f32> = HashMap::new();
-
-        // Score the base biome
-        let base_prob = terrain
-            .config
-            .get_biome_probability(height, moisture, base_biome);
-        biome_scores.insert(base_biome, base_prob);
-
-        // Score potential transitions
-        for (biome, _) in &terrain.config.biome_weights {
-            if *biome != base_biome {
-                let prob = terrain
-                    .config
-                    .get_biome_probability(height, moisture, *biome);
-                biome_scores.insert(*biome, prob * 0.5);
-            }
-        }
-
-        // Select highest scoring biome
-        biome_scores
-            .into_iter()
-            .max_by(|a, b| a.1.partial_cmp(&b.1).unwrap())
-            .map(|(biome, _)| biome)
-            .unwrap_or(base_biome)
+impl FromWorld for TerrainGeneratorSystem {
+    fn from_world(world: &mut World) -> Self {
+        let seed = world.resource::<TerrainState>().seed;
+        Self::new(seed)
     }
 }
 
-impl TerrainGeneratorSystem {
-    fn place_features(&mut self, chunk: &mut TerrainChunk, pos: UVec2, terrain: &TerrainComponent) {
-        let size = terrain.chunk_size as usize;
-        let chunk_world_pos = terrain.chunk_to_world_pos(pos);
-
-        for y in 0..size {
-            for x in 0..size {
-                let local_pos = Vec2::new(x as f32, y as f32) * terrain.scale;
-                let world_pos = chunk_world_pos + local_pos;
-
-                let biome = chunk.biome_map[y * size + x];
-                let height = chunk.height_map[y * size + x];
-                let moisture = chunk.moisture_map[y * size + x];
-
-                // Get variation noise for this position
-                let variation = self.noise_gen.get_feature_variation(world_pos, 30.0);
-
-                // Try to place features based on biome and local conditions
-                if let Some(feature) =
-                    self.generate_feature(biome, world_pos, height, moisture, variation, terrain)
-                {
-                    chunk.features.push(feature);
-                }
-            }
-        }
+/// System to generate terrain data for new chunks
+pub fn terrain_generation_system(
+    mut commands: Commands,
+    mut chunks: Query<(Entity, &mut TerrainChunkComponent), Added<TerrainChunkComponent>>,
+    terrain_state: Res<TerrainState>,
+    terrain_config: Res<TerrainConfig>,
+    terrain_assets: Res<TerrainAssets>,
+    mut generator: ResMut<TerrainGeneratorSystem>,
+) {
+    if !chunks.is_empty() {
+        info!("Generating chunks: {}", chunks.iter().count());
     }
 
-    fn generate_feature(
-        &mut self,
-        biome: BiomeType,
-        pos: Vec2,
-        height: f32,
-        moisture: f32,
-        variation: f32,
-        terrain: &TerrainComponent,
-    ) -> Option<TerrainFeature> {
-        match biome {
-            BiomeType::Forest => self.generate_forest_feature(pos, variation, terrain),
-            BiomeType::Orchard => self.generate_orchard_feature(pos, variation, terrain),
-            BiomeType::Crops => self.generate_crop_feature(pos, moisture, variation, terrain),
-            BiomeType::Grass => self.generate_grass_feature(pos, moisture, variation, terrain),
-            _ => None,
-        }
-    }
+    generator.init_kd_tree(terrain_state.chunk_size);
 
-    fn generate_forest_feature(
-        &mut self,
-        pos: Vec2,
-        variation: f32,
-        terrain: &TerrainComponent,
-    ) -> Option<TerrainFeature> {
-        let tree_density = terrain.config.get_feature_density(
-            FeatureType::Tree {
-                variant: TreeVariant::EvergreenFir,
-            },
-            BiomeType::Forest,
+    for (entity, mut chunk) in chunks.iter_mut() {
+        generate_chunk_data(&mut chunk, &terrain_state, &terrain_config, &mut generator);
+        spawn_chunk_features(
+            &mut commands,
+            entity,
+            &chunk,
+            &terrain_state,
+            &terrain_config,
+            &terrain_assets,
+            &mut generator.rng,
         );
-
-        if self.rng.gen::<f32>() > tree_density {
-            return None;
-        }
-
-        // Use variation to determine tree type
-        let (variant, asset) = if variation > 0.3 {
-            (TreeVariant::EvergreenFir, "evergreen-fur")
-        } else if variation > 0.0 {
-            (TreeVariant::WiltingFir, "wilting-fur")
-        } else {
-            (TreeVariant::EvergreenFir, "evergreen-fur")
-        };
-
-        Some(TerrainFeature {
-            name: "tree".to_string(),
-            asset: asset.to_string(),
-            feature_type: FeatureType::Tree { variant },
-            position: pos,
-            rotation: self.noise_gen.get_feature_rotation(pos),
-            scale: 0.8 + variation.abs() * 0.4, // Scale variation 0.8-1.2
-        })
-    }
-
-    fn generate_orchard_feature(
-        &mut self,
-        pos: Vec2,
-        variation: f32,
-        terrain: &TerrainComponent,
-    ) -> Option<TerrainFeature> {
-        let tree_density = terrain.config.get_feature_density(
-            FeatureType::Tree {
-                variant: TreeVariant::AppleTree,
-            },
-            BiomeType::Orchard,
-        );
-
-        if self.rng.gen::<f32>() > tree_density {
-            return None;
-        }
-
-        let variant = if variation > 0.0 {
-            (TreeVariant::AppleTree, "apple-tree")
-        } else {
-            (TreeVariant::PrunedTree, "pruned-tree")
-        };
-
-        Some(TerrainFeature {
-            name: "orchard_tree".to_string(),
-            asset: variant.1.to_string(),
-            feature_type: FeatureType::Tree { variant: variant.0 },
-            position: pos,
-            rotation: self.noise_gen.get_feature_rotation(pos),
-            scale: 1.0,
-        })
-    }
-
-    fn generate_crop_feature(
-        &mut self,
-        pos: Vec2,
-        moisture: f32,
-        variation: f32,
-        terrain: &TerrainComponent,
-    ) -> Option<TerrainFeature> {
-        let bush_density = terrain.config.get_feature_density(
-            FeatureType::Bush {
-                variant: BushVariant::GreenBushel,
-            },
-            BiomeType::Crops,
-        );
-
-        if self.rng.gen::<f32>() > bush_density {
-            return None;
-        }
-
-        // Use moisture and variation to determine bush type
-        let variant = if moisture > 0.6 {
-            (BushVariant::GreenBushel, "green-bushel")
-        } else if variation > 0.0 {
-            (BushVariant::RipeBushel, "ripe-bushel")
-        } else {
-            (BushVariant::DeadBushel, "dead-bushel")
-        };
-
-        Some(TerrainFeature {
-            name: "bush".to_string(),
-            asset: variant.1.to_string(),
-            feature_type: FeatureType::Bush { variant: variant.0 },
-            position: pos,
-            rotation: 0.0,
-            scale: 1.0,
-        })
-    }
-
-    fn generate_grass_feature(
-        &mut self,
-        pos: Vec2,
-        moisture: f32,
-        variation: f32,
-        terrain: &TerrainComponent,
-    ) -> Option<TerrainFeature> {
-        let flower_density = terrain.config.get_feature_density(
-            FeatureType::Flower {
-                variant: FlowerVariant::Single,
-            },
-            BiomeType::Grass,
-        );
-
-        if self.rng.gen::<f32>() > flower_density || moisture < 0.4 {
-            return None;
-        }
-
-        // Use variation to determine flower type
-        let variant = if variation > 0.5 {
-            (FlowerVariant::Cluster, "flower-cluster")
-        } else if variation > 0.0 {
-            (FlowerVariant::Double, "flower-double")
-        } else if variation > -0.5 {
-            (FlowerVariant::Quad, "flower-quad")
-        } else {
-            (FlowerVariant::Single, "flower-single")
-        };
-
-        Some(TerrainFeature {
-            name: "flower".to_string(),
-            asset: variant.1.to_string(),
-            feature_type: FeatureType::Flower { variant: variant.0 },
-            position: pos,
-            rotation: self.noise_gen.get_feature_rotation(pos),
-            scale: 0.9 + variation.abs() * 0.2,
-        })
     }
 }
 
-impl System for TerrainGeneratorSystem {
-    fn name(&self) -> &str {
-        "Terrain Generator System"
-    }
+pub fn generate_chunk_data(
+    chunk: &mut TerrainChunkComponent,
+    state: &TerrainState,
+    config: &TerrainConfig,
+    generator: &mut TerrainGeneratorSystem,
+) {
+    let chunk_size = state.chunk_size as i32;
 
-    fn run(&mut self, world: &mut World) -> Result<()> {
-        // Get visible chunks based on camera position
-        let camera = world.get_resource::<CameraComponent>()?;
-        let visible_chunks = TerrainComponent::get_visible_chunks(camera);
+    // Calculate base world coordinates for this chunk
+    let chunk_world_x = chunk.position.x * state.chunk_size as i32;
+    let chunk_world_y = chunk.position.y * state.chunk_size as i32;
 
-        for (_, terrain) in world.query_mut::<TerrainComponent>() {
-            // Generate missing chunks
-            for chunk_pos in &visible_chunks {
-                if !terrain.chunks.contains_key(chunk_pos) {
-                    let chunk = self.generate_chunk(*chunk_pos, terrain);
-                    terrain.chunks.insert(*chunk_pos, chunk);
-                }
-            }
+    // Pre-calculate scale for consistency
+    let world_scale = config.noise_scale;
 
-            // Update active chunks list
-            terrain.active_chunks = visible_chunks.clone().into_iter().collect();
+    // Generate height and moisture maps
+    for y in 0..chunk_size {
+        for x in 0..chunk_size {
+            let idx = (y * chunk_size + x) as usize;
 
-            // Clean up far chunks
-            terrain.chunks.retain(|pos, _| visible_chunks.contains(pos));
+            // Special handling for chunk boundaries in both x and y directions
+            let world_x = if x == 0 && chunk.position.x > 0 {
+                // Left edge (except for leftmost chunks)
+                (chunk_world_x - 1) as f32
+            } else {
+                (chunk_world_x + x as i32) as f32
+            };
+
+            let world_y = if y == 0 && chunk.position.y > 0 {
+                // Bottom edge (except for bottom chunks)
+                (chunk_world_y - 1) as f32
+            } else {
+                (chunk_world_y + y as i32) as f32
+            };
+
+            // Calculate world coordinates
+            let world_pos = Vec2::new(world_x, world_y);
+
+            chunk.height_map[idx] = generate_noise_value(
+                &generator.noise_gen,
+                world_pos,
+                world_scale,
+                config.noise_octaves,
+                config.noise_persistence,
+                config.noise_lacunarity,
+            );
+
+            chunk.moisture_map[idx] = generate_noise_value(
+                &generator.noise_gen,
+                world_pos * config.moisture_scale,
+                world_scale,
+                config.noise_octaves - 1,
+                config.noise_persistence,
+                config.noise_lacunarity,
+            );
+
+            chunk.biome_map[idx] = determine_biome(
+                chunk.height_map[idx],
+                chunk.moisture_map[idx],
+                world_pos,
+                config,
+                generator,
+            );
         }
-
-        Ok(())
-    }
-
-    fn dependencies(&self) -> Vec<&str> {
-        vec!["Camera System"]
     }
 }
 
+fn generate_noise_value(
+    noise: &OpenSimplex,
+    pos: Vec2,
+    scale: f32,
+    octaves: u32,
+    persistence: f32,
+    lacunarity: f32,
+) -> f32 {
+    let mut amplitude = 1.0;
+    let mut frequency = 1.0;
+    let mut noise_value = 0.0;
+    let mut weight = 0.0;
+
+    // Use doubles for better precision
+    let base_x = pos.x as f64;
+    let base_y = pos.y as f64;
+    let scale_d = scale as f64;
+
+    for _ in 0..octaves {
+        let sample_x = (base_x * frequency) / scale_d;
+        let sample_y = (base_y * frequency) / scale_d;
+
+        let noise_val = noise.get([sample_x as f64, sample_y as f64]) as f32;
+
+        noise_value += noise_val * amplitude;
+        weight += amplitude;
+        amplitude *= persistence;
+        frequency *= lacunarity as f64;
+    }
+
+    (noise_value / weight + 1.0) * 0.5
+}
+
+fn determine_biome(
+    height: f32,
+    moisture: f32,
+    pos: Vec2,
+    config: &TerrainConfig,
+    generator: &mut TerrainGeneratorSystem,
+) -> BiomeType {
+    // Check for water and beach first
+    if height < config.water_threshold {
+        return BiomeType::Water;
+    }
+    if height < config.water_threshold + config.beach_width {
+        return BiomeType::Sand;
+    }
+
+    // Get base biome from KD-tree
+    let base_biome = generator.get_biome_from_position(pos);
+
+    // Apply moisture and height modifications
+    let base_probability = config.get_biome_probability(height, moisture, base_biome);
+
+    // Calculate probabilities for all biomes
+    let mut biome_scores: HashMap<BiomeType, f32> = HashMap::new();
+    biome_scores.insert(base_biome, base_probability);
+
+    for (&biome, &weight) in &config.biome_weights {
+        if biome != base_biome {
+            let prob = config.get_biome_probability(height, moisture, biome);
+            biome_scores.insert(biome, prob * weight * 0.5);
+        }
+    }
+
+    // Select highest scoring biome
+    biome_scores
+        .into_iter()
+        .max_by(|a, b| a.1.partial_cmp(&b.1).unwrap())
+        .map(|(biome, _)| biome)
+        .unwrap_or(base_biome)
+}
+
+fn select_random_biome(rng: &mut StdRng) -> BiomeType {
+    let roll = rng.gen_range(0..100);
+    match roll {
+        0..=30 => BiomeType::Grass,
+        31..=50 => BiomeType::Forest,
+        51..=65 => BiomeType::Crops,
+        66..=80 => BiomeType::Orchard,
+        81..=90 => BiomeType::Water,
+        _ => BiomeType::Sand,
+    }
+}
+
+fn spawn_chunk_features(
+    commands: &mut Commands,
+    chunk_entity: Entity,
+    chunk: &TerrainChunkComponent,
+    state: &TerrainState,
+    config: &TerrainConfig,
+    assets: &TerrainAssets,
+    rng: &mut StdRng,
+) {
+    let chunk_size = state.chunk_size as usize;
+    let world_pos = Vec2::new(
+        chunk.position.x as f32 * state.chunk_size as f32 * state.scale,
+        chunk.position.y as f32 * state.chunk_size as f32 * state.scale,
+    );
+
+    for y in 0..chunk_size {
+        for x in 0..chunk_size {
+            let idx = y * chunk_size + x;
+            let pos = world_pos + Vec2::new(x as f32, y as f32) * state.scale;
+            let biome = chunk.biome_map[idx];
+
+            // Try to spawn features based on biome
+            if let Some(feature) = try_spawn_feature(
+                pos,
+                biome,
+                chunk.height_map[idx],
+                chunk.moisture_map[idx],
+                config,
+                rng,
+            ) {
+                spawn_feature(commands, chunk_entity, feature, assets);
+            }
+        }
+    }
+}
+
+fn try_spawn_feature(
+    pos: Vec2,
+    biome: BiomeType,
+    height: f32,
+    moisture: f32,
+    config: &TerrainConfig,
+    rng: &mut StdRng,
+) -> Option<TerrainFeatureComponent> {
+    match biome {
+        BiomeType::Forest => try_spawn_tree(pos, height, moisture, config, rng),
+        BiomeType::Orchard => try_spawn_orchard_tree(pos, height, moisture, config, rng),
+        BiomeType::Crops => try_spawn_bush(pos, height, moisture, config, rng),
+        BiomeType::Grass => try_spawn_flower(pos, height, moisture, config, rng),
+        _ => None,
+    }
+}
+
+fn spawn_feature(
+    commands: &mut Commands,
+    chunk_entity: Entity,
+    feature: TerrainFeatureComponent,
+    assets: &TerrainAssets,
+) {
+    if let Some(&sprite_index) = assets.feature_mappings.get(&feature.feature_type) {
+        commands
+            .spawn((
+                feature.clone(),
+                Sprite::from_atlas_image(
+                    assets.feature_texture.clone(),
+                    TextureAtlas {
+                        layout: assets.feature_layout.clone(),
+                        index: sprite_index,
+                    },
+                ),
+                Transform::from_translation(feature.position.extend(10.0))
+                    .with_rotation(Quat::from_rotation_z(feature.rotation))
+                    .with_scale(Vec3::splat(feature.scale)),
+                GlobalTransform::default(),
+                Visibility::default(),
+                InheritedVisibility::default(),
+                ViewVisibility::default(),
+            ))
+            .set_parent(chunk_entity);
+    }
+}
+
+// Implement similar functions for other feature types
+fn try_spawn_tree(
+    pos: Vec2,
+    _height: f32,
+    _moisture: f32,
+    config: &TerrainConfig,
+    rng: &mut StdRng,
+) -> Option<TerrainFeatureComponent> {
+    // Determine tree type based on random value
+    let tree_type = if rng.gen::<f32>() < 0.6 {
+        TreeVariant::EvergreenFir
+    } else {
+        TreeVariant::WiltingFir
+    };
+
+    let feature_type = FeatureType::Tree(tree_type);
+    let density = config.get_feature_density(feature_type, BiomeType::Forest);
+
+    if rng.gen::<f32>() > density {
+        return None;
+    }
+
+    Some(TerrainFeatureComponent {
+        feature_type,
+        variant: FeatureVariant::Tree(tree_type),
+        position: pos,
+        rotation: std::f32::consts::TAU,
+        scale: 0.8 + rng.gen::<f32>() * 0.4,
+    })
+}
+
+fn try_spawn_orchard_tree(
+    pos: Vec2,
+    _height: f32,
+    _moisture: f32,
+    config: &TerrainConfig,
+    rng: &mut StdRng,
+) -> Option<TerrainFeatureComponent> {
+    let object_probability = rng.gen::<f32>();
+
+    let tree_type = if rng.gen::<f32>() < 0.75 {
+        TreeVariant::AppleTree
+    } else {
+        TreeVariant::PrunedTree
+    };
+
+    let feature_type = FeatureType::Tree(tree_type);
+    if object_probability > config.get_feature_density(feature_type, BiomeType::Forest) {
+        return None;
+    }
+
+    Some(TerrainFeatureComponent {
+        feature_type,
+        variant: FeatureVariant::Tree(tree_type),
+        position: pos,
+        rotation: std::f32::consts::TAU,
+        scale: 0.9 + rng.gen::<f32>() * 0.2,
+    })
+}
+
+fn try_spawn_bush(
+    pos: Vec2,
+    _height: f32,
+    _moisture: f32,
+    _config: &TerrainConfig,
+    rng: &mut StdRng,
+) -> Option<TerrainFeatureComponent> {
+    // Using original crops logic for bush placement
+    let spawn_chance = rng.gen::<f32>();
+    if spawn_chance > 0.3 {
+        // Adjust this value as needed
+        return None;
+    }
+
+    let bush_type = match rng.gen_range(0..3) {
+        0 => BushVariant::GreenBushel,
+        1 => BushVariant::RipeBushel,
+        _ => BushVariant::DeadBushel,
+    };
+
+    let feature_type = FeatureType::Bush(bush_type);
+
+    Some(TerrainFeatureComponent {
+        feature_type,
+        variant: FeatureVariant::Bush(bush_type),
+        position: pos,
+        rotation: std::f32::consts::TAU,
+        scale: 0.7 + rng.gen::<f32>() * 0.3,
+    })
+}
+
+fn try_spawn_flower(
+    pos: Vec2,
+    _height: f32,
+    _moisture: f32,
+    config: &TerrainConfig,
+    rng: &mut StdRng,
+) -> Option<TerrainFeatureComponent> {
+    // Using original orchard flower logic
+
+    let flower_type = match rng.gen_range(0..4) {
+        0 => FlowerVariant::Single,
+        1 => FlowerVariant::Double,
+        2 => FlowerVariant::Quad,
+        _ => FlowerVariant::Cluster,
+    };
+
+    let feature_type = FeatureType::Flower(flower_type);
+    let density = config.get_feature_density(feature_type, BiomeType::Grass);
+
+    if rng.gen::<f32>() > density {
+        return None;
+    }
+
+    Some(TerrainFeatureComponent {
+        feature_type,
+        variant: FeatureVariant::Flower(flower_type),
+        position: pos,
+        rotation: std::f32::consts::TAU,
+        scale: 0.6 + rng.gen::<f32>() * 0.2,
+    })
+}
+
+#[cfg(test)]
 mod tests {
     use super::*;
-    use crate::components::CameraComponent;
-    use crate::ecs::EntityId;
-    use glam::Vec2;
+    use approx::assert_relative_eq; // Add this to Cargo.toml for float comparisons
 
-    fn setup_test_world() -> (World, EntityId) {
-        let mut world = World::new();
+    mod generator_initialization {
+        use super::*;
 
-        // Add camera
-        let camera = CameraComponent {
-            position: Vec2::ZERO,
-            viewport: Vec2::new(800.0, 600.0),
-            zoom: 1.0,
-            ..Default::default()
-        };
-        world.add_resource(camera);
+        #[test]
+        fn test_generator_initialization_with_seed() {
+            let seed = 12345;
+            let generator = TerrainGeneratorSystem::new(seed);
 
-        // Add terrain component
-        let terrain_entity = world.spawn();
-        let terrain = TerrainComponent::new(UVec2::new(1000, 1000), 32, 12345, 1.0);
-        world.add_component(terrain_entity, terrain).unwrap();
+            assert!(generator.kd_tree.is_none());
+            assert_eq!(generator.field_density, 0.001);
+        }
 
-        (world, terrain_entity)
-    }
+        #[test]
+        fn test_kd_tree_initialization() {
+            let mut generator = TerrainGeneratorSystem::new(12345);
+            let chunk_size = 32;
 
-    #[test]
-    fn test_chunk_generation() {
-        let (mut world, terrain_entity) = setup_test_world();
-        let mut system = TerrainGeneratorSystem::new(12345);
+            generator.init_kd_tree(chunk_size);
 
-        // Run system
-        system.run(&mut world).unwrap();
+            assert!(generator.kd_tree.is_some());
+            let tree = generator.kd_tree.as_ref().unwrap();
 
-        // Check if chunks were generated
-        let terrain = world
-            .get_component::<TerrainComponent>(terrain_entity)
-            .unwrap();
-        assert!(!terrain.chunks.is_empty());
-    }
+            // Expected number of points based on density
+            let expected_points =
+                ((chunk_size * chunk_size) as f32 * generator.field_density) as usize;
+            assert_eq!(tree.size(), expected_points);
+        }
 
-    #[test]
-    fn test_chunk_feature_generation() {
-        let (mut world, terrain_entity) = setup_test_world();
-        let mut system = TerrainGeneratorSystem::new(12345);
+        #[test]
+        fn test_deterministic_initialization() {
+            let seed = 12345;
+            let gen1 = TerrainGeneratorSystem::new(seed);
+            let gen2 = TerrainGeneratorSystem::new(seed);
 
-        // Generate a single chunk
-        let chunk_pos = UVec2::ZERO;
-        let chunk = system.generate_chunk(
-            chunk_pos,
-            world
-                .get_component::<TerrainComponent>(terrain_entity)
-                .unwrap(),
-        );
+            // Generate some noise values and compare
+            let pos = Vec2::new(1.0, 1.0);
+            let noise1 = gen1.noise_gen.get([pos.x as f64, pos.y as f64]);
+            let noise2 = gen2.noise_gen.get([pos.x as f64, pos.y as f64]);
 
-        // Verify chunk properties
-        assert!(!chunk.height_map.is_empty());
-        assert!(!chunk.moisture_map.is_empty());
-        assert!(!chunk.biome_map.is_empty());
-    }
-
-    #[test]
-    fn test_biome_generation() {
-        let (mut world, terrain_entity) = setup_test_world();
-        let mut system = TerrainGeneratorSystem::new(12345);
-
-        // Generate a chunk
-        let chunk_pos = UVec2::ZERO;
-        let terrain = world
-            .get_component::<TerrainComponent>(terrain_entity)
-            .unwrap();
-        let chunk = system.generate_chunk(chunk_pos, terrain);
-
-        // Verify biome distribution
-        let biome_counts: HashMap<BiomeType, usize> =
-            chunk
-                .biome_map
-                .iter()
-                .fold(HashMap::new(), |mut acc, &biome| {
-                    *acc.entry(biome).or_insert(0) += 1;
-                    acc
-                });
-
-        // Check for land biomes
-        assert!(
-            biome_counts.contains_key(&BiomeType::Grass)
-                || biome_counts.contains_key(&BiomeType::Forest)
-                || biome_counts.contains_key(&BiomeType::Crops),
-            "Should have at least one land biome"
-        );
-
-        // Verify total tile count
-        let total_tiles: usize = biome_counts.values().sum();
-        assert_eq!(
-            total_tiles,
-            (terrain.chunk_size * terrain.chunk_size) as usize
-        );
-    }
-
-    #[test]
-    fn test_feature_placement() {
-        let (mut world, terrain_entity) = setup_test_world();
-        let mut system = TerrainGeneratorSystem::new(12345);
-
-        // Generate a chunk
-        let chunk_pos = UVec2::ZERO;
-        let chunk = system.generate_chunk(
-            chunk_pos,
-            world
-                .get_component::<TerrainComponent>(terrain_entity)
-                .unwrap(),
-        );
-
-        // Check feature placement
-        let forest_tiles = chunk
-            .biome_map
-            .iter()
-            .filter(|&&biome| biome == BiomeType::Forest)
-            .count();
-
-        // If we have forest tiles, we should have some trees
-        if forest_tiles > 0 {
-            let tree_features = chunk
-                .features
-                .iter()
-                .filter(|f| matches!(f.feature_type, FeatureType::Tree { .. }))
-                .count();
-            assert!(tree_features > 0);
+            assert_eq!(noise1, noise2);
         }
     }
 
-    #[test]
-    fn test_terrain_persistence() {
-        let (mut world, terrain_entity) = setup_test_world();
-        let mut system = TerrainGeneratorSystem::new(12345);
+    mod noise_generation {
+        use super::*;
 
-        // Generate initial chunks
-        system.run(&mut world).unwrap();
-
-        // Store chunk data
-        let initial_chunks: HashMap<UVec2, TerrainChunk> = world
-            .get_component::<TerrainComponent>(terrain_entity)
-            .unwrap()
-            .chunks
-            .clone();
-
-        // Run system again
-        system.run(&mut world).unwrap();
-
-        // Compare chunks
-        let current_chunks = &world
-            .get_component::<TerrainComponent>(terrain_entity)
-            .unwrap()
-            .chunks;
-
-        // Verify chunks haven't changed
-        for (pos, chunk) in &initial_chunks {
-            assert!(current_chunks.contains_key(pos));
-            assert_eq!(
-                chunk.height_map,
-                current_chunks.get(pos).unwrap().height_map
+        #[test]
+        fn test_noise_value_range() {
+            let generator = TerrainGeneratorSystem::new(12345);
+            let pos = Vec2::new(1.0, 1.0);
+            let noise_value = generate_noise_value(
+                &generator.noise_gen,
+                pos,
+                1.0, // scale
+                4,   // octaves
+                0.5, // persistence
+                2.0, // lacunarity
             );
+
+            assert!(noise_value >= -1.0 && noise_value <= 1.0);
+        }
+
+        #[test]
+        fn test_noise_consistency() {
+            let generator = TerrainGeneratorSystem::new(12345);
+            let pos = Vec2::new(1.0, 1.0);
+
+            let value1 = generate_noise_value(&generator.noise_gen, pos, 1.0, 4, 0.5, 2.0);
+
+            let value2 = generate_noise_value(&generator.noise_gen, pos, 1.0, 4, 0.5, 2.0);
+
+            assert_relative_eq!(value1, value2);
+        }
+    }
+
+    mod biome_determination {
+        use super::*;
+
+        fn setup_test_config() -> TerrainConfig {
+            TerrainConfig {
+                water_threshold: 0.3,
+                beach_width: 0.05,
+                noise_scale: 1.0,
+                noise_octaves: 4,
+                noise_persistence: 0.5,
+                noise_lacunarity: 2.0,
+                moisture_scale: 1.0,
+                biome_weights: HashMap::from([
+                    (BiomeType::Grass, 1.0),
+                    (BiomeType::Forest, 1.0),
+                    (BiomeType::Water, 1.0),
+                    (BiomeType::Sand, 1.0),
+                ]),
+                ..Default::default()
+            }
+        }
+
+        #[test]
+        fn test_water_biome_threshold() {
+            let mut generator = TerrainGeneratorSystem::new(12345);
+            let config = setup_test_config();
+            let pos = Vec2::new(1.0, 1.0);
+
+            let biome = determine_biome(
+                0.2, // height below water threshold
+                0.5, // moisture
+                pos,
+                &config,
+                &mut generator,
+            );
+
+            assert_eq!(biome, BiomeType::Water);
+        }
+
+        #[test]
+        fn test_beach_biome_threshold() {
+            let mut generator = TerrainGeneratorSystem::new(12345);
+            let config = setup_test_config();
+            let pos = Vec2::new(1.0, 1.0);
+
+            let height = config.water_threshold + (config.beach_width / 2.0);
+            let biome = determine_biome(height, 0.5, pos, &config, &mut generator);
+
+            assert_eq!(biome, BiomeType::Sand);
+        }
+    }
+
+    mod feature_spawning {
+        use super::*;
+
+        #[test]
+        fn test_tree_spawn_properties() {
+            let mut rng = StdRng::seed_from_u64(12345);
+            let config = TerrainConfig::default();
+            let pos = Vec2::new(1.0, 1.0);
+
+            if let Some(feature) = try_spawn_tree(
+                pos, 0.5, // height
+                0.5, // moisture
+                &config, &mut rng,
+            ) {
+                assert!(matches!(feature.feature_type, FeatureType::Tree(_)));
+                assert_eq!(feature.position, pos);
+                assert!(feature.scale >= 0.8 && feature.scale <= 1.2);
+                assert!(feature.rotation >= 0.0 && feature.rotation <= std::f32::consts::TAU);
+            }
+        }
+
+        #[test]
+        fn test_feature_density_distribution() {
+            let mut rng = StdRng::seed_from_u64(12345);
+            let config = TerrainConfig::default();
+            let pos = Vec2::new(1.0, 1.0);
+
+            let mut feature_count = 0;
+            let iterations = 1000;
+
+            for _ in 0..iterations {
+                if try_spawn_tree(pos, 0.5, 0.5, &config, &mut rng).is_some() {
+                    feature_count += 1;
+                }
+            }
+
+            // Check if feature density is within reasonable bounds
+            let density = feature_count as f32 / iterations as f32;
+            assert!(density > 0.0 && density < 1.0);
+        }
+    }
+}
+
+#[cfg(test)]
+mod advanced_tests {
+    use super::*;
+    use std::time::Instant;
+
+    mod chunk_generation {
+        use super::*;
+
+        fn setup_test_chunk(position: IVec2) -> TerrainChunkComponent {
+            TerrainChunkComponent {
+                position,
+                height_map: vec![0.0; 32 * 32],
+                moisture_map: vec![0.0; 32 * 32],
+                biome_map: vec![BiomeType::Grass; 32 * 32],
+            }
+        }
+
+        #[test]
+        fn test_chunk_generation_completeness() {
+            let mut generator = TerrainGeneratorSystem::new(12345);
+            let mut chunk = setup_test_chunk(IVec2::new(0, 0));
+            let state = TerrainState {
+                chunk_size: 32,
+                scale: 1.0,
+                seed: 12345,
+                ..Default::default()
+            };
+            let config = TerrainConfig::default();
+
+            generate_chunk_data(&mut chunk, &state, &config, &mut generator);
+
+            // Verify all maps are populated
+            assert!(!chunk.height_map.iter().any(|&x| x == 0.0));
+            assert!(!chunk.moisture_map.iter().any(|&x| x == 0.0));
+            assert!(chunk.biome_map.iter().any(|&x| x != BiomeType::Grass));
+        }
+
+        #[test]
+        fn test_chunk_border_consistency() {
+            let mut generator = TerrainGeneratorSystem::new(12345);
+            let state = TerrainState {
+                chunk_size: 32,
+                scale: 1.0,
+                seed: 12345,
+                ..Default::default()
+            };
+            let config = TerrainConfig::default();
+
+            // Generate two adjacent chunks
+            let mut chunk1 = setup_test_chunk(IVec2::new(0, 0));
+            let mut chunk2 = setup_test_chunk(IVec2::new(1, 0));
+
+            generate_chunk_data(&mut chunk1, &state, &config, &mut generator);
+            generate_chunk_data(&mut chunk2, &state, &config, &mut generator);
+
+            // Compare border values
+            for y in 0..state.chunk_size as usize {
+                let chunk1_border = chunk1.height_map
+                    [y * state.chunk_size as usize + (state.chunk_size as usize - 1)];
+                let chunk2_border = chunk2.height_map[y * state.chunk_size as usize];
+                assert!((chunk1_border - chunk2_border).abs() < 0.1);
+            }
+        }
+    }
+
+    mod edge_cases {
+        use super::*;
+
+        #[test]
+        fn test_extreme_height_values() {
+            let mut generator = TerrainGeneratorSystem::new(12345);
+            let config = TerrainConfig::default();
+            let pos = Vec2::new(1.0, 1.0);
+
+            // Test very high elevation
+            let high_biome = determine_biome(1.0, 0.5, pos, &config, &mut generator);
+            assert!(matches!(high_biome, BiomeType::Grass | BiomeType::Forest));
+
+            // Test very low elevation
+            let low_biome = determine_biome(0.0, 0.5, pos, &config, &mut generator);
+            assert_eq!(low_biome, BiomeType::Water);
+        }
+
+        #[test]
+        fn test_chunk_size_boundaries() {
+            let mut generator = TerrainGeneratorSystem::new(12345);
+
+            // Test minimum chunk size
+            generator.init_kd_tree(4);
+            assert!(generator.kd_tree.is_some());
+
+            // Test large chunk size
+            generator.init_kd_tree(256);
+            assert!(generator.kd_tree.is_some());
+        }
+    }
+
+    mod performance {
+        use super::*;
+
+        #[test]
+        fn benchmark_chunk_generation() {
+            let mut generator = TerrainGeneratorSystem::new(12345);
+            let state = TerrainState {
+                chunk_size: 32,
+                scale: 1.0,
+                seed: 12345,
+                ..Default::default()
+            };
+            let config = TerrainConfig::default();
+            let mut chunk = TerrainChunkComponent {
+                position: IVec2::new(0, 0),
+                height_map: vec![0.0; 32 * 32],
+                moisture_map: vec![0.0; 32 * 32],
+                biome_map: vec![BiomeType::Grass; 32 * 32],
+            };
+
+            let start = Instant::now();
+            generate_chunk_data(&mut chunk, &state, &config, &mut generator);
+            let duration = start.elapsed();
+
+            // Assert generation takes less than 50ms (adjust based on your requirements)
+            assert!(duration.as_millis() < 50);
+        }
+
+        #[test]
+        fn test_kd_tree_performance() {
+            let mut generator = TerrainGeneratorSystem::new(12345);
+            let chunk_size = 32;
+
+            let start = Instant::now();
+            generator.init_kd_tree(chunk_size);
+            let init_duration = start.elapsed();
+
+            // Test point lookup performance
+            let start = Instant::now();
+            for x in 0..10 {
+                for y in 0..10 {
+                    let pos = Vec2::new(x as f32, y as f32);
+                    generator.get_biome_from_position(pos);
+                }
+            }
+            let lookup_duration = start.elapsed();
+
+            // Assert reasonable performance bounds
+            assert!(init_duration.as_millis() < 10);
+            assert!(lookup_duration.as_micros() < 1000);
+        }
+    }
+
+    mod biome_distribution {
+        use super::*;
+
+        #[test]
+        fn test_biome_distribution_ratios() {
+            let mut generator = TerrainGeneratorSystem::new(12345);
+            let state = TerrainState {
+                chunk_size: 32,
+                scale: 1.0,
+                seed: 12345,
+                ..Default::default()
+            };
+            let config = TerrainConfig::default();
+            let mut chunk = TerrainChunkComponent {
+                position: IVec2::new(0, 0),
+                height_map: vec![0.0; 32 * 32],
+                moisture_map: vec![0.0; 32 * 32],
+                biome_map: vec![BiomeType::Grass; 32 * 32],
+            };
+
+            generate_chunk_data(&mut chunk, &state, &config, &mut generator);
+
+            let mut biome_counts = HashMap::new();
+            for &biome in &chunk.biome_map {
+                *biome_counts.entry(biome).or_insert(0) += 1;
+            }
+
+            // Ensure we have a mix of biomes
+            assert!(biome_counts.len() >= 3);
+
+            // Check that no single biome dominates completely
+            let total_tiles = (state.chunk_size * state.chunk_size) as usize;
+            for &count in biome_counts.values() {
+                assert!(count < total_tiles * 3 / 4);
+            }
+        }
+
+        #[test]
+        fn test_biome_transitions() {
+            let mut generator = TerrainGeneratorSystem::new(12345);
+            let config = TerrainConfig::default();
+            let pos = Vec2::new(1.0, 1.0);
+
+            // Test moisture transition
+            let dry_biome = determine_biome(0.5, 0.1, pos, &config, &mut generator);
+            let wet_biome = determine_biome(0.5, 0.9, pos, &config, &mut generator);
+            assert_ne!(dry_biome, wet_biome);
+
+            // Test height transition
+            let low_biome = determine_biome(0.3, 0.5, pos, &config, &mut generator);
+            let high_biome = determine_biome(0.7, 0.5, pos, &config, &mut generator);
+            assert_ne!(low_biome, high_biome);
+        }
+    }
+
+    mod feature_variants {
+        use super::*;
+
+        #[test]
+        fn test_tree_variant_distribution() {
+            let mut rng = StdRng::seed_from_u64(12345);
+            let config = TerrainConfig::default();
+            let pos = Vec2::new(1.0, 1.0);
+
+            let mut variants = HashMap::new();
+            for _ in 0..1000 {
+                if let Some(feature) = try_spawn_tree(pos, 0.5, 0.5, &config, &mut rng) {
+                    if let FeatureType::Tree(variant) = feature.feature_type {
+                        *variants.entry(variant).or_insert(0) += 1;
+                    }
+                }
+            }
+
+            // Check that we have multiple variants
+            assert!(variants.len() >= 2);
+
+            // Check distribution isn't heavily skewed
+            for &count in variants.values() {
+                assert!(count > 50); // At least 5% of spawns
+            }
+        }
+
+        #[test]
+        fn test_feature_scale_distribution() {
+            let mut rng = StdRng::seed_from_u64(12345);
+            let config = TerrainConfig::default();
+            let pos = Vec2::new(1.0, 1.0);
+
+            let mut scales = Vec::new();
+            for _ in 0..100 {
+                if let Some(feature) = try_spawn_tree(pos, 0.5, 0.5, &config, &mut rng) {
+                    scales.push(feature.scale);
+                }
+            }
+
+            // Check scale range
+            let min_scale = scales.iter().fold(f32::INFINITY, |a, &b| a.min(b));
+            let max_scale = scales.iter().fold(f32::NEG_INFINITY, |a, &b| a.max(b));
+
+            assert!(min_scale >= 0.8);
+            assert!(max_scale <= 1.2);
+            assert!((max_scale - min_scale) > 0.2); // Ensure good variation
         }
     }
 }
