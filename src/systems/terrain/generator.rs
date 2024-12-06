@@ -3,87 +3,10 @@ use rand::prelude::*;
 use std::collections::HashMap;
 
 use crate::components::terrain::*;
-use crate::systems::terrain::noise::{NoiseGenerator, NoiseLayer};
+use crate::resources::terrain::config::BiomeConfig;
+use crate::resources::terrain::{TerrainAssets, TerrainConfig, TerrainState};
+use crate::systems::terrain::noise::NoiseGenerator;
 use crate::systems::terrain::rivers::generate_rivers;
-
-/// Configuration for each type of noise used in terrain generation
-#[derive(Debug, Clone)]
-pub struct NoiseConfig {
-    pub layers: Vec<NoiseLayer>,
-    pub value_range: (f32, f32),
-}
-
-impl NoiseConfig {
-    pub fn new(base_scale: f32) -> Self {
-        Self {
-            layers: vec![NoiseLayer::new(base_scale, 1.0, 4)],
-            value_range: (0.0, 1.0),
-        }
-    }
-
-    pub fn with_layer(mut self, layer: NoiseLayer) -> Self {
-        self.layers.push(layer);
-        self
-    }
-
-    pub fn with_range(mut self, min: f32, max: f32) -> Self {
-        self.value_range = (min, max);
-        self
-    }
-}
-
-/// Complete terrain generation configuration
-#[derive(Resource, Debug, Clone)]
-pub struct TerrainGeneratorConfig {
-    pub height_noise: NoiseConfig,
-    pub moisture_noise: NoiseConfig,
-    pub river_noise: NoiseConfig,
-    pub detail_noise: NoiseConfig,
-}
-
-impl Default for TerrainGeneratorConfig {
-    fn default() -> Self {
-        // Height noise configuration
-        let height_noise = NoiseConfig::new(100.0)
-            .with_layer(
-                NoiseLayer::new(50.0, 0.5, 2)
-                    .with_offset(Vec2::new(1000.0, 1000.0))
-                    .with_weight(0.5),
-            )
-            .with_layer(
-                NoiseLayer::new(25.0, 0.25, 1)
-                    .with_offset(Vec2::new(2000.0, 2000.0))
-                    .with_weight(0.25),
-            );
-
-        // Moisture noise configuration
-        let moisture_noise =
-            NoiseConfig::new(150.0).with_layer(NoiseLayer::new(75.0, 0.5, 2).with_weight(0.3));
-
-        // River noise configuration
-        let river_noise = NoiseConfig::new(200.0)
-            .with_layer(
-                NoiseLayer::new(100.0, 1.0, 1)
-                    .with_persistence(1.0)
-                    .with_lacunarity(1.0),
-            )
-            .with_range(0.0, 0.8); // Rivers are more likely in lower values
-
-        // Detail noise configuration
-        let detail_noise = NoiseConfig::new(75.0).with_layer(
-            NoiseLayer::new(25.0, 0.5, 1)
-                .with_offset(Vec2::new(3000.0, 3000.0))
-                .with_weight(0.3),
-        );
-
-        Self {
-            height_noise,
-            moisture_noise,
-            river_noise,
-            detail_noise,
-        }
-    }
-}
 
 #[derive(Resource)]
 pub struct TerrainGeneratorSystem {
@@ -95,79 +18,48 @@ pub struct TerrainGeneratorSystem {
 }
 
 impl TerrainGeneratorSystem {
-    pub fn new(seed: u64, config: &TerrainGeneratorConfig) -> Self {
-        let mut height_generator = NoiseGenerator::new(seed);
-        let mut moisture_generator = NoiseGenerator::new(seed.wrapping_add(1));
-        let mut river_generator = NoiseGenerator::new(seed.wrapping_add(2));
-        let mut detail_generator = NoiseGenerator::new(seed.wrapping_add(3));
+    pub fn new(state: &TerrainState, config: &TerrainConfig) -> Self {
+        let mut height_generator = NoiseGenerator::new(state.seed);
+        let mut moisture_generator = NoiseGenerator::new(state.seed.wrapping_add(1));
+        let mut river_generator = NoiseGenerator::new(state.seed.wrapping_add(2));
+        let detail_generator = NoiseGenerator::new(state.seed.wrapping_add(3));
 
         // Configure generators based on config
-        for layer in &config.height_noise.layers {
+        height_generator.set_value_range(0.0, 1.0);
+        for layer in &config.noise.height.layers {
             height_generator.add_layer(layer.clone());
         }
-        height_generator.set_value_range(
-            config.height_noise.value_range.0,
-            config.height_noise.value_range.1,
-        );
 
-        for layer in &config.moisture_noise.layers {
+        moisture_generator.set_value_range(0.0, 1.0);
+        for layer in &config.noise.moisture.layers {
             moisture_generator.add_layer(layer.clone());
         }
-        moisture_generator.set_value_range(
-            config.moisture_noise.value_range.0,
-            config.moisture_noise.value_range.1,
-        );
 
-        for layer in &config.river_noise.layers {
-            river_generator.add_layer(layer.clone());
-        }
-        river_generator.set_value_range(
-            config.river_noise.value_range.0,
-            config.river_noise.value_range.1,
-        );
-
-        for layer in &config.detail_noise.layers {
-            detail_generator.add_layer(layer.clone());
-        }
-        detail_generator.set_value_range(
-            config.detail_noise.value_range.0,
-            config.detail_noise.value_range.1,
-        );
+        river_generator.set_value_range(0.0, config.noise.river.max_length);
 
         Self {
             height_generator,
             moisture_generator,
             river_generator,
             detail_generator,
-            rng: StdRng::seed_from_u64(seed),
+            rng: StdRng::seed_from_u64(state.seed),
         }
     }
 
-    /// Generate all noise values for a given position
-    pub fn generate_noise_values(&self, world_pos: Vec2) -> TerrainNoiseValues {
-        TerrainNoiseValues {
-            height: self.height_generator.get_noise(world_pos),
-            moisture: self.moisture_generator.get_noise(world_pos),
-            river: self.river_generator.get_noise(world_pos),
-            detail: self.detail_generator.get_noise(world_pos),
-        }
+    pub fn get_height(&self, pos: Vec2) -> f32 {
+        self.height_generator.get_noise(pos)
     }
-}
 
-/// Structure to hold all noise values for a point
-#[derive(Debug, Clone, Copy)]
-pub struct TerrainNoiseValues {
-    pub height: f32,
-    pub moisture: f32,
-    pub river: f32,
-    pub detail: f32,
-}
+    pub fn get_moisture(&self, pos: Vec2) -> f32 {
+        self.moisture_generator.get_noise(pos)
+    }
 
-impl FromWorld for TerrainGeneratorSystem {
-    fn from_world(world: &mut World) -> Self {
-        let seed = world.resource::<TerrainState>().seed;
-        let config = world.resource::<TerrainGeneratorConfig>();
-        Self::new(seed, config)
+    pub fn get_river_value(&self, pos: Vec2) -> f32 {
+        self.river_generator.get_noise(pos)
+    }
+
+    pub fn get_detail_value(&self, pos: Vec2) -> f32 {
+        self.detail_generator.get_noise(pos)
     }
 }
 
@@ -204,99 +96,123 @@ pub fn generate_chunk_data(
     generator: &mut TerrainGeneratorSystem,
 ) {
     let chunk_size = state.chunk_size as i32;
-    let chunk_world_x = chunk.position.x * state.chunk_size as i32;
-    let chunk_world_y = chunk.position.y * state.chunk_size as i32;
-    let world_scale = config.noise_scale;
+    let chunk_world_pos = chunk.world_position(state.chunk_size, state.scale);
 
     for y in 0..chunk_size {
         for x in 0..chunk_size {
             let idx = (y * chunk_size + x) as usize;
-            let world_x = if x == 0 && chunk.position.x > 0 {
-                (chunk_world_x - 1) as f32
-            } else {
-                (chunk_world_x + x as i32) as f32
-            };
+            let world_pos = Vec2::new(
+                chunk_world_pos.x + x as f32 * state.scale,
+                chunk_world_pos.y + y as f32 * state.scale,
+            );
 
-            let world_y = if y == 0 && chunk.position.y > 0 {
-                (chunk_world_y - 1) as f32
-            } else {
-                (chunk_world_y + y as i32) as f32
-            };
-
-            let world_pos = Vec2::new(world_x, world_y);
-
+            // Generate base terrain values
             chunk.height_map[idx] = generator.get_height(world_pos);
-            chunk.moisture_map[idx] = generator.get_height(world_pos);
+            chunk.moisture_map[idx] = generator.get_moisture(world_pos);
 
-            let river_value = generator.get_river_value(world_pos);
-            let detail_value = generator.get_detail_value(world_pos);
-
-            let water_distance = distance_to_water(chunk, x, y, chunk_size);
-
-            // Determine biome using noise values
-            chunk.biome_map[idx] = generate_biome(
+            // Determine biome
+            chunk.biome_map[idx] = determine_biome(
                 chunk.height_map[idx],
                 chunk.moisture_map[idx],
-                river_value,
-                detail_value,
-                detail_value, // Using same value for micro/macro noise
-                water_distance,
-                config,
+                generator.get_river_value(world_pos),
+                generator.get_detail_value(world_pos),
+                &config.biome,
             );
         }
     }
-    generate_rivers(chunk, state, generator, &config.river_config);
+    generate_rivers(chunk, state, generator, &config.noise.river);
 
     smooth_biome_transitions(chunk, chunk_size);
 }
 
-struct BiomeData {
-    biome: BiomeType,
-    weight: f32,
-}
-
-fn generate_biome(
+fn determine_biome(
     height: f32,
     moisture: f32,
-    river_noise: f32,
-    macro_noise: f32,
-    micro_noise: f32,
-    water_distance: f32,
-    config: &TerrainConfig,
+    river_value: f32,
+    detail_value: f32,
+    config: &BiomeConfig,
 ) -> BiomeType {
-    if river_noise < 0.2 && height < 0.6 {
+    if height < config.thresholds.water {
         return BiomeType::Water;
     }
 
-    // if height < config.water_threshold + config.beach_width || water_distance < 2.0 {
-    //     return BiomeType::Sand;
-    // }
+    let water_proximity = (height - config.thresholds.water).abs();
+    let water_moisture = (1.0 - water_proximity.min(0.2) * 5.0).max(0.0);
+    let adjusted_moisture = (moisture + water_moisture) * 0.7; // Reduced moisture influence
 
-    let mut biome_weights = Vec::new();
-    let forest_weight = (moisture * 1.2).min(1.0) * (macro_noise * 0.8);
-    let grass_weight = (1.0 - moisture) * (1.0 - macro_noise) * 1.2;
-    let orchard_weight = moisture * micro_noise * 0.4;
-    let crops_weight = (1.0 - moisture) * micro_noise * 0.6;
+    let beach_factor = smoothstep(
+        config.thresholds.water,
+        config.thresholds.water + config.thresholds.beach_width,
+        height,
+    );
+    if beach_factor > 0.0 && beach_factor < 0.8 {
+        return BiomeType::Sand;
+    }
 
-    biome_weights.push(BiomeData {
-        biome: BiomeType::Forest,
-        weight: forest_weight,
-    });
-    biome_weights.push(BiomeData {
-        biome: BiomeType::Grass,
-        weight: grass_weight,
-    });
-    biome_weights.push(BiomeData {
-        biome: BiomeType::Orchard,
-        weight: orchard_weight,
-    });
-    biome_weights.push(BiomeData {
-        biome: BiomeType::Crops,
-        weight: crops_weight,
-    });
+    // Increased forest threshold and added height influence
+    let forest_threshold = lerp(
+        config.thresholds.forest_moisture + 0.1,
+        config.thresholds.forest_moisture + 0.7,
+        height,
+    );
 
-    biome_weights.sort_by(|a, b| b.weight.partial_cmp(&a.weight).unwrap());
-    biome_weights[0].biome
+    if adjusted_moisture > forest_threshold && detail_value > 0.3 {
+        BiomeType::Forest
+    } else {
+        BiomeType::Grass
+    }
+}
+
+// Smoothstep function for smooth transitions
+fn smoothstep(edge0: f32, edge1: f32, x: f32) -> f32 {
+    let t = ((x - edge0) / (edge1 - edge0)).clamp(0.0, 1.0);
+    t * t * (3.0 - 2.0 * t)
+}
+
+// Linear interpolation helper
+fn lerp(a: f32, b: f32, t: f32) -> f32 {
+    a + (b - a) * t
+}
+
+fn spawn_chunk_features(
+    commands: &mut Commands,
+    chunk_entity: Entity,
+    chunk: &TerrainChunkComponent,
+    state: &TerrainState,
+    config: &TerrainConfig,
+    assets: &TerrainAssets,
+    rng: &mut StdRng,
+) {
+    let chunk_size = state.chunk_size as usize;
+    let chunk_world_pos = chunk.world_position(state.chunk_size, state.scale);
+
+    for y in 0..chunk_size {
+        for x in 0..chunk_size {
+            let idx = y * chunk_size + x;
+            let biome = chunk.biome_map[idx];
+            let world_pos = Vec2::new(
+                chunk_world_pos.x + x as f32 * state.scale,
+                chunk_world_pos.y + y as f32 * state.scale,
+            );
+
+            // Try to spawn features based on biome and config
+            for (feature_type, base_density) in &config.feature.densities {
+                let multiplier = config
+                    .feature
+                    .biome_multipliers
+                    .get(&(feature_type.clone(), biome))
+                    .unwrap_or(&1.0);
+
+                if rng.gen::<f32>() < base_density * multiplier {
+                    // Call `try_spawn_feature` and check if it returns `Some`
+                    if let Some(feature) = try_spawn_feature(world_pos, biome, config, rng) {
+                        // Only pass `feature` to `spawn_feature` if it exists
+                        spawn_feature(commands, chunk_entity, feature, assets);
+                    }
+                }
+            }
+        }
+    }
 }
 
 fn smooth_biome_transitions(chunk: &mut TerrainChunkComponent, chunk_size: i32) {
@@ -358,55 +274,17 @@ fn distance_to_water(chunk: &TerrainChunkComponent, x: i32, y: i32, chunk_size: 
     min_distance
 }
 
-fn spawn_chunk_features(
-    commands: &mut Commands,
-    chunk_entity: Entity,
-    chunk: &TerrainChunkComponent,
-    state: &TerrainState,
-    config: &TerrainConfig,
-    assets: &TerrainAssets,
-    rng: &mut StdRng,
-) {
-    let chunk_size = state.chunk_size as usize;
-    let world_pos = Vec2::new(
-        chunk.position.x as f32 * state.chunk_size as f32 * state.scale,
-        chunk.position.y as f32 * state.chunk_size as f32 * state.scale,
-    );
-
-    for y in 0..chunk_size {
-        for x in 0..chunk_size {
-            let idx = y * chunk_size + x;
-            let pos = world_pos + Vec2::new(x as f32, y as f32) * state.scale;
-            let biome = chunk.biome_map[idx];
-
-            // Try to spawn features based on biome
-            if let Some(feature) = try_spawn_feature(
-                pos,
-                biome,
-                chunk.height_map[idx],
-                chunk.moisture_map[idx],
-                config,
-                rng,
-            ) {
-                spawn_feature(commands, chunk_entity, feature, assets);
-            }
-        }
-    }
-}
-
 fn try_spawn_feature(
     pos: Vec2,
     biome: BiomeType,
-    height: f32,
-    moisture: f32,
     config: &TerrainConfig,
     rng: &mut StdRng,
 ) -> Option<TerrainFeatureComponent> {
     match biome {
-        BiomeType::Forest => try_spawn_tree(pos, height, moisture, config, rng),
-        BiomeType::Orchard => try_spawn_orchard_tree(pos, height, moisture, config, rng),
-        BiomeType::Crops => try_spawn_bush(pos, height, moisture, config, rng),
-        BiomeType::Grass => try_spawn_flower(pos, height, moisture, config, rng),
+        BiomeType::Forest => try_spawn_tree(pos, config, rng),
+        BiomeType::Orchard => try_spawn_orchard_tree(pos, config, rng),
+        BiomeType::Crops => try_spawn_bush(pos, config, rng),
+        BiomeType::Grass => try_spawn_flower(pos, config, rng),
         _ => None,
     }
 }
@@ -443,8 +321,6 @@ fn spawn_feature(
 // Implement similar functions for other feature types
 fn try_spawn_tree(
     pos: Vec2,
-    _height: f32,
-    _moisture: f32,
     config: &TerrainConfig,
     rng: &mut StdRng,
 ) -> Option<TerrainFeatureComponent> {
@@ -456,7 +332,7 @@ fn try_spawn_tree(
     };
 
     let feature_type = FeatureType::Tree(tree_type);
-    let density = config.get_feature_density(feature_type, BiomeType::Forest);
+    let density = *config.feature.densities.get(&feature_type).unwrap_or(&0.0);
 
     if rng.gen::<f32>() > density {
         return None;
@@ -473,8 +349,6 @@ fn try_spawn_tree(
 
 fn try_spawn_orchard_tree(
     pos: Vec2,
-    _height: f32,
-    _moisture: f32,
     config: &TerrainConfig,
     rng: &mut StdRng,
 ) -> Option<TerrainFeatureComponent> {
@@ -487,7 +361,9 @@ fn try_spawn_orchard_tree(
     };
 
     let feature_type = FeatureType::Tree(tree_type);
-    if object_probability > config.get_feature_density(feature_type, BiomeType::Forest) {
+    let density = *config.feature.densities.get(&feature_type).unwrap_or(&0.0);
+
+    if object_probability > density {
         return None;
     }
 
@@ -502,12 +378,9 @@ fn try_spawn_orchard_tree(
 
 fn try_spawn_bush(
     pos: Vec2,
-    _height: f32,
-    _moisture: f32,
     _config: &TerrainConfig,
     rng: &mut StdRng,
 ) -> Option<TerrainFeatureComponent> {
-    // Using original crops logic for bush placement
     let spawn_chance = rng.gen::<f32>();
     if spawn_chance > 0.3 {
         // Adjust this value as needed
@@ -533,8 +406,6 @@ fn try_spawn_bush(
 
 fn try_spawn_flower(
     pos: Vec2,
-    _height: f32,
-    _moisture: f32,
     config: &TerrainConfig,
     rng: &mut StdRng,
 ) -> Option<TerrainFeatureComponent> {
@@ -548,7 +419,7 @@ fn try_spawn_flower(
     };
 
     let feature_type = FeatureType::Flower(flower_type);
-    let density = config.get_feature_density(feature_type, BiomeType::Grass);
+    let density = *config.feature.densities.get(&feature_type).unwrap_or(&0.0);
 
     if rng.gen::<f32>() > density {
         return None;

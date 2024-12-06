@@ -1,8 +1,7 @@
-mod config;
-mod environment;
-mod terrain;
+// mod environment;
+pub mod terrain;
 
-pub use config::environment::{
-    AtmosphereConfig, AtmosphereType, EnvironmentConfig, WindModelConfig,
-};
-pub use environment::EnvironmentResource;
+// pub use config::environment::{
+//     AtmosphereConfig, AtmosphereType, EnvironmentConfig, WindModelConfig,
+// };
+// pub use environment::EnvironmentResource;

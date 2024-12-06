@@ -1,6 +1,6 @@
-mod assets;
-mod config;
-mod state;
+pub mod assets;
+pub mod config;
+pub mod state;
 
 pub use assets::*;
 pub use config::*;

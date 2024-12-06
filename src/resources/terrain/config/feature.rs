@@ -13,7 +13,7 @@ impl Default for FeatureConfig {
         let mut biome_multipliers = HashMap::new();
 
         // Base densities
-        densities.insert(FeatureType::Tree(TreeVariant::EvergreenFir), 0.6);
+        densities.insert(FeatureType::Tree(TreeVariant::EvergreenFir), 0.9);
         densities.insert(FeatureType::Tree(TreeVariant::AppleTree), 0.1);
         densities.insert(FeatureType::Bush(BushVariant::GreenBushel), 0.2);
         densities.insert(FeatureType::Flower(FlowerVariant::Single), 0.1);

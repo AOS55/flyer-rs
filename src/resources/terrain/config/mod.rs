@@ -5,7 +5,7 @@ mod noise;
 use bevy::prelude::*;
 pub use biome::BiomeConfig;
 pub use feature::FeatureConfig;
-pub use noise::NoiseConfig;
+pub use noise::{NoiseConfig, RiverNoiseConfig};
 
 #[derive(Resource, Clone, Debug)]
 pub struct TerrainConfig {

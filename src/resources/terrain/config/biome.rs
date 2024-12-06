@@ -26,9 +26,9 @@ impl Default for BiomeConfig {
 
         Self {
             thresholds: BiomeThresholds {
-                water: 0.7,
+                water: 0.45,
                 beach_width: 0.025,
-                forest_moisture: 0.6,
+                forest_moisture: 0.5,
             },
             weights,
         }

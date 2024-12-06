@@ -19,4 +19,3 @@ pub use player::Player;
 pub use propulsion::{PropulsionComponent, PropulsionType};
 pub use render::{FlightSpriteBundle, RenderProperties, SpriteAnimation};
 pub use spatial::SpatialComponent;
-pub use terrain::TerrainState;

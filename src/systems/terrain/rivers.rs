@@ -1,6 +1,7 @@
 use bevy::prelude::*;
 
-use crate::components::terrain::{BiomeType, RiverConfig, TerrainChunkComponent, TerrainState};
+use crate::components::terrain::{BiomeType, TerrainChunkComponent};
+use crate::resources::terrain::{config::RiverNoiseConfig, TerrainState};
 use crate::systems::terrain::{generator::TerrainGeneratorSystem, noise::NoiseGenerator};
 
 /// Represents a river segment with its properties
@@ -10,6 +11,21 @@ pub struct RiverSegment {
     width: f32,
     flow_strength: f32,
     depth: f32,
+}
+
+impl RiverSegment {
+    fn new(pos: Vec2, source_distance: f32) -> Self {
+        // Width and depth increase with distance from source
+        let base_width = 1.0;
+        let width_factor = (source_distance / 100.0).min(3.0); // Cap max width
+
+        Self {
+            pos,
+            width: base_width * (1.0 + width_factor),
+            flow_strength: 1.0 / (1.0 + source_distance * 0.01), // Decreases with distance
+            depth: 0.2 + source_distance * 0.001,
+        }
+    }
 }
 
 /// Represents a complete river with all its segments
@@ -46,7 +62,7 @@ pub fn generate_rivers(
     chunk: &mut TerrainChunkComponent,
     state: &TerrainState,
     generator: &TerrainGeneratorSystem,
-    config: &RiverConfig,
+    config: &RiverNoiseConfig,
 ) {
     let chunk_size = state.chunk_size as i32;
     let mut rivers = Vec::new();
@@ -75,10 +91,22 @@ pub fn generate_rivers(
 fn find_river_sources(
     chunk: &TerrainChunkComponent,
     chunk_size: i32,
-    config: &RiverConfig,
+    config: &RiverNoiseConfig,
 ) -> Vec<Vec2> {
+    println!(
+        "Height map range: {} to {}",
+        chunk
+            .height_map
+            .iter()
+            .fold(f32::INFINITY, |a, &b| a.min(b)),
+        chunk
+            .height_map
+            .iter()
+            .fold(f32::NEG_INFINITY, |a, &b| a.max(b))
+    );
+
     let mut sources = Vec::new();
-    let source_noise = NoiseGenerator::new(12345); // Use consistent seed for source distribution
+    let source_noise = NoiseGenerator::new(12345);
 
     for y in 0..chunk_size {
         for x in 0..chunk_size {
@@ -86,14 +114,39 @@ fn find_river_sources(
             let height = chunk.height_map[idx];
             let pos = Vec2::new(x as f32, y as f32);
 
-            // Use noise to add randomness to source placement
-            let noise_val = source_noise.get_noise(pos * 0.1);
+            // Check surrounding heights
+            let mut is_peak = true;
+            for dy in -1..=1 {
+                for dx in -1..=1 {
+                    if dx == 0 && dy == 0 {
+                        continue;
+                    }
+                    let nx = x + dx;
+                    let ny = y + dy;
+                    if nx >= 0 && nx < chunk_size && ny >= 0 && ny < chunk_size {
+                        let neighbor_idx = (ny * chunk_size + nx) as usize;
+                        if chunk.height_map[neighbor_idx] >= height {
+                            is_peak = false;
+                            break;
+                        }
+                    }
+                }
+                if !is_peak {
+                    break;
+                }
+            }
 
-            if height > config.min_source_height && noise_val > 0.7 {
-                sources.push(pos);
+            // Only create rivers at local peaks above threshold
+            if is_peak && height > config.min_source_height {
+                let noise_val = source_noise.get_noise(pos * 0.1);
+                if noise_val > 0.7 {
+                    // Reduced frequency of river sources
+                    sources.push(pos);
+                }
             }
         }
     }
+    println!("Found {} potential river sources", sources.len());
 
     sources
 }
@@ -103,7 +156,7 @@ fn generate_river_path(
     source: Vec2,
     chunk_size: i32,
     generator: &TerrainGeneratorSystem,
-    config: &RiverConfig,
+    config: &RiverNoiseConfig,
 ) -> Option<River> {
     let mut river = River::new(
         source,
@@ -112,7 +165,7 @@ fn generate_river_path(
     let mut current_pos = source;
     let meander_noise = NoiseGenerator::new(54321); // Consistent seed for meandering
 
-    while river.total_length < config.max_river_length {
+    while river.total_length < config.max_length {
         let (next_pos, flow_dir) =
             find_next_river_point(chunk, current_pos, chunk_size, &meander_noise, config);
 
@@ -123,7 +176,7 @@ fn generate_river_path(
 
         // Calculate new segment properties
         let segment_length = (next_pos - current_pos).length();
-        let downstream_factor = river.total_length / config.max_river_length;
+        let downstream_factor = river.total_length / config.max_length;
         let width = 1.0 + downstream_factor * config.width_growth_rate;
         let depth = 0.2 + downstream_factor * config.depth_growth_rate;
         let flow_strength = 1.0 - downstream_factor * 0.5;
@@ -155,7 +208,7 @@ fn find_next_river_point(
     current: Vec2,
     chunk_size: i32,
     meander_noise: &NoiseGenerator,
-    config: &RiverConfig,
+    config: &RiverNoiseConfig,
 ) -> (Vec2, Vec2) {
     let mut lowest_pos = current;
     let mut lowest_height = f32::MAX;
@@ -197,10 +250,15 @@ fn apply_rivers_to_terrain(
     chunk: &mut TerrainChunkComponent,
     rivers: &[River],
     chunk_size: i32,
-    config: &RiverConfig,
+    config: &RiverNoiseConfig,
 ) {
     for river in rivers {
         for segment in &river.segments {
+            println!(
+                "Applying river at ({}, {}), width: {}, flow: {}",
+                segment.pos.x, segment.pos.y, segment.width, segment.flow_strength
+            );
+
             apply_river_segment(chunk, segment, chunk_size, config);
         }
     }
@@ -210,9 +268,9 @@ fn apply_river_segment(
     chunk: &mut TerrainChunkComponent,
     segment: &RiverSegment,
     chunk_size: i32,
-    config: &RiverConfig,
+    config: &RiverNoiseConfig,
 ) {
-    let radius = (segment.width / 2.0).ceil() as i32;
+    let radius = (segment.width * 1.5).ceil() as i32;
 
     for dy in -radius..=radius {
         for dx in -radius..=radius {
@@ -224,22 +282,36 @@ fn apply_river_segment(
             }
 
             let distance = ((dx * dx + dy * dy) as f32).sqrt();
-            if distance > segment.width / 2.0 {
+            if distance > segment.width {
                 continue;
             }
 
             let idx = (y * chunk_size + x) as usize;
 
-            // Calculate erosion effect
-            let erosion_factor = 1.0 - (distance / (segment.width / 2.0));
+            // Calculate erosion and depression
+            let bank_factor = distance / segment.width;
+            let erosion_factor = 1.0 - bank_factor;
             let erosion = erosion_factor * config.erosion_strength * segment.flow_strength;
 
-            // Apply river effects
-            chunk.height_map[idx] *= 1.0 - erosion;
-            chunk.biome_map[idx] = BiomeType::Water;
+            // Create river valley
+            let valley_width = segment.width * 2.0;
+            let valley_factor = (-((distance / valley_width).powi(2))).exp();
 
-            // Could also modify moisture map here
-            chunk.moisture_map[idx] = (chunk.moisture_map[idx] + erosion_factor).min(1.0);
+            // Apply terrain modifications
+            chunk.height_map[idx] *= 1.0 - (erosion * 0.5); // Reduced erosion
+            chunk.height_map[idx] -= valley_factor * 0.05; // Subtle valley depression
+
+            // Update biome and moisture
+            if distance < segment.width * 0.7 {
+                chunk.biome_map[idx] = BiomeType::Water;
+            } else if distance < segment.width {
+                // River banks
+                chunk.biome_map[idx] = BiomeType::Sand;
+            }
+
+            // Increase moisture near rivers
+            let moisture_factor = (-((distance / (segment.width * 3.0)).powi(2))).exp();
+            chunk.moisture_map[idx] = (chunk.moisture_map[idx] + moisture_factor).min(1.0);
         }
     }
 }

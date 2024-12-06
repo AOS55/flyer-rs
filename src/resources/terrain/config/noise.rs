@@ -38,31 +38,40 @@ impl Default for NoiseConfig {
     fn default() -> Self {
         Self {
             height: HeightNoiseConfig {
-                scale: 100.0,
+                scale: 800.0,
                 octaves: 4,
                 persistence: 0.5,
                 lacunarity: 2.0,
                 layers: vec![
-                    NoiseLayer::new(50.0, 0.5, 2)
+                    // Continental shapes - large, smooth variations
+                    NoiseLayer::new(1200.0, 1.0, 2)
+                        .with_persistence(0.7)
                         .with_offset(Vec2::new(1000.0, 1000.0))
                         .with_weight(0.5),
-                    NoiseLayer::new(25.0, 0.25, 1)
+                    // Medium terrain features
+                    NoiseLayer::new(400.0, 0.5, 3)
+                        .with_persistence(0.6)
                         .with_offset(Vec2::new(2000.0, 2000.0))
-                        .with_weight(0.25),
+                        .with_weight(0.3),
+                    // Local terrain details
+                    NoiseLayer::new(100.0, 0.25, 4)
+                        .with_persistence(0.5)
+                        .with_offset(Vec2::new(3000.0, 3000.0))
+                        .with_weight(0.2),
                 ],
             },
             moisture: MoistureNoiseConfig {
-                scale: 150.0,
+                scale: 250.0,
                 layers: vec![NoiseLayer::new(75.0, 0.5, 2).with_weight(0.3)],
             },
             river: RiverNoiseConfig {
                 min_source_height: 0.7,
                 meander_factor: 0.3,
-                min_slope: 0.01,
+                min_slope: 0.05,
                 width_growth_rate: 0.1,
-                depth_growth_rate: 0.05,
-                erosion_strength: 0.2,
-                max_length: 100.0,
+                depth_growth_rate: 0.1,
+                erosion_strength: 0.1,
+                max_length: 150.0,
             },
         }
     }

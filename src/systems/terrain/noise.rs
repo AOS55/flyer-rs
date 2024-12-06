@@ -53,7 +53,7 @@ impl NoiseLayer {
 #[derive(Debug)]
 pub struct NoiseGenerator {
     noise_fn: noise::OpenSimplex,
-    layers: Vec<NoiseLayer>,
+    pub layers: Vec<NoiseLayer>,
     value_range: Range<f32>,
 }
 
