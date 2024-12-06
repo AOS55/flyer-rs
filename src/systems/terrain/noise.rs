@@ -1,102 +1,124 @@
-use crate::components::TerrainGenConfig;
-use glam::Vec2;
-use noise::{NoiseFn, OpenSimplex, Seedable};
+use bevy::prelude::*;
+use noise::NoiseFn;
+use std::ops::Range;
 
+/// Represents a single layer of noise with its parameters
+#[derive(Debug, Clone)]
+pub struct NoiseLayer {
+    pub scale: f32,
+    pub amplitude: f32,
+    pub octaves: u32,
+    pub persistence: f32,
+    pub lacunarity: f32,
+    pub offset: Vec2, // Allows for shifting different layers
+    pub weight: f32,  // Importance of this layer in final result
+}
+
+impl NoiseLayer {
+    pub fn new(scale: f32, amplitude: f32, octaves: u32) -> Self {
+        Self {
+            scale,
+            amplitude,
+            octaves,
+            persistence: 0.5,
+            lacunarity: 2.0,
+            offset: Vec2::ZERO,
+            weight: 1.0,
+        }
+    }
+
+    // Builder pattern for optional parameters
+    pub fn with_persistence(mut self, persistence: f32) -> Self {
+        self.persistence = persistence;
+        self
+    }
+
+    pub fn with_lacunarity(mut self, lacunarity: f32) -> Self {
+        self.lacunarity = lacunarity;
+        self
+    }
+
+    pub fn with_offset(mut self, offset: Vec2) -> Self {
+        self.offset = offset;
+        self
+    }
+
+    pub fn with_weight(mut self, weight: f32) -> Self {
+        self.weight = weight;
+        self
+    }
+}
+
+/// Manages multiple noise layers for terrain generation
+#[derive(Debug)]
 pub struct NoiseGenerator {
-    noise: OpenSimplex,
-    seed: u64,
+    noise_fn: noise::OpenSimplex,
+    layers: Vec<NoiseLayer>,
+    value_range: Range<f32>,
 }
 
 impl NoiseGenerator {
     pub fn new(seed: u64) -> Self {
         Self {
-            noise: OpenSimplex::new(seed as u32),
-            seed,
+            noise_fn: noise::OpenSimplex::new(seed as u32),
+            layers: Vec::new(),
+            value_range: 0.0..1.0,
         }
     }
 
-    // Generate noise with multiple octaves for more natural terrain
-    pub fn get_noise(
-        &self,
-        pos: Vec2,
-        scale: f32,
-        octaves: u32,
-        persistence: f32,
-        lacunarity: f32,
-    ) -> f32 {
-        let mut amplitude = 1.0;
+    pub fn add_layer(&mut self, layer: NoiseLayer) {
+        self.layers.push(layer);
+    }
+
+    pub fn set_value_range(&mut self, min: f32, max: f32) {
+        self.value_range = min..max;
+    }
+
+    /// Generate noise value at a specific position considering all layers
+    pub fn get_noise(&self, pos: Vec2) -> f32 {
+        let mut total_value = 0.0;
+        let mut total_weight = 0.0;
+
+        for layer in &self.layers {
+            let noise_value = self.generate_layered_noise(pos, layer);
+            total_value += noise_value * layer.weight;
+            total_weight += layer.weight;
+        }
+
+        // Normalize and map to desired range
+        let normalized = if total_weight > 0.0 {
+            total_value / total_weight
+        } else {
+            0.0
+        };
+
+        self.map_to_range(normalized)
+    }
+
+    /// Generate noise for a specific layer with all its parameters
+    fn generate_layered_noise(&self, pos: Vec2, layer: &NoiseLayer) -> f32 {
+        let mut value = 0.0;
+        let mut amplitude = layer.amplitude;
         let mut frequency = 1.0;
-        let mut noise_value = 0.0;
-        let mut weight = 0.0;
+        let mut max_value = 0.0;
 
-        for _ in 0..octaves {
-            let sample_x = pos.x as f64 * frequency as f64 / scale as f64;
-            let sample_y = pos.y as f64 * frequency as f64 / scale as f64;
+        for _ in 0..layer.octaves {
+            let sample_pos = (pos + layer.offset) * frequency / layer.scale;
+            let noise_val = self
+                .noise_fn
+                .get([sample_pos.x as f64, sample_pos.y as f64]) as f32;
 
-            let noise_val = self.noise.get([sample_x, sample_y]) as f32;
-            noise_value += noise_val * amplitude;
-
-            weight += amplitude;
-            amplitude *= persistence;
-            frequency *= lacunarity;
+            value += noise_val * amplitude;
+            max_value += amplitude;
+            amplitude *= layer.persistence;
+            frequency *= layer.lacunarity;
         }
 
-        // Normalize the result
-        noise_value / weight
+        // Normalize to [0, 1] range
+        (value / max_value) * 0.5 + 0.5
     }
 
-    // Generate combined height and moisture maps for biome determination
-    pub fn generate_terrain_maps(
-        &self,
-        chunk_pos: Vec2,
-        chunk_size: u32,
-        config: &TerrainGenConfig,
-    ) -> (Vec<f32>, Vec<f32>) {
-        let size = chunk_size as usize;
-        let mut height_map = vec![0.0; size * size];
-        let mut moisture_map = vec![0.0; size * size];
-
-        for y in 0..size {
-            for x in 0..size {
-                let world_pos = Vec2::new(chunk_pos.x + x as f32, chunk_pos.y + y as f32);
-
-                // Generate height with multiple octaves
-                height_map[y * size + x] = self.get_noise(
-                    world_pos,
-                    config.noise_scale,
-                    config.noise_octaves,
-                    config.noise_persistence,
-                    config.noise_lacunarity,
-                );
-
-                // Generate moisture with different parameters for variation
-                moisture_map[y * size + x] = self.get_noise(
-                    world_pos,
-                    config.noise_scale * config.moisture_scale,
-                    config.noise_octaves - 1,
-                    config.noise_persistence,
-                    config.noise_lacunarity,
-                );
-            }
-        }
-
-        (height_map, moisture_map)
-    }
-
-    // Generate variation noise for feature placement
-    pub fn get_feature_variation(&self, world_pos: Vec2, scale: f32) -> f32 {
-        self.get_noise(
-            world_pos, scale, 2, // Fewer octaves for feature variation
-            0.5, 2.0,
-        )
-    }
-
-    // Generate noise for feature rotation
-    pub fn get_feature_rotation(&self, world_pos: Vec2) -> f32 {
-        self.get_noise(
-            world_pos, 50.0, // Larger scale for smoother rotation variation
-            1,    // Single octave is enough for rotation
-            1.0, 1.0,
-        ) * std::f32::consts::TAU // Full rotation range
+    fn map_to_range(&self, value: f32) -> f32 {
+        self.value_range.start + (self.value_range.end - self.value_range.start) * value
     }
 }

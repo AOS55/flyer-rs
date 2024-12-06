@@ -1,37 +1,29 @@
-use crate::ecs::component::Component;
-use glam::Vec2;
+use bevy::math::Vec2;
+use bevy::prelude::*;
 use serde::{Deserialize, Serialize};
-use std::any::Any;
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CameraComponent {
-    pub position: Vec2,               // Current position
-    pub viewport: Vec2,               // Viewport dimensions
-    pub zoom: f32,                    // Camera zoom level
-    pub bounds: Option<(Vec2, Vec2)>, // Optional world bounds
-    pub target: Option<Vec2>,         // Optional follow target
-    pub interpolation_factor: f32,    // Smoothing factor for camera movement
+#[derive(Component, Debug, Serialize, Deserialize, Clone, Reflect)]
+#[reflect(Component)]
+pub struct FlightCamera {
+    #[reflect(ignore)]
+    pub target: Option<Vec2>,
+    pub interpolation_factor: f32,
+    pub zoom_speed: f32,
+    pub min_zoom: f32,
+    pub max_zoom: f32,
+    #[reflect(ignore)]
+    pub bounds: Option<(Vec2, Vec2)>,
 }
 
-impl Default for CameraComponent {
+impl Default for FlightCamera {
     fn default() -> Self {
         Self {
-            position: Vec2::ZERO,
-            viewport: Vec2::new(1920.0, 1080.0),
-            zoom: 1.0,
-            bounds: None,
             target: None,
             interpolation_factor: 0.1,
+            zoom_speed: 0.1,
+            min_zoom: 0.1,
+            max_zoom: 10.0,
+            bounds: None,
         }
-    }
-}
-
-impl Component for CameraComponent {
-    fn as_any(&self) -> &dyn Any {
-        self
-    }
-
-    fn as_any_mut(&mut self) -> &mut dyn Any {
-        self
     }
 }

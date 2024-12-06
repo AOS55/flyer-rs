@@ -1,10 +1,9 @@
-use crate::ecs::component::Component;
-
+use bevy::prelude::*;
 use nalgebra::{Matrix3, Vector3};
 use serde::{Deserialize, Serialize};
 use std::any::Any;
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Component, Debug, Clone, Serialize, Deserialize)]
 pub struct PhysicsComponent {
     pub mass: f64,
     pub inertia: Matrix3<f64>,
@@ -75,15 +74,5 @@ impl PhysicsComponent {
         self.moments.clear();
         self.net_force = Vector3::zeros();
         self.net_moment = Vector3::zeros();
-    }
-}
-
-impl Component for PhysicsComponent {
-    fn as_any(&self) -> &dyn Any {
-        self
-    }
-
-    fn as_any_mut(&mut self) -> &mut dyn Any {
-        self
     }
 }

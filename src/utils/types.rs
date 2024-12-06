@@ -1,3 +1,5 @@
+use bevy::reflect::{FromReflect, Reflect};
+use glam::Vec2;
 use nalgebra::Vector3;
 use serde::{Deserialize, Serialize};
 
@@ -36,4 +38,22 @@ pub struct AirData {
     pub total_pressure: f64,
     pub density: f64,
     pub altitude: f64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Reflect)]
+pub struct ReflectableVec2 {
+    pub x: f32,
+    pub y: f32,
+}
+
+impl From<Vec2> for ReflectableVec2 {
+    fn from(vec: Vec2) -> Self {
+        Self { x: vec.x, y: vec.y }
+    }
+}
+
+impl From<ReflectableVec2> for Vec2 {
+    fn from(reflectable: ReflectableVec2) -> Self {
+        Vec2::new(reflectable.x, reflectable.y)
+    }
 }

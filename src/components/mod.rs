@@ -1,6 +1,7 @@
 pub mod aerodynamics;
 pub mod camera;
 pub mod physics;
+pub mod player;
 pub mod propulsion;
 pub mod render;
 pub mod spatial;
@@ -12,9 +13,10 @@ pub use aerodynamics::{
     YawCoefficients,
 };
 
-pub use camera::CameraComponent;
+pub use camera::FlightCamera;
 pub use physics::{Force, ForceCategory, Moment, PhysicsComponent, ReferenceFrame};
+pub use player::Player;
 pub use propulsion::{PropulsionComponent, PropulsionType};
-pub use render::RenderComponent;
+pub use render::{FlightSpriteBundle, RenderProperties, SpriteAnimation};
 pub use spatial::SpatialComponent;
-pub use terrain::{TerrainComponent, TerrainGenConfig};
+pub use terrain::TerrainState;

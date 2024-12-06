@@ -1,31 +1,160 @@
-use crate::components::camera::CameraComponent;
-use crate::ecs::component::Component;
-use crate::utils::CHUNK_SIZE;
-
-use glam::{UVec2, Vec2};
+use bevy::prelude::*;
 use serde::{Deserialize, Serialize};
-use std::any::Any;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 
-#[derive(Clone, Serialize, Deserialize)]
-pub struct TerrainTile {
-    pub name: String,
-    pub asset: String,
-    pub biome_type: BiomeType,
-    pub position: Vec2,
-}
+// ---- Components ----
 
-#[derive(Clone, Serialize, Deserialize)]
-pub struct TerrainFeature {
-    pub name: String,
-    pub asset: String,
+#[derive(Component, Debug, Clone)]
+pub struct TerrainFeatureComponent {
     pub feature_type: FeatureType,
+    pub variant: FeatureVariant,
     pub position: Vec2,
     pub rotation: f32,
     pub scale: f32,
 }
 
-#[derive(Clone, Copy, PartialEq, Hash, Eq, Serialize, Deserialize)]
+#[derive(Component, Debug, Clone)]
+#[require(Sprite, Transform)]
+pub struct TerrainTileComponent {
+    pub biome_type: BiomeType,
+    pub position: Vec2,
+    pub sprite_index: usize,
+}
+
+#[derive(Component, Debug, Clone)]
+#[require(Sprite, Transform, Visibility)]
+pub struct TerrainChunkComponent {
+    pub position: IVec2,           // Chunk position in chunk coordinates
+    pub height_map: Vec<f32>,      // Height values for each tile
+    pub moisture_map: Vec<f32>,    // Moisture values for each tile
+    pub biome_map: Vec<BiomeType>, // Biome type for each tile
+}
+
+impl TerrainChunkComponent {
+    pub fn new(position: IVec2, chunk_size: u32) -> Self {
+        let size = (chunk_size * chunk_size) as usize;
+        Self {
+            position,
+            height_map: vec![0.0; size],
+            moisture_map: vec![0.0; size],
+            biome_map: vec![BiomeType::Grass; size],
+        }
+    }
+
+    pub fn world_position(&self, chunk_size: u32, scale: f32) -> Vec3 {
+        Vec3::new(
+            self.position.x as f32 * chunk_size as f32 * scale,
+            self.position.y as f32 * chunk_size as f32 * scale,
+            0.0,
+        )
+    }
+}
+
+// ---- Resources ----
+
+#[derive(Resource, Debug, Clone)]
+pub struct TerrainState {
+    pub chunk_size: u32,
+    pub world_size: IVec2,
+    pub scale: f32,
+    pub seed: u64,
+    pub active_chunks: Vec<IVec2>,
+}
+
+impl Default for TerrainState {
+    fn default() -> Self {
+        Self {
+            chunk_size: 32,
+            world_size: IVec2::new(1000, 1000),
+            scale: 1.0,
+            seed: 12345,
+            active_chunks: Vec::new(),
+        }
+    }
+}
+
+#[derive(Resource, Clone, Debug, Deserialize, Serialize)]
+pub struct TerrainConfig {
+    // Noise generation settings
+    pub noise_scale: f32,
+    pub noise_octaves: u32,
+    pub noise_persistence: f32,
+    pub noise_lacunarity: f32,
+
+    // Biome generation settings
+    pub field_density: f32,
+    pub biome_scale: f32,
+    pub moisture_scale: f32,
+
+    // Height thresholds
+    pub water_threshold: f32,
+    pub beach_width: f32,
+
+    // Feature placement settings
+    pub feature_densities: HashMap<FeatureType, f32>,
+    pub biome_weights: HashMap<BiomeType, f32>,
+
+    // River generation settings
+    pub river_config: RiverConfig,
+}
+
+/// Resource that manages all terrain-related textures and their mappings
+#[derive(Resource, Clone)]
+pub struct TerrainAssets {
+    /// Handle to the main terrain tileset image (e.g., "terrain_tiles.png")
+    /// Contains all base terrain types (grass, water, sand, etc.) in a sprite sheet
+    pub tile_texture: Handle<Image>,
+
+    /// Handle to the feature tileset image (e.g., "features.png")
+    /// Contains all terrain features (trees, rocks, buildings, etc.) in a sprite sheet
+    pub feature_texture: Handle<Image>,
+
+    /// Defines how to split the tile_texture into individual sprites
+    /// Specifies the grid layout (tile size, rows, columns) for terrain tiles
+    pub tile_layout: Handle<TextureAtlasLayout>,
+
+    /// Defines how to split the feature_texture into individual sprites
+    /// Specifies the grid layout (sprite size, rows, columns) for feature sprites
+    pub feature_layout: Handle<TextureAtlasLayout>,
+
+    /// Maps game biome types to their corresponding sprite indices in tile_texture
+    /// Example: BiomeType::Desert => 0 (first sprite in the tileset)
+    pub tile_mappings: HashMap<BiomeType, usize>,
+
+    /// Maps game feature types to their corresponding sprite indices in feature_texture
+    /// Example: FeatureType::Tree => 5 (sixth sprite in the feature set)
+    pub feature_mappings: HashMap<FeatureType, usize>,
+}
+
+/// Configuration for river generation
+#[derive(Debug, Clone, Resource, Deserialize, Serialize)]
+pub struct RiverConfig {
+    pub min_source_height: f32, // Minimum height for river sources
+    pub meander_factor: f32,    // How much rivers can deviate from steepest path
+    pub min_slope: f32,         // Minimum slope required for river flow
+    pub width_growth_rate: f32, // How quickly rivers widen downstream
+    pub depth_growth_rate: f32, // How quickly rivers deepen downstream
+    pub erosion_strength: f32,  // How much rivers erode the terrain
+    pub max_river_length: f32,  // Maximum length of a river
+}
+
+impl Default for RiverConfig {
+    fn default() -> Self {
+        Self {
+            min_source_height: 0.7,
+            meander_factor: 0.3,
+            min_slope: 0.01,
+            width_growth_rate: 0.1,
+            depth_growth_rate: 0.05,
+            erosion_strength: 0.2,
+            max_river_length: 100.0,
+        }
+    }
+}
+
+// ---- Enums ----
+
+#[derive(Debug, Clone, Copy, PartialEq, Hash, Eq, Serialize, Deserialize)]
 pub enum BiomeType {
     Grass,
     Forest,
@@ -35,15 +164,15 @@ pub enum BiomeType {
     Sand,
 }
 
-#[derive(Clone, Copy, PartialEq, Hash, Serialize, Deserialize, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Hash, Eq, Serialize, Deserialize)]
 pub enum FeatureType {
-    Tree { variant: TreeVariant },
-    Bush { variant: BushVariant },
-    Flower { variant: FlowerVariant },
+    Tree(TreeVariant),
+    Bush(BushVariant),
+    Flower(FlowerVariant),
     Rock,
 }
 
-#[derive(Clone, Copy, PartialEq, Hash, Serialize, Deserialize, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Hash, Eq, Serialize, Deserialize)]
 pub enum TreeVariant {
     EvergreenFir,
     WiltingFir,
@@ -51,14 +180,14 @@ pub enum TreeVariant {
     PrunedTree,
 }
 
-#[derive(Clone, Copy, PartialEq, Hash, Serialize, Deserialize, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Hash, Eq, Serialize, Deserialize)]
 pub enum BushVariant {
     GreenBushel,
     RipeBushel,
     DeadBushel,
 }
 
-#[derive(Clone, Copy, PartialEq, Hash, Serialize, Deserialize, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Hash, Eq, Serialize, Deserialize)]
 pub enum FlowerVariant {
     Single,
     Double,
@@ -66,78 +195,23 @@ pub enum FlowerVariant {
     Cluster,
 }
 
-#[derive(Clone)]
-pub struct TerrainChunk {
-    pub biome_map: Vec<BiomeType>,
-    pub height_map: Vec<f32>,
-    pub moisture_map: Vec<f32>,
-    pub tiles: Vec<TerrainTile>,
-    pub features: Vec<TerrainFeature>,
-    pub dirty: bool,
+#[derive(Debug, Clone, Copy, PartialEq, Hash, Eq, Serialize, Deserialize)]
+pub enum FeatureVariant {
+    Tree(TreeVariant),
+    Bush(BushVariant),
+    Flower(FlowerVariant),
+    Rock,
 }
 
-impl TerrainChunk {
-    pub fn new(size: u32) -> Self {
-        Self {
-            biome_map: vec![BiomeType::Grass; (size * size) as usize],
-            height_map: vec![0.0; (size * size) as usize],
-            moisture_map: vec![0.0; (size * size) as usize],
-            tiles: Vec::new(),
-            features: Vec::new(),
-            dirty: true,
-        }
-    }
-}
+// ---- Implementations ----
 
-#[derive(Clone)]
-pub struct TerrainGenConfig {
-    // Noise generation settings
-    pub noise_scale: f32,       // Base scale for noise generation
-    pub noise_octaves: u32,     // Number of octaves for noise generation
-    pub noise_persistence: f32, // How much each octave contributes
-    pub noise_lacunarity: f32,  // How frequency increases with each octave
-
-    // Biome generation settings
-    pub field_density: f32,  // Controls density of biome regions
-    pub biome_scale: f32,    // Scale factor for biome transitions
-    pub moisture_scale: f32, // Scale for moisture variation
-
-    // Height thresholds
-    pub water_threshold: f32, // Height below which water appears
-    pub beach_width: f32,     // Width of beach transition
-
-    // Feature placement settings
-    pub feature_densities: HashMap<FeatureType, f32>,
-    pub biome_weights: HashMap<BiomeType, f32>, // Relative weights for biome distribution
-}
-
-impl Default for TerrainGenConfig {
+impl Default for TerrainConfig {
     fn default() -> Self {
         let mut feature_densities = HashMap::new();
-        feature_densities.insert(
-            FeatureType::Tree {
-                variant: TreeVariant::EvergreenFir,
-            },
-            0.6,
-        );
-        feature_densities.insert(
-            FeatureType::Tree {
-                variant: TreeVariant::AppleTree,
-            },
-            0.1,
-        );
-        feature_densities.insert(
-            FeatureType::Bush {
-                variant: BushVariant::GreenBushel,
-            },
-            0.2,
-        );
-        feature_densities.insert(
-            FeatureType::Flower {
-                variant: FlowerVariant::Single,
-            },
-            0.1,
-        );
+        feature_densities.insert(FeatureType::Tree(TreeVariant::EvergreenFir), 0.6);
+        feature_densities.insert(FeatureType::Tree(TreeVariant::AppleTree), 0.1);
+        feature_densities.insert(FeatureType::Bush(BushVariant::GreenBushel), 0.2);
+        feature_densities.insert(FeatureType::Flower(FlowerVariant::Single), 0.1);
 
         let mut biome_weights = HashMap::new();
         biome_weights.insert(BiomeType::Grass, 1.0);
@@ -147,31 +221,26 @@ impl Default for TerrainGenConfig {
         biome_weights.insert(BiomeType::Water, 0.2);
         biome_weights.insert(BiomeType::Sand, 0.1);
 
+        let river_config = RiverConfig::default();
+
         Self {
-            // Noise settings
-            noise_scale: 100.0,
+            noise_scale: 20.0,
             noise_octaves: 4,
             noise_persistence: 0.5,
             noise_lacunarity: 2.0,
-
-            // Biome settings
-            field_density: 0.005,
-            biome_scale: 1.0,
+            field_density: 0.3,
+            biome_scale: 10.0,
             moisture_scale: 0.5,
-
-            // Height thresholds
-            water_threshold: -0.2,
-            beach_width: 0.05,
-
-            // Feature settings
+            water_threshold: 0.7,
+            beach_width: 0.025,
             feature_densities,
             biome_weights,
+            river_config,
         }
     }
 }
 
-impl TerrainGenConfig {
-    // Helper method to get biome probability based on height and moisture
+impl TerrainConfig {
     pub fn get_biome_probability(&self, height: f32, moisture: f32, biome: BiomeType) -> f32 {
         let base_weight = self.biome_weights.get(&biome).unwrap_or(&0.0);
 
@@ -208,109 +277,50 @@ impl TerrainGenConfig {
         }
     }
 
-    // Helper method to get feature density for a specific biome
     pub fn get_feature_density(&self, feature: FeatureType, biome: BiomeType) -> f32 {
         let base_density = self.feature_densities.get(&feature).unwrap_or(&0.0);
 
         match (feature, biome) {
-            (FeatureType::Tree { .. }, BiomeType::Forest) => base_density * 1.5,
-            (FeatureType::Tree { .. }, BiomeType::Orchard) => base_density * 1.2,
-            (FeatureType::Bush { .. }, BiomeType::Crops) => base_density * 1.3,
-            (FeatureType::Flower { .. }, BiomeType::Grass) => base_density * 1.1,
+            (FeatureType::Tree(_), BiomeType::Forest) => base_density * 1.5,
+            (FeatureType::Tree(_), BiomeType::Orchard) => base_density * 1.2,
+            (FeatureType::Bush(_), BiomeType::Crops) => base_density * 1.3,
+            (FeatureType::Flower(_), BiomeType::Grass) => base_density * 1.1,
             _ => *base_density,
         }
     }
 }
 
-pub struct TerrainComponent {
-    pub chunks: HashMap<UVec2, TerrainChunk>,
-    pub chunk_size: u32,
-    pub world_size: UVec2,
-    pub scale: f32,
-    pub seed: u64,
-    pub config: TerrainGenConfig,
-    pub active_chunks: Vec<UVec2>,
-}
-
-impl TerrainComponent {
-    pub fn new(world_size: UVec2, chunk_size: u32, seed: u64, scale: f32) -> Self {
+impl TerrainAssets {
+    pub fn new() -> Self {
         Self {
-            chunks: HashMap::new(),
-            chunk_size,
-            world_size,
-            scale,
-            seed,
-            config: TerrainGenConfig::default(),
-            active_chunks: Vec::new(),
+            tile_texture: default(),
+            feature_texture: default(),
+            tile_layout: default(),
+            feature_layout: default(),
+            tile_mappings: HashMap::new(),
+            feature_mappings: HashMap::new(),
         }
     }
 
-    pub fn get_chunk(&self, pos: UVec2) -> Option<&TerrainChunk> {
-        self.chunks.get(&pos)
-    }
-
-    pub fn get_chunk_mut(&mut self, pos: UVec2) -> Option<&mut TerrainChunk> {
-        self.chunks.get_mut(&pos)
-    }
-
-    pub fn world_to_chunk_pos(&self, world_pos: Vec2) -> UVec2 {
-        UVec2::new(
-            (world_pos.x / (self.chunk_size as f32 * self.scale)).floor() as u32,
-            (world_pos.y / (self.chunk_size as f32 * self.scale)).floor() as u32,
+    pub fn get_tile_sprite(&self, biome: BiomeType) -> Sprite {
+        let index = self.tile_mappings.get(&biome).copied().unwrap_or(0);
+        Sprite::from_atlas_image(
+            self.tile_texture.clone(),
+            TextureAtlas {
+                layout: self.tile_layout.clone(),
+                index,
+            },
         )
     }
 
-    pub fn chunk_to_world_pos(&self, chunk_pos: UVec2) -> Vec2 {
-        Vec2::new(
-            chunk_pos.x as f32 * self.chunk_size as f32 * self.scale,
-            chunk_pos.y as f32 * self.chunk_size as f32 * self.scale,
+    pub fn get_feature_sprite(&self, feature: FeatureType) -> Sprite {
+        let index = self.feature_mappings.get(&feature).copied().unwrap_or(0);
+        Sprite::from_atlas_image(
+            self.feature_texture.clone(),
+            TextureAtlas {
+                layout: self.feature_layout.clone(),
+                index,
+            },
         )
-    }
-
-    pub fn get_biome_at(&self, world_pos: Vec2) -> Option<BiomeType> {
-        let chunk_pos = self.world_to_chunk_pos(world_pos);
-        let chunk = self.get_chunk(chunk_pos)?;
-
-        let local_pos = world_pos - self.chunk_to_world_pos(chunk_pos);
-        let x = (local_pos.x / self.scale) as usize;
-        let y = (local_pos.y / self.scale) as usize;
-
-        if x >= self.chunk_size as usize || y >= self.chunk_size as usize {
-            return None;
-        }
-
-        Some(chunk.biome_map[y * self.chunk_size as usize + x])
-    }
-
-    pub fn get_visible_chunks(camera: &CameraComponent) -> HashSet<UVec2> {
-        let mut visible = HashSet::new();
-
-        // Calculate view distance based on viewport and zoom
-        let viewport_extent = camera.viewport * 0.5 / camera.zoom;
-        let view_distance = viewport_extent.length() / CHUNK_SIZE as f32;
-
-        let chunk_pos = camera.position / CHUNK_SIZE as f32;
-        let chunks_to_load = view_distance.ceil() as i32;
-
-        // Add chunks in view distance
-        for x in -chunks_to_load..=chunks_to_load {
-            for y in -chunks_to_load..=chunks_to_load {
-                visible.insert(UVec2::new(
-                    (chunk_pos.x + x as f32) as u32,
-                    (chunk_pos.y + y as f32) as u32,
-                ));
-            }
-        }
-
-        visible
-    }
-}
-
-impl Component for TerrainComponent {
-    fn as_any(&self) -> &dyn Any {
-        self
-    }
-    fn as_any_mut(&mut self) -> &mut dyn Any {
-        self
     }
 }

@@ -1,43 +1,73 @@
 [package]
-name = "flyer-rs"
+name = "flyer"
 version = "0.1.0"
 edition = "2021"
-
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+authors = ["Your Name <your.email@example.com>"]
+description = "A flying simulation project"
+repository = "https://github.com/yourusername/flyer-rs"
+license = "MIT OR Apache-2.0"
+keywords = ["simulation", "flying", "physics"]
+categories = ["simulation"]
 
 [lib]
 name = "flyer"
 
-# [dependencies.sdl2]
-#     version = "0.35"
-#     default-features = false
-#     features = ["ttf","image","gfx","mixer"]
-
 [dependencies]
-# minifb = "0.25"
+# Graphics and rendering
 tiny-skia = "0.11.1"
-noise = "0.8.0"
 image = "0.24.7"
+bevy = { version = "0.15" }
+
+# Math and physics
 glam = { version = "0.24.2", features = ["mint", "serde"] }
-rand = "0.8.5"
-rand_seeder = "0.2.3"
-rand_chacha = "0.3.1"
-aerso = { git = "https://github.com/rob-clarke/aerso.git" }
+nalgebra = { version = "0.29", features = ["serde-serialize"] }
+noise = "0.8.0"
+aerso = { git = "https://github.com/rob-clarke/aerso.git", branch = "main" }
+
+# Optimization and algorithms
+argmin = { version = "0.8.1", features = ["rayon"] }
+argmin-math = { version = "0.3" }
+argmin_testfunctions = "0.1.1"
+kiddo = "2.1.1"
+
+# Serialization
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0.107"
 serde_yaml = "0.9"
-nalgebra = { version = "0.29.0", features = ["serde-serialize"] }
-kiddo = "2.1.1"
+
+# Random number generation
+rand = "0.8.5"
+rand_seeder = "0.2.3"
+rand_chacha = "0.3.1"
+
+# Utility
 rayon = "1.7.0"
 thiserror = "1.0"
-argmin = { version = "0.8.1", features = ["rayon"] }
-argmin-math = { version = "0.3", features = ["nalgebra_latest-serde"] }
-argmin_testfunctions = "0.1.1"
-uuid = { version = "1.11", features = ["v4"] }
+uuid = { version = "1.11", features = ["v4", "serde"] }
 petgraph = "0.6"
-tempfile = "3.2.0"
-# plotters = "0.3.5"
+tempfile = "3.8"
 
 [dev-dependencies]
-pretty_assertions = "1.0"
+pretty_assertions = "1.4"
 approx = "0.5.1"
+
+[profile.dev]
+opt-level = 1
+debug = true
+incremental = true
+
+[profile.release]
+opt-level = 3
+lto = "thin"
+strip = true
+panic = "abort"
+
+[profile.dev.package."*"]
+opt-level = 3
+
+# Enable a small amount of optimization in debug mode
+[profile.test]
+opt-level = 1
+
+[workspace]
+members = ["."]

@@ -1,3 +1,2 @@
-pub mod renderer;
-
-pub use self::renderer::RenderSystem;
+pub mod sprite_assets;
+pub mod sprite_systems;

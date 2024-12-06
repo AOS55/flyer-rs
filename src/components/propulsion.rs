@@ -1,4 +1,4 @@
-use crate::ecs::component::Component;
+use bevy::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::any::Any;
 
@@ -51,35 +51,5 @@ impl Default for PropulsionComponent {
             temperature: 288.15, // 15°C in Kelvin
             fuel_flow: 0.0,
         }
-    }
-}
-
-impl Component for PropulsionComponent {
-    fn as_any(&self) -> &dyn Any {
-        self
-    }
-
-    fn as_any_mut(&mut self) -> &mut dyn Any {
-        self
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_default_propulsion() {
-        let prop = PropulsionComponent::default();
-        assert_eq!(prop.throttle, 0.0);
-        assert_eq!(prop.efficiency, 0.8);
-        assert_eq!(prop.rpm, 0.0);
-    }
-
-    #[test]
-    fn test_component_casting() {
-        let prop = PropulsionComponent::default();
-        let any_ref = prop.as_any();
-        assert!(any_ref.downcast_ref::<PropulsionComponent>().is_some());
     }
 }

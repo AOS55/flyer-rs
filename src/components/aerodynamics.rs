@@ -1,9 +1,8 @@
-use crate::ecs::component::Component;
+use bevy::prelude::Component;
 use nalgebra::Vector3;
 use serde::{Deserialize, Serialize};
-use std::any::Any;
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Component, Debug, Clone, Serialize, Deserialize)]
 pub struct AerodynamicsComponent {
     pub geometry: AircraftGeometry,
     pub air_data: AirData,
@@ -11,14 +10,14 @@ pub struct AerodynamicsComponent {
     pub control_surfaces: ControlSurfaces,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Component, Debug, Clone, Serialize, Deserialize)]
 pub struct AircraftGeometry {
     pub wing_area: f64,
     pub wing_span: f64,
     pub mean_aerodynamic_chord: f64,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Component, Debug, Clone, Serialize, Deserialize)]
 pub struct AirData {
     pub true_airspeed: f64,
     pub alpha: f64,
@@ -29,7 +28,7 @@ pub struct AirData {
     pub wind_velocity: Vector3<f64>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Component, Debug, Clone, Serialize, Deserialize)]
 pub struct AeroCoefficients {
     pub drag: DragCoefficients,
     pub lift: LiftCoefficients,
@@ -39,7 +38,7 @@ pub struct AeroCoefficients {
     pub yaw: YawCoefficients,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Component, Debug, Clone, Serialize, Deserialize)]
 pub struct ControlSurfaces {
     pub elevator: f64,
     pub aileron: f64,
@@ -47,7 +46,7 @@ pub struct ControlSurfaces {
     pub flaps: f64,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Component, Debug, Clone, Serialize, Deserialize)]
 pub struct DragCoefficients {
     pub c_d_0: f64,
     pub c_d_alpha: f64,
@@ -61,7 +60,7 @@ pub struct DragCoefficients {
     pub c_d_alpha4: f64,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Component, Debug, Clone, Serialize, Deserialize)]
 pub struct LiftCoefficients {
     pub c_l_0: f64,
     pub c_l_alpha: f64,
@@ -73,7 +72,7 @@ pub struct LiftCoefficients {
     pub c_l_alpha4: f64,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Component, Debug, Clone, Serialize, Deserialize)]
 pub struct SideForceCoefficients {
     pub c_y_beta: f64,
     pub c_y_p: f64,
@@ -82,7 +81,7 @@ pub struct SideForceCoefficients {
     pub c_y_deltar: f64,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Component, Debug, Clone, Serialize, Deserialize)]
 pub struct RollCoefficients {
     pub c_l_beta: f64,
     pub c_l_p: f64,
@@ -91,7 +90,7 @@ pub struct RollCoefficients {
     pub c_l_deltar: f64,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Component, Debug, Clone, Serialize, Deserialize)]
 pub struct PitchCoefficients {
     pub c_m_0: f64,
     pub c_m_alpha: f64,
@@ -105,7 +104,7 @@ pub struct PitchCoefficients {
     pub c_m_alpha4: f64,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Component, Debug, Clone, Serialize, Deserialize)]
 pub struct YawCoefficients {
     pub c_n_beta: f64,
     pub c_n_p: f64,
@@ -114,16 +113,6 @@ pub struct YawCoefficients {
     pub c_n_deltar: f64,
     pub c_n_beta2: f64,
     pub c_n_beta3: f64,
-}
-
-impl Component for AerodynamicsComponent {
-    fn as_any(&self) -> &dyn Any {
-        self
-    }
-
-    fn as_any_mut(&mut self) -> &mut dyn Any {
-        self
-    }
 }
 
 impl Default for AerodynamicsComponent {
