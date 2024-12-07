@@ -2158,6 +2158,7 @@ dependencies = [
  "argmin-math",
  "argmin_testfunctions",
  "bevy",
+ "futures-lite",
  "glam 0.24.2",
  "image 0.24.9",
  "kiddo",

@@ -1,7 +1,7 @@
 use bevy::prelude::*;
 use std::collections::HashSet;
 
-#[derive(Resource)]
+#[derive(Resource, Clone)]
 pub struct TerrainState {
     // Runtime state
     pub active_chunks: Vec<IVec2>,
@@ -10,7 +10,6 @@ pub struct TerrainState {
 
     // Core parameters
     pub chunk_size: u32,
-    pub world_size: IVec2,
     pub scale: f32,
     pub seed: u64,
 

@@ -1,7 +1,6 @@
 use bevy::prelude::*;
 use nalgebra::{Matrix3, Vector3};
 use serde::{Deserialize, Serialize};
-use std::any::Any;
 
 #[derive(Component, Debug, Clone, Serialize, Deserialize)]
 pub struct PhysicsComponent {

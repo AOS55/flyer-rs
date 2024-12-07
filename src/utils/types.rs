@@ -1,4 +1,4 @@
-use bevy::reflect::{FromReflect, Reflect};
+use bevy::reflect::Reflect;
 use glam::Vec2;
 use nalgebra::Vector3;
 use serde::{Deserialize, Serialize};

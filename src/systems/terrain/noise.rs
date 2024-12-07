@@ -50,7 +50,7 @@ impl NoiseLayer {
 }
 
 /// Manages multiple noise layers for terrain generation
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct NoiseGenerator {
     noise_fn: noise::OpenSimplex,
     pub layers: Vec<NoiseLayer>,

@@ -15,25 +15,30 @@ impl TerrainPlugin {
         commands.insert_resource(TerrainConfig::default());
     }
 
-    fn setup_state(mut commands: Commands, config: Res<TerrainConfig>) {
-        let terrain_state = TerrainState {
-            // Core parameters from config
-            chunk_size: config.render.tile_size as u32,
-            world_size: IVec2::new(1000, 1000), // Could come from config
-            scale: config.render.tile_size,
-            seed: rand::random(), // Or from config
+    fn setup_state(
+        mut commands: Commands,
+        config: Res<TerrainConfig>,
+        existing_state: Option<Res<TerrainState>>,
+    ) {
+        if existing_state.is_none() {
+            let terrain_state = TerrainState {
+                // Core parameters from config
+                chunk_size: config.render.tile_size as u32,
+                scale: config.render.tile_size,
+                seed: rand::random(), // Or from config
 
-            // Runtime state
-            active_chunks: Vec::new(),
-            chunks_to_load: Default::default(),
-            chunks_to_unload: Default::default(),
+                // Runtime state
+                active_chunks: Vec::new(),
+                chunks_to_load: Default::default(),
+                chunks_to_unload: Default::default(),
 
-            // Loading parameters
-            loading_radius: 5,
-            max_chunks_per_frame: 8,
-        };
+                // Loading parameters
+                loading_radius: 5,
+                max_chunks_per_frame: 8,
+            };
 
-        commands.insert_resource(terrain_state);
+            commands.insert_resource(terrain_state);
+        }
     }
 
     fn setup_assets(

@@ -32,7 +32,6 @@ fn setup(mut commands: Commands) {
     let terrain_state = TerrainState {
         // Core parameters
         chunk_size: 32,
-        world_size: IVec2::new(1000, 1000),
         scale: 16.0,
         seed: 42,
 
@@ -61,7 +60,7 @@ fn pan_camera(
 ) {
     let (mut transform, mut projection) = query.single_mut();
     let mut direction = Vec3::ZERO;
-    let speed = 200.0;
+    let speed = 400.0;
 
     // info!(
     //     "Camera position: {}, Scale: {}",

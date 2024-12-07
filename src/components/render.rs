@@ -41,10 +41,10 @@ pub struct FlightSpriteBundle {
 
 impl FlightSpriteBundle {
     pub fn new(
-        texture: Handle<Image>,
-        atlas_layout: Handle<TextureAtlasLayout>,
-        animation_frame: usize,
-        transform: Transform,
+        _texture: Handle<Image>,
+        _atlas_layout: Handle<TextureAtlasLayout>,
+        _animation_frame: usize,
+        _transform: Transform,
         properties: RenderProperties,
     ) -> Self {
         Self {

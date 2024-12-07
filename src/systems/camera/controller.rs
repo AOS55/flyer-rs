@@ -1,7 +1,6 @@
 use crate::components::FlightCamera;
 use crate::components::Player;
 use bevy::input::mouse::MouseWheel;
-use bevy::math::Vec2;
 use bevy::prelude::*;
 
 pub fn spawn_camera(mut commands: Commands) {
@@ -12,7 +11,7 @@ pub fn camera_follow_system(
     mut camera_query: Query<(&FlightCamera, &mut Transform, &mut OrthographicProjection)>,
     time: Res<Time>,
 ) {
-    for (camera, mut transform, mut projection) in camera_query.iter_mut() {
+    for (camera, mut transform, _projection) in camera_query.iter_mut() {
         // Update position if there's a target
         if let Some(target) = camera.target {
             let current_pos = transform.translation.truncate();

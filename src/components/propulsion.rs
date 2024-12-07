@@ -1,6 +1,4 @@
-use bevy::prelude::*;
 use serde::{Deserialize, Serialize};
-use std::any::Any;
 
 /// Different types of propulsion systems available
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]

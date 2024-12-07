@@ -10,7 +10,7 @@ use crate::resources::terrain::{TerrainAssets, TerrainConfig, TerrainState};
 use crate::systems::terrain::noise::NoiseGenerator;
 use crate::systems::terrain::rivers::generate_rivers;
 
-#[derive(Resource)]
+#[derive(Resource, Clone)]
 pub struct TerrainGeneratorSystem {
     height_generator: NoiseGenerator,
     moisture_generator: NoiseGenerator,
@@ -129,22 +129,6 @@ pub fn generate_chunk_data(
         }
     }
 
-    // Log value ranges
-    info!("Height range: {} -> {}", min_height, max_height);
-    info!("Moisture range: {} -> {}", min_moisture, max_moisture);
-
-    // Create histogram buckets for height values
-    let mut height_buckets = vec![0; 10];
-    for height in &chunk.height_map {
-        let bucket = ((height * 10.0) as usize).min(9);
-        height_buckets[bucket] += 1;
-    }
-
-    info!("Height distribution:");
-    for (i, count) in height_buckets.iter().enumerate() {
-        info!("{}% - {}%: {} values", i * 10, (i + 1) * 10, count);
-    }
-
     // Then generate and apply rivers to modify the terrain
     generate_rivers(chunk, state, generator, &config.noise.river);
 
@@ -161,8 +145,6 @@ pub fn generate_chunk_data(
             chunk.biome_map[idx] = determine_biome(
                 chunk.height_map[idx],
                 chunk.moisture_map[idx],
-                generator.get_river_value(world_pos),
-                generator.get_detail_value(world_pos),
                 &config.biome,
                 state.seed,
                 world_pos,
@@ -176,8 +158,6 @@ pub fn generate_chunk_data(
 fn determine_biome(
     height: f32,
     moisture: f32,
-    river_value: f32,
-    detail_value: f32,
     config: &BiomeConfig,
     seed: u64,
     world_pos: Vec2,
@@ -355,29 +335,6 @@ fn smooth_biome_transitions(chunk: &mut TerrainChunkComponent, chunk_size: i32) 
     chunk.biome_map = smoothed;
 }
 
-fn distance_to_water(chunk: &TerrainChunkComponent, x: i32, y: i32, chunk_size: i32) -> f32 {
-    let mut min_distance = f32::MAX;
-
-    for dy in -1..=1 {
-        for dx in -1..=1 {
-            let nx = x + dx;
-            let ny = y + dy;
-
-            if nx >= 0 && nx < chunk_size && ny >= 0 && ny < chunk_size {
-                let idx = (ny * chunk_size + nx) as usize;
-                if chunk.biome_map[idx] == BiomeType::Water {
-                    let distance = ((dx * dx + dy * dy) as f32).sqrt();
-                    if distance < min_distance {
-                        min_distance = distance;
-                    }
-                }
-            }
-        }
-    }
-
-    min_distance
-}
-
 fn spawn_feature(
     commands: &mut Commands,
     chunk_entity: Entity,
@@ -423,7 +380,6 @@ fn try_spawn_feature(
         BiomeType::Desert => try_spawn_generic(pos, &config.feature.desert, rng),
         BiomeType::Mountain => try_spawn_generic(pos, &config.feature.mountain, rng),
         BiomeType::Snow => try_spawn_generic(pos, &config.feature.snow, rng),
-        _ => None,
     }
 }
 

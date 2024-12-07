@@ -9,7 +9,7 @@ pub struct SpriteAssets {
 }
 
 pub fn load_sprite_assets(
-    mut commands: Commands,
+    mut _commands: Commands,
     asset_server: Res<AssetServer>,
     mut texture_atlas_layouts: ResMut<Assets<TextureAtlasLayout>>,
     mut sprite_assets: ResMut<SpriteAssets>,
@@ -21,7 +21,7 @@ pub fn load_sprite_assets(
     );
 
     // Create atlas layouts and sources
-    let mut texture_atlas_builder = TextureAtlasBuilder::default();
+    let mut _texture_atlas_builder = TextureAtlasBuilder::default();
     let layout = TextureAtlasLayout::from_grid(UVec2::new(32, 32), 8, 4, None, None);
     let layout_handle = texture_atlas_layouts.add(layout.clone());
 

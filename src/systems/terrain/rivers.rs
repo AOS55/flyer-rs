@@ -105,7 +105,7 @@ fn generate_river_path(
     chunk: &TerrainChunkComponent,
     source: Vec2,
     chunk_size: i32,
-    generator: &TerrainGeneratorSystem,
+    _generator: &TerrainGeneratorSystem,
     config: &RiverNoiseConfig,
 ) -> Option<River> {
     let source_idx = (source.y as i32 * chunk_size + source.x as i32) as usize;

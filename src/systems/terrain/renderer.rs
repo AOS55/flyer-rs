@@ -61,7 +61,7 @@ fn terrain_visual_update_system(
 fn feature_visual_update_system(
     mut features: Query<(&TerrainFeatureComponent, &mut Sprite, &mut Transform)>,
     assets: Res<TerrainAssets>,
-    config: Res<TerrainConfig>,
+    _config: Res<TerrainConfig>,
 ) {
     for (feature, mut sprite, mut transform) in features.iter_mut() {
         // Update sprite

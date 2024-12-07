@@ -36,9 +36,9 @@ pub fn spawn_animated_sprite(
     commands: &mut Commands,
     texture: Handle<Image>,
     atlas_layout: Handle<TextureAtlasLayout>,
-    atlas_sources: &TextureAtlasSources,
+    _atlas_sources: &TextureAtlasSources,
     animation: SpriteAnimation,
-    transform: Transform,
+    _transform: Transform,
     properties: RenderProperties,
 ) -> Entity {
     let sprite = Sprite {
