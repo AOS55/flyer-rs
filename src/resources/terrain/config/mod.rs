@@ -4,7 +4,7 @@ mod noise;
 
 use bevy::prelude::*;
 pub use biome::BiomeConfig;
-pub use feature::FeatureConfig;
+pub use feature::{BiomeFeatureConfig, FeatureConfig};
 pub use noise::{NoiseConfig, RiverNoiseConfig};
 
 #[derive(Resource, Clone, Debug)]

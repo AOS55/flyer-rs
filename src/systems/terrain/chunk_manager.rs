@@ -70,14 +70,14 @@ pub fn chunk_loading_system(
         loading_state.chunks_to_load.remove(&chunk_pos);
 
         // Logging for debugging
-        info!(
-            "Attempting to spawn chunk at world coordinates: {}",
-            Vec2::new(
-                chunk_pos.x as f32 * terrain_state.chunk_size as f32 * terrain_state.scale,
-                chunk_pos.y as f32 * terrain_state.chunk_size as f32 * terrain_state.scale
-            )
-        );
-        info!("Spawning chunk at position: {:?}", chunk_pos);
+        // info!(
+        //     "Attempting to spawn chunk at world coordinates: {}",
+        //     Vec2::new(
+        //         chunk_pos.x as f32 * terrain_state.chunk_size as f32 * terrain_state.scale,
+        //         chunk_pos.y as f32 * terrain_state.chunk_size as f32 * terrain_state.scale
+        //     )
+        // );
+        // info!("Spawning chunk at position: {:?}", chunk_pos);
     }
 }
 
@@ -157,7 +157,7 @@ fn spawn_chunk(
         .id();
 
     // Logging for debugging
-    info!("Spawning chunk at position: {:?}", position);
+    // info!("Spawning chunk at position: {:?}", position);
 
     // Spawn tile entities as children
     let chunk_size = terrain_state.chunk_size as usize;
@@ -176,10 +176,10 @@ fn spawn_chunk(
                     y as f32 * terrain_state.scale,
                 );
 
-            println!(
-                "Spawning tile at local pos ({}, {}) world pos: {:?}",
-                x, y, tile_world_pos
-            );
+            // println!(
+            //     "Spawning tile at local pos ({}, {}) world pos: {:?}",
+            //     x, y, tile_world_pos
+            // );
 
             commands
                 .spawn((
@@ -202,7 +202,7 @@ fn spawn_chunk(
                 .set_parent(chunk_entity);
 
             // Logging for debugging
-            info!("Spawning tile at position: {:?}", tile_world_pos);
+            // info!("Spawning tile at position: {:?}", tile_world_pos);
         }
     }
 }

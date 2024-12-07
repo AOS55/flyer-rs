@@ -42,7 +42,7 @@ impl TerrainPlugin {
         mut texture_layouts: ResMut<Assets<TextureAtlasLayout>>,
     ) {
         // Crate texture atlas layouts
-        let tile_layout = TextureAtlasLayout::from_grid(UVec2::new(16, 16), 5, 4, None, None);
+        let tile_layout = TextureAtlasLayout::from_grid(UVec2::new(16, 16), 3, 3, None, None);
         let feature_layout = TextureAtlasLayout::from_grid(UVec2::new(16, 16), 5, 5, None, None);
 
         let tile_layout_handle = texture_layouts.add(tile_layout);
@@ -96,28 +96,41 @@ impl Plugin for TerrainPlugin {
 fn setup_sprite_mappings(terrain_assets: &mut TerrainAssets) {
     // Tile mappings
     let tile_mappings = [
-        (BiomeType::Grass, 9),
-        (BiomeType::Forest, 11),
-        (BiomeType::Crops, 13),
-        (BiomeType::Orchard, 5),
-        (BiomeType::Water, 17),
-        (BiomeType::Sand, 15),
+        (BiomeType::Grass, 0),
+        (BiomeType::Forest, 1),
+        (BiomeType::Crops, 2),
+        (BiomeType::Orchard, 3),
+        (BiomeType::Water, 4),
+        (BiomeType::Beach, 5),
+        (BiomeType::Desert, 6),
+        (BiomeType::Mountain, 7),
+        (BiomeType::Snow, 8),
     ];
 
     // Feature mappings
     let feature_mappings = [
-        (FeatureType::Tree(TreeVariant::EvergreenFir), 4),
-        (FeatureType::Tree(TreeVariant::WiltingFir), 4),
         (FeatureType::Tree(TreeVariant::AppleTree), 0),
-        (FeatureType::Tree(TreeVariant::PrunedTree), 2),
-        (FeatureType::Bush(BushVariant::GreenBushel), 9),
-        (FeatureType::Bush(BushVariant::RipeBushel), 14),
-        (FeatureType::Bush(BushVariant::DeadBushel), 3),
-        (FeatureType::Flower(FlowerVariant::Single), 12),
-        (FeatureType::Flower(FlowerVariant::Double), 12),
-        (FeatureType::Flower(FlowerVariant::Quad), 12),
-        (FeatureType::Flower(FlowerVariant::Cluster), 12),
-        (FeatureType::Rock, 19),
+        (FeatureType::Tree(TreeVariant::BananaTree), 1),
+        (FeatureType::Tree(TreeVariant::EvergreenFir), 2),
+        (FeatureType::Tree(TreeVariant::PrunedTree), 3),
+        (FeatureType::Tree(TreeVariant::CoconutPalm), 4),
+        (FeatureType::Tree(TreeVariant::Palm), 5),
+        (FeatureType::Tree(TreeVariant::WiltingFir), 6),
+        (FeatureType::Tree(TreeVariant::Cactus), 7),
+        (FeatureType::Bush(BushVariant::GreenBushel), 8),
+        (FeatureType::Bush(BushVariant::DeadBushel), 9),
+        (FeatureType::Bush(BushVariant::RipeBushel), 10),
+        (FeatureType::Flower(FlowerVariant::BerryBush), 11),
+        (FeatureType::Flower(FlowerVariant::MushroomCluster), 12),
+        (FeatureType::Flower(FlowerVariant::Reeds), 13),
+        (FeatureType::Flower(FlowerVariant::WildFlower), 14),
+        (FeatureType::Snow(SnowVariant::SnowMan), 15),
+        (FeatureType::Rock(RockVariant::Log), 16),
+        (FeatureType::Rock(RockVariant::RoundRock), 17),
+        (FeatureType::Rock(RockVariant::CrackedRock), 18),
+        (FeatureType::Rock(RockVariant::IrregularRock), 19),
+        (FeatureType::Rock(RockVariant::BrownRock), 20),
+        (FeatureType::Rock(RockVariant::JaggedRock), 21),
     ];
 
     // Initialize mappings

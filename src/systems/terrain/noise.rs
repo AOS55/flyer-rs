@@ -100,7 +100,6 @@ impl NoiseGenerator {
         let mut value = 0.0;
         let mut amplitude = layer.amplitude;
         let mut frequency = 1.0;
-        let mut max_value = 0.0;
 
         for _ in 0..layer.octaves {
             let sample_pos = (pos + layer.offset) * frequency / layer.scale;
@@ -109,13 +108,12 @@ impl NoiseGenerator {
                 .get([sample_pos.x as f64, sample_pos.y as f64]) as f32;
 
             value += noise_val * amplitude;
-            max_value += amplitude;
             amplitude *= layer.persistence;
             frequency *= layer.lacunarity;
         }
 
         // Normalize to [0, 1] range
-        (value / max_value) * 0.5 + 0.5
+        (value + layer.amplitude) / (0.4 + layer.amplitude)
     }
 
     fn map_to_range(&self, value: f32) -> f32 {
