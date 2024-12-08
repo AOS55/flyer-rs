@@ -20,11 +20,10 @@ impl TerrainChunkComponent {
         }
     }
 
-    pub fn world_position(&self, chunk_size: u32, scale: f32) -> Vec3 {
-        Vec3::new(
+    pub fn world_position(&self, chunk_size: u32, scale: f32) -> Vec2 {
+        Vec2::new(
             self.position.x as f32 * chunk_size as f32 * scale,
             self.position.y as f32 * chunk_size as f32 * scale,
-            0.0,
         )
     }
 }

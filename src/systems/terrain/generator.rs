@@ -100,11 +100,6 @@ pub fn generate_chunk_data(
     let chunk_size = state.chunk_size as i32;
     let chunk_world_pos = chunk.world_position(state.chunk_size, state.scale);
 
-    let mut min_height = f32::MAX;
-    let mut max_height = f32::MIN;
-    let mut min_moisture = f32::MAX;
-    let mut max_moisture = f32::MIN;
-
     // First generate base terrain values
     for y in 0..chunk_size {
         for x in 0..chunk_size {
@@ -113,15 +108,6 @@ pub fn generate_chunk_data(
                 chunk_world_pos.x + x as f32 * state.scale,
                 chunk_world_pos.y + y as f32 * state.scale,
             );
-
-            let height = generator.get_height(world_pos);
-            let moisture = generator.get_moisture(world_pos);
-
-            // Track min/max values
-            min_height = min_height.min(height);
-            max_height = max_height.max(height);
-            min_moisture = min_moisture.min(moisture);
-            max_moisture = max_moisture.max(moisture);
 
             // Generate base terrain values
             chunk.height_map[idx] = generator.get_height(world_pos);
@@ -364,7 +350,7 @@ fn spawn_feature(
     }
 }
 
-fn try_spawn_feature(
+pub fn try_spawn_feature(
     pos: Vec2,
     biome: BiomeType,
     config: &TerrainConfig,

@@ -1,12 +1,18 @@
+use bevy::prelude::*;
 use bevy::{
     ecs::{system::SystemState, world::CommandQueue},
-    prelude::*,
     tasks::{block_on, futures_lite::future, AsyncComputeTaskPool, Task},
 };
+use rand::rngs::StdRng;
+use rand::SeedableRng;
 use std::collections::HashSet;
 
 use crate::components::terrain::*;
-use crate::resources::terrain::{TerrainAssets, TerrainState};
+use crate::resources::terrain::{TerrainAssets, TerrainConfig, TerrainState};
+use crate::systems::terrain::{
+    generator::{generate_chunk_data, try_spawn_feature},
+    TerrainGeneratorSystem,
+};
 
 #[derive(Component)]
 pub struct ComputeChunk {
@@ -32,7 +38,7 @@ impl Default for ChunkLoadingState {
             chunks_to_load: HashSet::new(),
             chunks_to_unload: HashSet::new(),
             loading_radius: 5,
-            max_chunks_per_frame: 8,
+            max_chunks_per_frame: 80,
             last_update: std::time::Instant::now(),
             last_scale: 1.0,
         }
@@ -45,6 +51,11 @@ fn should_update_chunks(loading_state: &ChunkLoadingState, current_scale: f32) -
 
     let time_since_update = loading_state.last_update.elapsed();
     let scale_change = (current_scale - loading_state.last_scale).abs();
+
+    info!(
+        "Update check: time_since_update={:?}, scale_change={}, current_scale={}, last_scale={}",
+        time_since_update, scale_change, current_scale, loading_state.last_scale
+    );
 
     time_since_update > MIN_UPDATE_INTERVAL || scale_change > SCALE_THRESHOLD
 }
@@ -79,10 +90,15 @@ pub fn update_chunk_tracking_system(
         return;
     };
 
+    info!("Current view scale: {}", view_scale);
+
     // Only update chunks if we've moved significantly or zoomed significantly
     if !should_update_chunks(&loading_state, view_scale) {
+        info!("Skipped update due to should_update_chunks check");
         return;
     }
+
+    info!("Proceeding with chunk update");
 
     let visible_chunks = get_visible_chunks(&camera_query, &terrain_state);
     let current_chunks: HashSet<_> = chunks.iter().map(|(_, c)| c.position).collect();
@@ -111,24 +127,9 @@ pub fn update_chunk_tracking_system(
         .copied()
         .collect();
 
-    // Update the scale for the next frame
+    // Update the scale for the next frames
     loading_state.last_scale = view_scale;
     loading_state.last_update = std::time::Instant::now();
-}
-
-/// System to handle chunk unloading
-pub fn chunk_unloading_system(
-    mut commands: Commands,
-    mut loading_state: ResMut<ChunkLoadingState>,
-    chunks: Query<(Entity, &TerrainChunkComponent)>,
-) {
-    // Unload chunks that are no longer needed
-    for (entity, chunk) in chunks.iter() {
-        if loading_state.chunks_to_unload.contains(&chunk.position) {
-            commands.entity(entity).despawn_recursive();
-            loading_state.chunks_to_unload.remove(&chunk.position);
-        }
-    }
 }
 
 /// System to update active chunks list in terrain state
@@ -147,15 +148,30 @@ fn get_visible_chunks(
 
     if let Ok((camera_transform, projection)) = camera_query.get_single() {
         let camera_pos = camera_transform.translation.truncate();
-        // let view_distance = projection.scale * 3.0;
         let chunk_size_world = terrain_state.chunk_size as f32 * terrain_state.scale;
         let window_chunks_x = (800.0 * projection.scale / chunk_size_world).ceil() as i32;
         let window_chunks_y = (600.0 * projection.scale / chunk_size_world).ceil() as i32;
         let chunks_to_load = (window_chunks_x.max(window_chunks_y) * 2).max(10);
 
+        info!(
+            "Visibility calc: camera_pos={:?}, chunk_size_world={}, window_chunks=({},{}), chunks_to_load={}",
+            camera_pos, chunk_size_world, window_chunks_x, window_chunks_y, chunks_to_load
+        );
+
         let center_chunk = IVec2::new(
             (camera_pos.x / chunk_size_world).round() as i32,
             (camera_pos.y / chunk_size_world).round() as i32,
+        );
+
+        info!("Center chunk: {:?}", center_chunk);
+
+        // Log the chunk range we're about to process
+        info!(
+            "Chunk range: x=({} to {}), y=({} to {})",
+            center_chunk.x - chunks_to_load,
+            center_chunk.x + chunks_to_load,
+            center_chunk.y - chunks_to_load,
+            center_chunk.y + chunks_to_load
         );
 
         for x in -chunks_to_load..=chunks_to_load {
@@ -179,77 +195,149 @@ pub fn spawn_chunk_tasks(mut commands: Commands, mut loading_state: ResMut<Chunk
         .copied()
         .collect();
 
+    info!("Attempting to spawn {} chunk tasks", chunks_to_load.len());
+
     for &chunk_pos in chunks_to_load.iter() {
+        info!("Spawning task for chunk at {:?}", chunk_pos);
         let entity = commands.spawn_empty().id();
 
         let task = thread_pool.spawn(async move {
+            info!("Starting chunk generation for {:?}", chunk_pos);
             let mut command_queue = CommandQueue::default();
 
             command_queue.push(move |world: &mut World| {
-                // Create a SystemState to properly access our resources
-                let mut system_state =
-                    SystemState::<(Res<TerrainState>, Res<TerrainAssets>)>::new(world);
+                // Create a SystemState to access our resources
+                let mut system_state = SystemState::<(
+                    Res<TerrainState>,
+                    Res<TerrainConfig>,
+                    Res<TerrainAssets>,
+                    ResMut<TerrainGeneratorSystem>,
+                )>::new(world);
 
-                let (terrain_state, terrain_assets) = system_state.get_mut(world);
+                let (terrain_state, terrain_config, terrain_assets, mut generator) =
+                    system_state.get_mut(world);
 
-                let chunk_size = terrain_state.chunk_size;
-                let tile_size = terrain_state.scale;
-                let chunk_world_pos = Vec2::new(
-                    chunk_pos.x as f32 * chunk_size as f32 * tile_size,
-                    chunk_pos.y as f32 * chunk_size as f32 * tile_size,
-                );
+                // Create and generate the chunk
+                let mut chunk = TerrainChunkComponent::new(chunk_pos, terrain_state.chunk_size);
+                generate_chunk_data(&mut chunk, &terrain_state, &terrain_config, &mut generator);
 
-                // First, prepare all tile data
+                let chunk_size = terrain_state.chunk_size as usize;
+                let chunk_world_pos =
+                    chunk.world_position(terrain_state.chunk_size, terrain_state.scale);
+                let mut rng = StdRng::seed_from_u64(terrain_state.seed);
+
+                // Collect all feature data first
+                let mut features_data = Vec::new();
+                for y in 0..chunk_size {
+                    for x in 0..chunk_size {
+                        let idx = y * chunk_size + x;
+                        let biome = chunk.biome_map[idx];
+                        let world_pos = Vec2::new(
+                            chunk_world_pos.x + x as f32 * terrain_state.scale,
+                            chunk_world_pos.y + y as f32 * terrain_state.scale,
+                        );
+
+                        if let Some(feature) =
+                            try_spawn_feature(world_pos, biome, &terrain_config, &mut rng)
+                        {
+                            if let Some(&sprite_index) =
+                                terrain_assets.feature_mappings.get(&feature.feature_type)
+                            {
+                                features_data.push((
+                                    feature.clone(),
+                                    Sprite::from_atlas_image(
+                                        terrain_assets.feature_texture.clone(),
+                                        TextureAtlas {
+                                            layout: terrain_assets.feature_layout.clone(),
+                                            index: sprite_index,
+                                        },
+                                    ),
+                                    Transform::from_translation(feature.position.extend(10.0))
+                                        .with_rotation(Quat::from_rotation_z(feature.rotation))
+                                        .with_scale(Vec3::splat(feature.scale)),
+                                ));
+                            }
+                        }
+                    }
+                }
+
+                // Generate tile data
                 let mut tile_data = Vec::new();
-                for y in 0..chunk_size as usize {
-                    for x in 0..chunk_size as usize {
+                for y in 0..chunk_size {
+                    for x in 0..chunk_size {
+                        let idx = y * chunk_size + x;
                         let tile_world_pos = chunk_world_pos
                             + Vec2::new(
                                 x as f32 * terrain_state.scale,
                                 y as f32 * terrain_state.scale,
                             );
 
-                        tile_data.push((
-                            Sprite {
-                                image: terrain_assets.tile_texture.clone(),
-                                texture_atlas: Some(TextureAtlas {
-                                    layout: terrain_assets.tile_layout.clone(),
-                                    index: 0,
-                                }),
-                                ..default()
-                            },
-                            TerrainTileComponent {
-                                biome_type: BiomeType::Grass,
-                                position: tile_world_pos,
-                                sprite_index: 0,
-                            },
-                            Transform::from_translation(tile_world_pos.extend(0.0))
-                                .with_scale(Vec3::splat(1.0)),
-                        ));
+                        let biome = chunk.biome_map[idx];
+                        if let Some(&sprite_index) = terrain_assets.tile_mappings.get(&biome) {
+                            tile_data.push((
+                                TerrainTileComponent {
+                                    position: tile_world_pos,
+                                    biome_type: biome,
+                                    sprite_index,
+                                },
+                                Sprite::from_atlas_image(
+                                    terrain_assets.tile_texture.clone(),
+                                    TextureAtlas {
+                                        layout: terrain_assets.tile_layout.clone(),
+                                        index: sprite_index,
+                                    },
+                                ),
+                                Transform::from_translation(tile_world_pos.extend(0.0))
+                                    .with_scale(Vec3::splat(1.0)),
+                            ));
+                        }
                     }
                 }
 
-                // Release the system state borrow
+                // Release resources before world manipulation
                 system_state.apply(world);
 
-                // Now spawn the chunk entity with its components
-                let mut chunk_entity = world.entity_mut(entity);
-                chunk_entity.insert((
-                    TerrainChunkComponent::new(chunk_pos, chunk_size),
-                    Transform::default(),
-                    GlobalTransform::default(),
-                    Visibility::default(),
-                    InheritedVisibility::default(),
-                    ViewVisibility::default(),
-                ));
+                // Spawn the chunk entity with all children at once
+                world
+                    .entity_mut(entity)
+                    .insert((
+                        chunk,
+                        Transform::default(),
+                        GlobalTransform::default(),
+                        Visibility::default(),
+                        InheritedVisibility::default(),
+                        ViewVisibility::default(),
+                    ))
+                    .with_children(|builder| {
+                        // Spawn all terrain tiles as children
+                        for (tile, sprite, transform) in tile_data {
+                            builder.spawn((
+                                tile,
+                                sprite,
+                                transform,
+                                GlobalTransform::default(),
+                                Visibility::default(),
+                                InheritedVisibility::default(),
+                                ViewVisibility::default(),
+                            ));
+                        }
 
-                // Spawn all tiles and add them as children
-                for tile_components in tile_data {
-                    let tile_entity = world.spawn(tile_components).id();
-                    world.entity_mut(entity).add_child(tile_entity);
-                }
+                        // Spawn all features as children
+                        for (feature, sprite, transform) in features_data {
+                            builder.spawn((
+                                feature,
+                                sprite,
+                                transform,
+                                GlobalTransform::default(),
+                                Visibility::default(),
+                                InheritedVisibility::default(),
+                                ViewVisibility::default(),
+                            ));
+                        }
+                    });
             });
 
+            info!("Completed chunk generation for {:?}", chunk_pos);
             command_queue
         });
 
@@ -266,15 +354,36 @@ pub fn spawn_chunk_tasks(mut commands: Commands, mut loading_state: ResMut<Chunk
 pub fn handle_chunk_tasks(
     mut commands: Commands,
     mut compute_chunks: Query<(Entity, &mut ComputeChunk)>,
+    chunks: Query<&TerrainChunkComponent>,
 ) {
     for (entity, mut compute_chunk) in &mut compute_chunks {
-        if let Some(mut command_queue) = block_on(future::poll_once(&mut compute_chunk.task)) {
-            // Execute the command queue which will create our chunk
-            commands.append(&mut command_queue);
+        // First check if this chunk position is already loaded
+        if chunks.iter().any(|c| c.position == compute_chunk.position) {
+            commands.entity(entity).despawn_recursive();
+            continue;
+        }
 
-            // Remove the compute task component as we're done
+        if let Some(mut command_queue) = block_on(future::poll_once(&mut compute_chunk.task)) {
+            commands.append(&mut command_queue);
             commands.entity(entity).remove::<ComputeChunk>();
         }
+    }
+}
+
+/// System to handle chunk unloading
+pub fn chunk_unloading_system(
+    mut commands: Commands,
+    mut loading_state: ResMut<ChunkLoadingState>,
+    chunks: Query<(Entity, &TerrainChunkComponent)>,
+) {
+    let to_unload: Vec<_> = loading_state.chunks_to_unload.iter().copied().collect();
+
+    // Unload chunks that are no longer needed
+    for position in to_unload {
+        if let Some((entity, _)) = chunks.iter().find(|(_, chunk)| chunk.position == position) {
+            commands.entity(entity).despawn_recursive();
+        }
+        loading_state.chunks_to_unload.remove(&position);
     }
 }
 
@@ -296,20 +405,37 @@ pub fn cleanup_stale_tasks(mut commands: Commands, compute_chunks: Query<(Entity
 #[derive(Component)]
 pub struct DebugMarker;
 
-pub fn debug_check_system(
-    compute_chunks: Query<(Entity, &ComputeChunk)>,
-    orphaned_sprites: Query<Entity, (With<Sprite>, Without<Parent>)>,
+#[allow(dead_code)]
+fn debug_chunk_metrics(
+    compute_chunks: Query<&ComputeChunk>,
+    chunks: Query<&TerrainChunkComponent>,
+    loading_state: Res<ChunkLoadingState>,
     time: Res<Time>,
 ) {
+    // Log every 5 seconds
     if time.elapsed_secs() % 5.0 < 0.1 {
-        // Run every 5 seconds
         info!(
-            "Debug status:\n\
-            - Pending compute tasks: {}\n\
-            - Orphaned sprites: {}",
+            "Terrain Metrics:\n\
+            - Active compute tasks: {}\n\
+            - Spawned chunks: {}\n\
+            - Chunks queued for loading: {}\n\
+            - Chunks queued for unloading: {}\n",
             compute_chunks.iter().count(),
-            orphaned_sprites.iter().count()
+            chunks.iter().count(),
+            loading_state.chunks_to_load.len(),
+            loading_state.chunks_to_unload.len(),
         );
+
+        // Log tasks that have been running for too long
+        for compute_chunk in compute_chunks.iter() {
+            let duration = compute_chunk.started_at.elapsed();
+            if duration.as_secs() > 5 {
+                warn!(
+                    "Long-running task detected! Chunk {:?} has been computing for {:?}",
+                    compute_chunk.position, duration
+                );
+            }
+        }
     }
 }
 
@@ -321,7 +447,8 @@ pub struct ChunkStats {
     total_generations: usize,
 }
 
-pub fn track_chunk_lifecycle(
+#[allow(dead_code)]
+fn track_chunk_lifecycle(
     mut stats: ResMut<ChunkStats>,
     chunks: Query<&TerrainChunkComponent, Added<TerrainChunkComponent>>,
 ) {
@@ -340,6 +467,72 @@ pub fn track_chunk_lifecycle(
     }
 }
 
+pub fn cleanup_orphaned_components(
+    mut commands: Commands,
+    orphaned_features: Query<Entity, (With<TerrainFeatureComponent>, Without<Parent>)>,
+    orphaned_tiles: Query<Entity, (With<TerrainTileComponent>, Without<Parent>)>,
+) {
+    for entity in orphaned_features.iter() {
+        warn!("Despawning orphaned feature");
+        commands.entity(entity).despawn();
+    }
+
+    for entity in orphaned_tiles.iter() {
+        warn!("Despawning orphaned tile");
+        commands.entity(entity).despawn();
+    }
+}
+
+pub fn verify_chunk_cleanup(
+    chunks: Query<&TerrainChunkComponent>,
+    features: Query<&TerrainFeatureComponent>,
+    tiles: Query<&TerrainTileComponent>,
+    loading_state: Res<ChunkLoadingState>,
+) {
+    // Log counts every frame where we have unloads pending
+    if !loading_state.chunks_to_unload.is_empty() {
+        info!(
+            "After unload - Chunks: {}, Features: {}, Tiles: {}",
+            chunks.iter().count(),
+            features.iter().count(),
+            tiles.iter().count()
+        );
+
+        // Check if any chunks that should be unloaded still exist
+        for chunk in chunks.iter() {
+            if loading_state.chunks_to_unload.contains(&chunk.position) {
+                warn!(
+                    "Found chunk that should have been unloaded: {:?}",
+                    chunk.position
+                );
+            }
+        }
+    }
+}
+
+pub fn verify_chunk_hierarchy(
+    chunks: Query<(Entity, &TerrainChunkComponent, &Children)>,
+    orphaned_features: Query<Entity, (With<TerrainFeatureComponent>, Without<Parent>)>,
+    orphaned_tiles: Query<Entity, (With<TerrainTileComponent>, Without<Parent>)>,
+    mut commands: Commands,
+) {
+    // Clean up any orphaned entities
+    for entity in orphaned_features.iter().chain(orphaned_tiles.iter()) {
+        commands.entity(entity).despawn();
+    }
+
+    // Verify all chunks have expected children
+    for (chunk_entity, chunk, children) in chunks.iter() {
+        if children.is_empty() {
+            warn!(
+                "Chunk at {:?} has no children - cleaning up",
+                chunk.position
+            );
+            commands.entity(chunk_entity).despawn_recursive();
+        }
+    }
+}
+
 /// Plugin to organize chunk management systems
 pub struct ChunkManagerPlugin;
 
@@ -354,8 +547,9 @@ impl Plugin for ChunkManagerPlugin {
                 chunk_unloading_system,
                 update_active_chunks_system,
                 cleanup_stale_tasks,
-                debug_check_system,
-                track_chunk_lifecycle,
+                cleanup_orphaned_components,
+                verify_chunk_cleanup,
+                verify_chunk_hierarchy,
             )
                 .chain(),
         );
