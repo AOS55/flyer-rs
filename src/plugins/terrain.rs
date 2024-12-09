@@ -3,9 +3,7 @@ use std::collections::HashMap;
 
 use crate::components::terrain::*;
 use crate::resources::terrain::{TerrainAssets, TerrainConfig, TerrainState};
-use crate::systems::terrain::{
-    terrain_generation_system, ChunkManagerPlugin, TerrainGeneratorSystem, TerrainRenderPlugin,
-};
+use crate::systems::terrain::{ChunkManagerPlugin, TerrainGeneratorSystem, TerrainRenderPlugin};
 
 pub struct TerrainPlugin;
 
@@ -17,18 +15,23 @@ impl TerrainPlugin {
 
     fn setup_state(
         mut commands: Commands,
-        config: Res<TerrainConfig>,
+        existing_config: Option<Res<TerrainConfig>>,
         existing_state: Option<Res<TerrainState>>,
     ) {
+        if existing_config.is_none() {
+            commands.insert_resource(TerrainConfig::default());
+        }
+
         if existing_state.is_none() {
             let terrain_state = TerrainState {
                 // Core parameters from config
-                chunk_size: config.render.tile_size as u32,
-                scale: config.render.tile_size,
+                chunk_size: 16,
+                scale: 1.0,
                 seed: rand::random(), // Or from config
 
                 // Runtime state
                 active_chunks: Vec::new(),
+                tile_size: 16.0,
                 chunks_to_load: Default::default(),
                 chunks_to_unload: Default::default(),
 
@@ -92,9 +95,7 @@ impl Plugin for TerrainPlugin {
                     .chain(),
             )
             // Add sub-plugins
-            .add_plugins((ChunkManagerPlugin, TerrainRenderPlugin))
-            // Main systems
-            .add_systems(Update, (terrain_generation_system,));
+            .add_plugins((ChunkManagerPlugin));
     }
 }
 

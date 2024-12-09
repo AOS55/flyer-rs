@@ -17,7 +17,6 @@ pub struct TerrainConfig {
 
 #[derive(Clone, Debug)]
 pub struct RenderConfig {
-    pub tile_size: f32,
     pub feature_layer_offset: f32,
 }
 
@@ -28,7 +27,6 @@ impl Default for TerrainConfig {
             biome: BiomeConfig::default(),
             feature: FeatureConfig::default(),
             render: RenderConfig {
-                tile_size: 16.0,
                 feature_layer_offset: 10.0,
             },
         }

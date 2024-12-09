@@ -1,29 +1,26 @@
-use super::BiomeType;
+use super::{BiomeType, TerrainFeatureComponent};
+use crate::resources::terrain::TerrainState;
 use bevy::prelude::*;
+use std::collections::HashMap;
 
 #[derive(Component, Debug, Clone)]
+#[require(Sprite)]
 pub struct TerrainChunkComponent {
     pub position: IVec2,
     pub height_map: Vec<f32>,
     pub moisture_map: Vec<f32>,
     pub biome_map: Vec<BiomeType>,
+    pub features: HashMap<usize, TerrainFeatureComponent>,
 }
 
 impl TerrainChunkComponent {
-    pub fn new(position: IVec2, chunk_size: u32) -> Self {
-        let size = (chunk_size * chunk_size) as usize;
+    pub fn new(position: IVec2, state: &TerrainState) -> Self {
         Self {
             position,
-            height_map: vec![0.0; size],
-            moisture_map: vec![0.0; size],
-            biome_map: vec![BiomeType::Grass; size],
+            height_map: vec![0.0; state.chunk_tile_count()],
+            moisture_map: vec![0.0; state.chunk_tile_count()],
+            biome_map: vec![BiomeType::Grass; state.chunk_tile_count()],
+            features: HashMap::new(),
         }
-    }
-
-    pub fn world_position(&self, chunk_size: u32, scale: f32) -> Vec2 {
-        Vec2::new(
-            self.position.x as f32 * chunk_size as f32 * scale,
-            self.position.y as f32 * chunk_size as f32 * scale,
-        )
     }
 }

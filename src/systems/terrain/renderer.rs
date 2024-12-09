@@ -1,7 +1,7 @@
 use bevy::prelude::*;
 
 use crate::components::terrain::*;
-use crate::resources::terrain::{TerrainAssets, TerrainConfig};
+use crate::resources::terrain::{TerrainAssets, TerrainConfig, TerrainState};
 
 pub struct TerrainRenderPlugin;
 
@@ -17,42 +17,35 @@ impl Plugin for TerrainRenderPlugin {
 fn terrain_visual_update_system(
     chunks: Query<(&TerrainChunkComponent, &Children), Changed<TerrainChunkComponent>>,
     mut tiles: Query<(&mut Sprite, &mut Transform, &TerrainTileComponent)>,
+    state: Res<TerrainState>,
     assets: Res<TerrainAssets>,
-    config: Res<TerrainConfig>,
 ) {
-    let tile_size = config.render.tile_size;
-
     for (chunk, children) in chunks.iter() {
-        let chunk_size = (chunk.height_map.len() as f32).sqrt() as u32;
-        let chunk_world_pos = Vec2::new(
-            chunk.position.x as f32 * chunk_size as f32 * tile_size,
-            chunk.position.y as f32 * chunk_size as f32 * tile_size,
-        );
+        // Use state to compute the chunk's world position
+        let chunk_world_pos = state.chunk_to_world(chunk.position);
 
         for (index, &child) in children.iter().enumerate() {
-            if let Ok((mut sprite, mut transform, _)) = tiles.get_mut(child) {
-                let x = index as u32 % chunk_size;
-                let y = index as u32 / chunk_size;
-                let idx = y * chunk_size + x;
+            if let Ok((mut sprite, mut transform, tile)) = tiles.get_mut(child) {
+                // Calculate x,y grid position within chunk
+                let x = index % state.chunk_size;
+                let y = index / state.chunk_size;
 
                 // Update sprite based on biome
-                let biome = chunk.biome_map[idx as usize];
-                if let Some(sprite_index) = get_sprite_index(biome, &assets) {
+                if let Some(&sprite_index) = assets.tile_mappings.get(&tile.biome_type) {
                     sprite.texture_atlas = Some(TextureAtlas {
                         layout: assets.tile_layout.clone(),
                         index: sprite_index,
                     });
                 }
 
-                // Position
-                let world_x = chunk_world_pos.x + x as f32 * tile_size;
-                let world_y = chunk_world_pos.y + y as f32 * tile_size;
-                transform.translation = Vec3::new(world_x, world_y, get_biome_z_layer(biome));
+                // Position each tile by its grid position times tile size
+                let world_x = chunk_world_pos.x + x as f32 * state.tile_size;
+                let world_y = chunk_world_pos.y + y as f32 * state.tile_size;
+                transform.translation =
+                    Vec3::new(world_x, world_y, get_biome_z_layer(tile.biome_type));
 
-                // Height-based scaling
-                let height = chunk.height_map[idx as usize];
-                let scale = 1.0 + (height * 0.2);
-                transform.scale = Vec3::splat(scale);
+                // Keep scale at 1 to prevent gaps
+                transform.scale = Vec3::splat(1.0);
             }
         }
     }

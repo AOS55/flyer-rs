@@ -2,6 +2,7 @@ use bevy::prelude::*;
 use serde::{Deserialize, Serialize};
 
 #[derive(Component, Debug, Clone)]
+#[require(Sprite)]
 pub struct TerrainFeatureComponent {
     pub feature_type: FeatureType,
     pub position: Vec2,

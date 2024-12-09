@@ -6,9 +6,9 @@ use std::hash::{Hash, Hasher};
 use crate::components::terrain::*;
 use crate::resources::terrain::config::BiomeConfig;
 use crate::resources::terrain::BiomeFeatureConfig;
-use crate::resources::terrain::{TerrainAssets, TerrainConfig, TerrainState};
+use crate::resources::terrain::{TerrainConfig, TerrainState};
 use crate::systems::terrain::noise::NoiseGenerator;
-use crate::systems::terrain::rivers::generate_rivers;
+// use crate::systems::terrain::rivers::generate_rivers;
 
 #[derive(Resource, Clone)]
 pub struct TerrainGeneratorSystem {
@@ -48,6 +48,78 @@ impl TerrainGeneratorSystem {
         }
     }
 
+    pub fn generate_chunk(
+        &mut self,
+        position: IVec2,
+        state: &TerrainState,
+        config: &TerrainConfig,
+    ) -> TerrainChunkComponent {
+        // Initialize result structures
+        let mut result = TerrainChunkComponent::new(position, state);
+
+        self.generate_base_terrain(state, &mut result);
+
+        self.generate_biomes(state, &mut result, config);
+
+        self.generate_features(state, &mut result, config);
+
+        result
+    }
+
+    fn generate_base_terrain(&self, state: &TerrainState, result: &mut TerrainChunkComponent) {
+        for y in 0..state.chunk_size {
+            for x in 0..state.chunk_size {
+                let idx = y * state.chunk_size + x;
+                let world_pos = state.get_tile_world_pos(result.position, x, y);
+                result.height_map[idx as usize] = self.get_height(world_pos);
+                result.moisture_map[idx as usize] = self.get_moisture(world_pos);
+            }
+        }
+    }
+
+    fn generate_biomes(
+        &self,
+        state: &TerrainState,
+        result: &mut TerrainChunkComponent,
+        config: &TerrainConfig,
+    ) {
+        for y in 0..state.chunk_size {
+            for x in 0..state.chunk_size {
+                let idx = y * state.chunk_size + x;
+                let world_pos = state.get_tile_world_pos(result.position, x, y);
+
+                result.biome_map[idx] = determine_biome(
+                    result.height_map[idx],
+                    result.moisture_map[idx],
+                    &config.biome,
+                    state.seed,
+                    world_pos,
+                );
+            }
+        }
+        self.smooth_biome_transitions(&mut result.biome_map, state.chunk_size as i32);
+    }
+
+    fn generate_features(
+        &mut self,
+        state: &TerrainState,
+        result: &mut TerrainChunkComponent,
+        config: &TerrainConfig,
+    ) {
+        for y in 0..state.chunk_size {
+            for x in 0..state.chunk_size {
+                let idx = y * state.chunk_size + x;
+                let world_pos = state.get_tile_world_pos(result.position, x, y);
+
+                if let Some(feature) =
+                    try_spawn_feature(world_pos, result.biome_map[idx], config, &mut self.rng)
+                {
+                    result.features.insert(idx, feature);
+                }
+            }
+        }
+    }
+
     pub fn get_height(&self, pos: Vec2) -> f32 {
         self.height_generator.get_noise(pos)
     }
@@ -63,83 +135,117 @@ impl TerrainGeneratorSystem {
     pub fn get_detail_value(&self, pos: Vec2) -> f32 {
         self.detail_generator.get_noise(pos)
     }
-}
 
-pub fn terrain_generation_system(
-    mut commands: Commands,
-    mut chunks: Query<(Entity, &mut TerrainChunkComponent), Added<TerrainChunkComponent>>,
-    terrain_state: Res<TerrainState>,
-    terrain_config: Res<TerrainConfig>,
-    terrain_assets: Res<TerrainAssets>,
-    mut generator: ResMut<TerrainGeneratorSystem>,
-) {
-    if !chunks.is_empty() {
-        info!("Generating chunks: {}", chunks.iter().count());
-    }
+    fn smooth_biome_transitions(&self, biome_map: &mut Vec<BiomeType>, chunk_size: i32) {
+        let mut smoothed = biome_map.clone();
+        let kernel_size = 2;
 
-    for (entity, mut chunk) in chunks.iter_mut() {
-        generate_chunk_data(&mut chunk, &terrain_state, &terrain_config, &mut generator);
-        spawn_chunk_features(
-            &mut commands,
-            entity,
-            &chunk,
-            &terrain_state,
-            &terrain_config,
-            &terrain_assets,
-            &mut generator.rng,
-        );
-    }
-}
+        for y in 0..chunk_size {
+            for x in 0..chunk_size {
+                let idx = (y * chunk_size + x) as usize;
+                let mut biome_counts = HashMap::new();
 
-pub fn generate_chunk_data(
-    chunk: &mut TerrainChunkComponent,
-    state: &TerrainState,
-    config: &TerrainConfig,
-    generator: &mut TerrainGeneratorSystem,
-) {
-    let chunk_size = state.chunk_size as i32;
-    let chunk_world_pos = chunk.world_position(state.chunk_size, state.scale);
+                for dy in -kernel_size..=kernel_size {
+                    for dx in -kernel_size..=kernel_size {
+                        let nx = x + dx;
+                        let ny = y + dy;
 
-    // First generate base terrain values
-    for y in 0..chunk_size {
-        for x in 0..chunk_size {
-            let idx = (y * chunk_size + x) as usize;
-            let world_pos = Vec2::new(
-                chunk_world_pos.x + x as f32 * state.scale,
-                chunk_world_pos.y + y as f32 * state.scale,
-            );
+                        if nx >= 0 && nx < chunk_size && ny >= 0 && ny < chunk_size {
+                            let weight = 1.0 / ((dx * dx + dy * dy) as f32 + 1.0);
+                            let neighbor_idx = (ny * chunk_size + nx) as usize;
+                            *biome_counts.entry(biome_map[neighbor_idx]).or_insert(0.0) += weight;
+                        }
+                    }
+                }
 
-            // Generate base terrain values
-            chunk.height_map[idx] = generator.get_height(world_pos);
-            chunk.moisture_map[idx] = generator.get_moisture(world_pos);
+                if let Some((dominant_biome, _)) = biome_counts
+                    .iter()
+                    .max_by(|a, b| a.1.partial_cmp(b.1).unwrap())
+                {
+                    smoothed[idx] = *dominant_biome;
+                }
+            }
         }
+
+        *biome_map = smoothed;
     }
-
-    // Then generate and apply rivers to modify the terrain
-    generate_rivers(chunk, state, generator, &config.noise.river);
-
-    // Finally, determine biomes based on the modified terrain
-    for y in 0..chunk_size {
-        for x in 0..chunk_size {
-            let idx = (y * chunk_size + x) as usize;
-            let world_pos = Vec2::new(
-                chunk_world_pos.x + x as f32 * state.scale,
-                chunk_world_pos.y + y as f32 * state.scale,
-            );
-
-            // Determine biome using modified height and moisture values
-            chunk.biome_map[idx] = determine_biome(
-                chunk.height_map[idx],
-                chunk.moisture_map[idx],
-                &config.biome,
-                state.seed,
-                world_pos,
-            );
-        }
-    }
-
-    smooth_biome_transitions(chunk, chunk_size);
 }
+
+// pub fn terrain_generation_system(
+//     mut commands: Commands,
+//     mut chunks: Query<(Entity, &mut TerrainChunkComponent), Added<TerrainChunkComponent>>,
+//     terrain_state: Res<TerrainState>,
+//     terrain_config: Res<TerrainConfig>,
+//     terrain_assets: Res<TerrainAssets>,
+//     mut generator: ResMut<TerrainGeneratorSystem>,
+// ) {
+//     if !chunks.is_empty() {
+//         info!("Generating chunks: {}", chunks.iter().count());
+//     }
+
+//     for (entity, mut chunk) in chunks.iter_mut() {
+//         generate_chunk_data(&mut chunk, &terrain_state, &terrain_config, &mut generator);
+//         spawn_chunk_features(
+//             &mut commands,
+//             entity,
+//             &chunk,
+//             &terrain_state,
+//             &terrain_config,
+//             &terrain_assets,
+//             &mut generator.rng,
+//         );
+//     }
+// }
+
+// pub fn generate_chunk_data(
+//     chunk: &mut TerrainChunkComponent,
+//     state: &TerrainState,
+//     config: &TerrainConfig,
+//     generator: &mut TerrainGeneratorSystem,
+// ) {
+//     let chunk_size = state.chunk_size as i32;
+//     let chunk_world_pos = chunk.world_position(state.chunk_size, state.scale);
+
+//     // First generate base terrain values
+//     for y in 0..chunk_size {
+//         for x in 0..chunk_size {
+//             let idx = (y * chunk_size + x) as usize;
+//             let world_pos = Vec2::new(
+//                 chunk_world_pos.x + x as f32 * state.scale,
+//                 chunk_world_pos.y + y as f32 * state.scale,
+//             );
+
+//             // Generate base terrain values
+//             chunk.height_map[idx] = generator.get_height(world_pos);
+//             chunk.moisture_map[idx] = generator.get_moisture(world_pos);
+//         }
+//     }
+
+//     // Then generate and apply rivers to modify the terrain
+//     generate_rivers(chunk, state, generator, &config.noise.river);
+
+//     // Finally, determine biomes based on the modified terrain
+//     for y in 0..chunk_size {
+//         for x in 0..chunk_size {
+//             let idx = (y * chunk_size + x) as usize;
+//             let world_pos = Vec2::new(
+//                 chunk_world_pos.x + x as f32 * state.scale,
+//                 chunk_world_pos.y + y as f32 * state.scale,
+//             );
+
+//             // Determine biome using modified height and moisture values
+//             chunk.biome_map[idx] = determine_biome(
+//                 chunk.height_map[idx],
+//                 chunk.moisture_map[idx],
+//                 &config.biome,
+//                 state.seed,
+//                 world_pos,
+//             );
+//         }
+//     }
+
+//     smooth_biome_transitions(chunk, chunk_size);
+// }
 
 fn determine_biome(
     height: f32,
@@ -256,99 +362,63 @@ fn get_grid_cell(world_pos: Vec2, seed: u64, config: &BiomeConfig) -> BiomeType 
     }
 }
 
-fn spawn_chunk_features(
-    commands: &mut Commands,
-    chunk_entity: Entity,
-    chunk: &TerrainChunkComponent,
-    state: &TerrainState,
-    config: &TerrainConfig,
-    assets: &TerrainAssets,
-    rng: &mut StdRng,
-) {
-    let chunk_size = state.chunk_size as usize;
-    let chunk_world_pos = chunk.world_position(state.chunk_size, state.scale);
+// fn spawn_chunk_features(
+//     commands: &mut Commands,
+//     chunk_entity: Entity,
+//     chunk: &TerrainChunkComponent,
+//     state: &TerrainState,
+//     config: &TerrainConfig,
+//     assets: &TerrainAssets,
+//     rng: &mut StdRng,
+// ) {
+//     let chunk_size = state.chunk_size as usize;
+//     let chunk_world_pos = chunk.world_position(state.chunk_size, state.scale);
 
-    for y in 0..chunk_size {
-        for x in 0..chunk_size {
-            let idx = y * chunk_size + x;
-            let biome = chunk.biome_map[idx];
-            let world_pos = Vec2::new(
-                chunk_world_pos.x + x as f32 * state.scale,
-                chunk_world_pos.y + y as f32 * state.scale,
-            );
+//     for y in 0..chunk_size {
+//         for x in 0..chunk_size {
+//             let idx = y * chunk_size + x;
+//             let biome = chunk.biome_map[idx];
+//             let world_pos = Vec2::new(
+//                 chunk_world_pos.x + x as f32 * state.scale,
+//                 chunk_world_pos.y + y as f32 * state.scale,
+//             );
 
-            if let Some(feature) = try_spawn_feature(world_pos, biome, config, rng) {
-                // Only pass `feature` to `spawn_feature` if it exists
-                spawn_feature(commands, chunk_entity, feature, assets);
-            }
-        }
-    }
-}
+//             if let Some(feature) = try_spawn_feature(world_pos, biome, config, rng) {
+//                 // Only pass `feature` to `spawn_feature` if it exists
+//                 spawn_feature(commands, chunk_entity, feature, assets);
+//             }
+//         }
+//     }
+// }
 
-fn smooth_biome_transitions(chunk: &mut TerrainChunkComponent, chunk_size: i32) {
-    let mut smoothed = chunk.biome_map.clone();
-    let kernel_size = 2;
-
-    for y in 0..chunk_size {
-        for x in 0..chunk_size {
-            let idx = (y * chunk_size + x) as usize;
-            let mut biome_counts = HashMap::new();
-
-            for dy in -kernel_size..=kernel_size {
-                for dx in -kernel_size..=kernel_size {
-                    let nx = x + dx;
-                    let ny = y + dy;
-
-                    if nx >= 0 && nx < chunk_size && ny >= 0 && ny < chunk_size {
-                        let weight = 1.0 / ((dx * dx + dy * dy) as f32 + 1.0);
-                        let neighbor_idx = (ny * chunk_size + nx) as usize;
-                        *biome_counts
-                            .entry(chunk.biome_map[neighbor_idx])
-                            .or_insert(0.0) += weight;
-                    }
-                }
-            }
-
-            if let Some((dominant_biome, _)) = biome_counts
-                .iter()
-                .max_by(|a, b| a.1.partial_cmp(b.1).unwrap())
-            {
-                smoothed[idx] = *dominant_biome;
-            }
-        }
-    }
-
-    chunk.biome_map = smoothed;
-}
-
-fn spawn_feature(
-    commands: &mut Commands,
-    chunk_entity: Entity,
-    feature: TerrainFeatureComponent,
-    assets: &TerrainAssets,
-) {
-    if let Some(&sprite_index) = assets.feature_mappings.get(&feature.feature_type) {
-        commands
-            .spawn((
-                feature.clone(),
-                Sprite::from_atlas_image(
-                    assets.feature_texture.clone(),
-                    TextureAtlas {
-                        layout: assets.feature_layout.clone(),
-                        index: sprite_index,
-                    },
-                ),
-                Transform::from_translation(feature.position.extend(10.0))
-                    .with_rotation(Quat::from_rotation_z(feature.rotation))
-                    .with_scale(Vec3::splat(feature.scale)),
-                GlobalTransform::default(),
-                Visibility::default(),
-                InheritedVisibility::default(),
-                ViewVisibility::default(),
-            ))
-            .set_parent(chunk_entity);
-    }
-}
+// fn spawn_feature(
+//     commands: &mut Commands,
+//     chunk_entity: Entity,
+//     feature: TerrainFeatureComponent,
+//     assets: &TerrainAssets,
+// ) {
+//     if let Some(&sprite_index) = assets.feature_mappings.get(&feature.feature_type) {
+//         commands
+//             .spawn((
+//                 feature.clone(),
+//                 Sprite::from_atlas_image(
+//                     assets.feature_texture.clone(),
+//                     TextureAtlas {
+//                         layout: assets.feature_layout.clone(),
+//                         index: sprite_index,
+//                     },
+//                 ),
+//                 Transform::from_translation(feature.position.extend(10.0))
+//                     .with_rotation(Quat::from_rotation_z(feature.rotation))
+//                     .with_scale(Vec3::splat(feature.scale)),
+//                 GlobalTransform::default(),
+//                 Visibility::default(),
+//                 InheritedVisibility::default(),
+//                 ViewVisibility::default(),
+//             ))
+//             .set_parent(chunk_entity);
+//     }
+// }
 
 pub fn try_spawn_feature(
     pos: Vec2,

@@ -23,7 +23,6 @@ fn setup(mut commands: Commands) {
         biome: Default::default(),
         feature: Default::default(),
         render: RenderConfig {
-            tile_size: 16.0,
             feature_layer_offset: 10.0,
         },
     };
@@ -32,11 +31,12 @@ fn setup(mut commands: Commands) {
     let terrain_state = TerrainState {
         // Core parameters
         chunk_size: 32,
-        scale: 16.0,
+        scale: 1.0,
         seed: 42,
 
         // Runtime state
         active_chunks: Vec::new(),
+        tile_size: 16.0,
         chunks_to_load: Default::default(),
         chunks_to_unload: Default::default(),
 

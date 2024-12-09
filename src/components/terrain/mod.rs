@@ -23,3 +23,9 @@ pub enum BiomeType {
     Mountain,
     Snow,
 }
+
+impl Default for BiomeType {
+    fn default() -> Self {
+        BiomeType::Grass
+    }
+}
