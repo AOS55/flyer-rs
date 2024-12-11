@@ -42,7 +42,7 @@ fn setup(mut commands: Commands) {
 
         // Loading parameters
         loading_radius: 10,
-        max_chunks_per_frame: 16,
+        max_chunks_per_frame: 8,
     };
 
     // Insert resources

@@ -1,29 +1,31 @@
 use aerso::density_models::StandardDensity;
 use aerso::wind_models::{ConstantWind, LogWind, PowerWind};
 use aerso::{DensityModel, WindModel};
+use bevy::prelude::*;
 use nalgebra::Vector3;
 
-use super::config::environment::{EnvironmentConfig, WindModelConfig};
+use crate::resources::environment::{EnvironmentConfig, WindConfig};
 
-pub struct EnvironmentResource {
+#[derive(Resource)]
+pub struct EnvironmentModel {
     wind_model: Box<dyn WindModel<f64> + Send + Sync>,
     density_model: Box<dyn DensityModel<f64> + Send + Sync>,
 }
 
-impl EnvironmentResource {
+impl EnvironmentModel {
     pub fn new(config: &EnvironmentConfig) -> Self {
         let wind_model = match &config.wind_model_config {
-            WindModelConfig::Constant { velocity } => {
+            WindConfig::Constant { velocity } => {
                 Box::new(ConstantWind::new(*velocity)) as Box<dyn WindModel<f64> + Send + Sync>
             }
-            WindModelConfig::Logarithmic {
+            WindConfig::Logarithmic {
                 d,
                 z0,
                 u_star,
                 bearing,
             } => Box::new(LogWind::new(*d, *z0, *u_star, *bearing))
                 as Box<dyn WindModel<f64> + Send + Sync>,
-            WindModelConfig::PowerLaw {
+            WindConfig::PowerLaw {
                 u_r,
                 z_r,
                 bearing,
@@ -54,18 +56,18 @@ impl EnvironmentResource {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::resources::config::environment::AtmosphereConfig;
+    use crate::resources::environment::AtmosphereConfig;
 
     #[test]
     fn test_constant_wind() {
         let config = EnvironmentConfig {
-            wind_model_config: WindModelConfig::Constant {
+            wind_model_config: WindConfig::Constant {
                 velocity: Vector3::new(1.0, 0.0, 0.0),
             },
             atmosphere_config: AtmosphereConfig::default(),
         };
 
-        let env = EnvironmentResource::new(&config);
+        let env = EnvironmentModel::new(&config);
         let position = Vector3::new(0.0, 0.0, 0.0);
         let wind = env.get_wind(&position);
 
@@ -75,7 +77,7 @@ mod tests {
     #[test]
     fn test_density_model() {
         let config = EnvironmentConfig::default();
-        let env = EnvironmentResource::new(&config);
+        let env = EnvironmentModel::new(&config);
 
         let ground_position = Vector3::new(0.0, 0.0, 0.0);
         let altitude_position = Vector3::new(0.0, 0.0, 1000.0);

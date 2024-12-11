@@ -3,7 +3,7 @@ use std::collections::HashMap;
 
 use crate::components::terrain::*;
 use crate::resources::terrain::{TerrainAssets, TerrainConfig, TerrainState};
-use crate::systems::terrain::{ChunkManagerPlugin, TerrainGeneratorSystem, TerrainRenderPlugin};
+use crate::systems::terrain::{ChunkManagerPlugin, TerrainGeneratorSystem};
 
 pub struct TerrainPlugin;
 
@@ -95,7 +95,7 @@ impl Plugin for TerrainPlugin {
                     .chain(),
             )
             // Add sub-plugins
-            .add_plugins((ChunkManagerPlugin));
+            .add_plugins(ChunkManagerPlugin);
     }
 }
 

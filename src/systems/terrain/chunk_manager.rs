@@ -297,7 +297,6 @@ fn spawn_chunk_entities(
     for (idx, feature) in &chunk.features {
         if let Some(&sprite_index) = assets.feature_mappings.get(&feature.feature_type) {
             let world_pos = state.tile_index_to_chunk(*idx);
-            info!("Tile position: {}", world_pos);
             commands
                 .spawn((
                     feature.clone(),
@@ -323,10 +322,23 @@ fn spawn_chunk_entities(
     }
 }
 
-fn handle_chunk_unloading(mut commands: Commands, mut chunk_manager: ResMut<ChunkManager>) {
-    for (pos, entity) in chunk_manager.get_chunks_to_unload() {
-        commands.entity(entity).despawn_recursive();
-        chunk_manager.remove_chunk(pos);
+fn handle_chunk_unloading(
+    mut commands: Commands,
+    mut chunk_manager: ResMut<ChunkManager>,
+    chunks_query: Query<Entity>,
+) {
+    let chunks_to_unload = chunk_manager.get_chunks_to_unload();
+
+    for (pos, entity) in chunks_to_unload {
+        // Verify entity exists before attempting to despawn
+        if chunks_query.get(entity).is_ok() {
+            commands.entity(entity).despawn_recursive();
+            chunk_manager.remove_chunk(pos);
+        } else {
+            // If entity doesn't exist but is still in manager, clean it up
+            warn!("Chunk at {:?} had invalid entity reference", pos);
+            chunk_manager.remove_chunk(pos);
+        }
     }
 }
 

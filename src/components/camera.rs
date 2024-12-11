@@ -1,29 +1,23 @@
-use bevy::math::Vec2;
 use bevy::prelude::*;
-use serde::{Deserialize, Serialize};
+use nalgebra::Vector3;
 
-#[derive(Component, Debug, Serialize, Deserialize, Clone, Reflect)]
-#[reflect(Component)]
-pub struct FlightCamera {
-    #[reflect(ignore)]
-    pub target: Option<Vec2>,
-    pub interpolation_factor: f32,
-    pub zoom_speed: f32,
-    pub min_zoom: f32,
-    pub max_zoom: f32,
-    #[reflect(ignore)]
-    pub bounds: Option<(Vec2, Vec2)>,
+#[derive(Component, Debug)]
+pub struct CameraComponent {
+    pub target: Option<Entity>,
+    pub offset: Vector3<f64>, // Offset from target [m]
+    pub deadzone: f64,        // Deadzone around target [m]
+    pub smoothing: f32,       // Smoothing factor [0, 1]
+    pub locked: bool,         // Lock camera to target
 }
 
-impl Default for FlightCamera {
+impl Default for CameraComponent {
     fn default() -> Self {
-        Self {
+        CameraComponent {
             target: None,
-            interpolation_factor: 0.1,
-            zoom_speed: 0.1,
-            min_zoom: 0.1,
-            max_zoom: 10.0,
-            bounds: None,
+            offset: Vector3::new(0.0, 0.0, 500.0),
+            deadzone: 50.0,
+            smoothing: 0.0,
+            locked: false,
         }
     }
 }

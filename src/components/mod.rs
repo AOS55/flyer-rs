@@ -1,21 +1,18 @@
-pub mod aerodynamics;
+pub mod aircraft;
 pub mod camera;
+pub mod controller;
 pub mod physics;
-pub mod player;
 pub mod propulsion;
-pub mod render;
 pub mod spatial;
 pub mod terrain;
 
-pub use aerodynamics::{
-    AeroCoefficients, AerodynamicsComponent, AirData, AircraftGeometry, ControlSurfaces,
-    DragCoefficients, LiftCoefficients, PitchCoefficients, RollCoefficients, SideForceCoefficients,
-    YawCoefficients,
+pub use aircraft::{
+    AirData, AircraftAeroCoefficients, AircraftConfig, AircraftControlSurfaces, AircraftGeometry,
+    AircraftRenderState, AircraftState, AircraftType, Attitude, DubinsAircraftConfig,
+    DubinsAircraftState, MassModel, PhysicsModel,
 };
-
-pub use camera::FlightCamera;
+pub use camera::CameraComponent;
+pub use controller::PlayerController;
 pub use physics::{Force, ForceCategory, Moment, PhysicsComponent, ReferenceFrame};
-pub use player::Player;
 pub use propulsion::{PropulsionComponent, PropulsionType};
-pub use render::{FlightSpriteBundle, RenderProperties, SpriteAnimation};
 pub use spatial::SpatialComponent;

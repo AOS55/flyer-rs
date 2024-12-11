@@ -11,7 +11,7 @@ pub struct TerrainState {
     // Core parameters
     pub chunk_size: usize,
     pub tile_size: f32,
-    pub scale: f32,
+    pub scale: f32, // px to meter scale, TODO: implement conversions
     pub seed: u64,
 
     // Loading parameters
@@ -22,12 +22,12 @@ pub struct TerrainState {
 impl TerrainState {
     // Get the size of a chunk in world units
     pub fn chunk_world_size(&self) -> f32 {
-        self.chunk_size as f32 * self.tile_size * self.scale
+        self.chunk_size as f32 * self.tile_size
     }
 
     // Helper method to get the size of a tile in world units
     pub fn tile_world_size(&self) -> f32 {
-        self.tile_size * self.scale
+        self.tile_size
     }
 
     // Convert world position to chunk coordinates

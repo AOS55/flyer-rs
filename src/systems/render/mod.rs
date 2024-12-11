@@ -1,2 +1,3 @@
-pub mod sprite_assets;
-pub mod sprite_systems;
+mod aircraft;
+
+pub use aircraft::{aircraft_render_system, spawn_aircraft_sprite};

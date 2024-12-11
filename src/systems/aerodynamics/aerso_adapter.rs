@@ -1,4 +1,4 @@
-use crate::components::{AeroCoefficients, AircraftGeometry, ControlSurfaces};
+use crate::components::{AircraftAeroCoefficients, AircraftControlSurfaces, AircraftGeometry};
 use aerso::types::{Force, Torque};
 use aerso::{AeroEffect, AirState};
 use nalgebra::Vector3;
@@ -6,11 +6,11 @@ use std::f64::consts::PI;
 
 pub struct AersoAdapter {
     geometry: AircraftGeometry,
-    coefficients: AeroCoefficients,
+    coefficients: AircraftAeroCoefficients,
 }
 
 impl AersoAdapter {
-    pub fn new(geometry: AircraftGeometry, coefficients: AeroCoefficients) -> Self {
+    pub fn new(geometry: AircraftGeometry, coefficients: AircraftAeroCoefficients) -> Self {
         Self {
             coefficients,
             geometry,
@@ -20,7 +20,7 @@ impl AersoAdapter {
     fn compute_forces(
         &self,
         air_state: &AirState<f64>,
-        control_surfaces: &ControlSurfaces,
+        control_surfaces: &AircraftControlSurfaces,
         rates: Vector3<f64>,
     ) -> (Vector3<f64>, Vector3<f64>) {
         let controls = &control_surfaces;
@@ -35,7 +35,7 @@ impl AersoAdapter {
 
         // Non-dimensional rates
         let p_hat = (self.geometry.wing_span * p) / (2.0 * air_state.airspeed);
-        let q_hat = (self.geometry.mean_aerodynamic_chord * q) / (2.0 * air_state.airspeed);
+        let q_hat = (self.geometry.mac * q) / (2.0 * air_state.airspeed);
         let r_hat = (self.geometry.wing_span * r) / (2.0 * air_state.airspeed);
         // Calculate coefficients following the reference implementation
         let c_d = coeffs.drag.c_d_0
@@ -98,7 +98,7 @@ impl AersoAdapter {
 
         let moments = Vector3::new(
             air_state.q * self.geometry.wing_span * self.geometry.wing_area * c_l_roll,
-            air_state.q * self.geometry.mean_aerodynamic_chord * self.geometry.wing_area * c_m,
+            air_state.q * self.geometry.mac * self.geometry.wing_area * c_m,
             air_state.q * self.geometry.wing_span * self.geometry.wing_area * c_n,
         );
 
@@ -106,7 +106,7 @@ impl AersoAdapter {
     }
 
     #[allow(dead_code)]
-    pub fn create_input_vector(&self, controls: &ControlSurfaces) -> Vec<f64> {
+    pub fn create_input_vector(&self, controls: &AircraftControlSurfaces) -> Vec<f64> {
         vec![
             controls.aileron,
             controls.elevator,
@@ -123,7 +123,7 @@ impl AeroEffect<Vec<f64>> for AersoAdapter {
         rates: Vector3<f64>,
         input: &Vec<f64>,
     ) -> (Force<f64>, Torque<f64>) {
-        let controls = ControlSurfaces {
+        let controls = AircraftControlSurfaces {
             aileron: input[0],
             elevator: input[1],
             rudder: input[2],
@@ -147,14 +147,14 @@ mod tests {
 
     fn create_test_geometry() -> AircraftGeometry {
         AircraftGeometry {
-            wing_area: 16.0,             // m^2
-            wing_span: 10.0,             // m
-            mean_aerodynamic_chord: 1.6, // m
+            wing_area: 16.0, // m^2
+            wing_span: 10.0, // m
+            mac: 1.6,        // m
         }
     }
 
-    fn create_test_coefficients() -> AeroCoefficients {
-        let mut coeffs = AeroCoefficients::default();
+    fn create_test_coefficients() -> AircraftAeroCoefficients {
+        let mut coeffs = AircraftAeroCoefficients::twin_otter();
 
         // Basic coefficients
         coeffs.lift.c_l_0 = 0.2;
@@ -200,7 +200,7 @@ mod tests {
     fn test_straight_level_flight() {
         let adapter = AersoAdapter::new(create_test_geometry(), create_test_coefficients());
         let air_state = create_test_air_state(50.0, 0.0, 0.0);
-        let controls = ControlSurfaces::default();
+        let controls = AircraftControlSurfaces::default();
         let rates = Vector3::zeros();
 
         let (forces, moments) = adapter.compute_forces(&air_state, &controls, rates);
@@ -225,7 +225,7 @@ mod tests {
         let adapter = AersoAdapter::new(create_test_geometry(), create_test_coefficients());
         let alpha = 5.0 * PI / 180.0;
         let air_state = create_test_air_state(50.0, alpha, 0.0);
-        let controls = ControlSurfaces::default();
+        let controls = AircraftControlSurfaces::default();
         let rates = Vector3::zeros();
 
         let (forces, _) = adapter.compute_forces(&air_state, &controls, rates);
@@ -250,13 +250,13 @@ mod tests {
         let air_state = create_test_air_state(50.0, 0.0, 0.0);
         let rates = Vector3::zeros();
 
-        let mut controls = ControlSurfaces::default();
+        let mut controls = AircraftControlSurfaces::default();
         controls.elevator = 0.1; // 10% deflection
 
         let (_, moments) = adapter.compute_forces(&air_state, &controls, rates);
 
-        let actual_cm = moments.y
-            / (air_state.q * adapter.geometry.wing_area * adapter.geometry.mean_aerodynamic_chord);
+        let actual_cm =
+            moments.y / (air_state.q * adapter.geometry.wing_area * adapter.geometry.mac);
 
         let expected_cm = adapter.coefficients.pitch.c_m_0
             + adapter.coefficients.pitch.c_m_deltae * controls.elevator;
@@ -275,7 +275,7 @@ mod tests {
         let adapter = AersoAdapter::new(create_test_geometry(), create_test_coefficients());
         let beta = 5.0 * PI / 180.0;
         let air_state = create_test_air_state(50.0, 0.0, beta);
-        let controls = ControlSurfaces::default();
+        let controls = AircraftControlSurfaces::default();
         let rates = Vector3::zeros();
 
         let (forces, moments) = adapter.compute_forces(&air_state, &controls, rates);
@@ -299,14 +299,13 @@ mod tests {
     fn test_angular_rate_effects() {
         let adapter = AersoAdapter::new(create_test_geometry(), create_test_coefficients());
         let air_state = create_test_air_state(50.0, 0.0, 0.0);
-        let controls = ControlSurfaces::default();
+        let controls = AircraftControlSurfaces::default();
 
         // Test pitch rate damping
         let rates = Vector3::new(0.0, 0.2, 0.0); // pitch rate
 
         // Calculate non-dimensional pitch rate
-        let q_hat =
-            (adapter.geometry.mean_aerodynamic_chord * rates.y) / (2.0 * air_state.airspeed);
+        let q_hat = (adapter.geometry.mac * rates.y) / (2.0 * air_state.airspeed);
 
         let (_, moments) = adapter.compute_forces(&air_state, &controls, rates);
 
@@ -315,8 +314,8 @@ mod tests {
             adapter.coefficients.pitch.c_m_0 + (adapter.coefficients.pitch.c_m_q * q_hat);
 
         // Divide by all scaling factors used in the moment calculation
-        let actual_cm = moments.y
-            / (air_state.q * adapter.geometry.wing_area * adapter.geometry.mean_aerodynamic_chord);
+        let actual_cm =
+            moments.y / (air_state.q * adapter.geometry.wing_area * adapter.geometry.mac);
 
         println!("Debug rate effects:");
         println!("  q_hat: {}", q_hat);
@@ -339,7 +338,7 @@ mod tests {
             2.0 * PI / 180.0, // 2 degrees sideslip
         );
 
-        let mut controls = ControlSurfaces::default();
+        let mut controls = AircraftControlSurfaces::default();
         controls.aileron = 0.1;
         controls.elevator = -0.05;
         controls.rudder = 0.03;
@@ -362,7 +361,7 @@ mod tests {
     #[test]
     fn test_input_vector_creation() {
         let adapter = AersoAdapter::new(create_test_geometry(), create_test_coefficients());
-        let controls = ControlSurfaces {
+        let controls = AircraftControlSurfaces {
             aileron: 0.1,
             elevator: -0.2,
             rudder: 0.3,

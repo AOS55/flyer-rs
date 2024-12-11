@@ -1,5 +1,5 @@
 use crate::components::{PhysicsComponent, ReferenceFrame, SpatialComponent};
-use crate::config::physics::PhysicsConfig;
+use crate::resources::PhysicsConfig;
 use bevy::prelude::*;
 use nalgebra::Vector3;
 
@@ -16,8 +16,12 @@ pub fn force_calculator_system(
         let gravity_force = config.gravity * physics.mass;
         physics.net_force += gravity_force;
 
-        // Process forces (existing logic)
-        for force in &physics.forces {
+        // Extract forces and moments to avoid conflicting borrows
+        let forces = physics.forces.clone();
+        let moments = physics.moments.clone();
+
+        // Process forces
+        for force in &forces {
             let force_inertial = match force.frame {
                 ReferenceFrame::Body => spatial.attitude * force.vector,
                 ReferenceFrame::Inertial => force.vector,
@@ -33,8 +37,8 @@ pub fn force_calculator_system(
             }
         }
 
-        // Process moments (existing logic)
-        for moment in &physics.moments {
+        // Process moments
+        for moment in &moments {
             let moment_inertial = match moment.frame {
                 ReferenceFrame::Body => spatial.attitude * moment.vector,
                 ReferenceFrame::Inertial => moment.vector,
@@ -43,52 +47,4 @@ pub fn force_calculator_system(
             physics.net_moment += moment_inertial;
         }
     }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::components::Moment;
-    use crate::components::{Force, ForceCategory};
-    use approx::assert_relative_eq;
-    use nalgebra::{UnitQuaternion, Vector3};
-
-    // Helper function to create a basic physics component
-    fn create_test_physics() -> PhysicsComponent {
-        PhysicsComponent::new(
-            1.0,                           // mass
-            nalgebra::Matrix3::identity(), // inertia
-        )
-    }
-
-    // Helper function to create a basic spatial component
-    fn create_test_spatial() -> SpatialComponent {
-        SpatialComponent {
-            position: Vector3::zeros(),
-            velocity: Vector3::zeros(),
-            attitude: UnitQuaternion::identity(),
-            angular_velocity: Vector3::zeros(),
-        }
-    }
-
-    #[test]
-    fn test_gravity_force() {}
-
-    #[test]
-    fn test_body_force_transformation() {}
-
-    #[test]
-    fn test_force_with_moment() {}
-
-    #[test]
-    fn test_multiple_forces() {}
-
-    #[test]
-    fn test_force_categories() {}
-
-    #[test]
-    fn test_moment_accumulation() {}
-
-    #[test]
-    fn test_force_clearing() {}
 }
