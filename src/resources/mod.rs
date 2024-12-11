@@ -14,7 +14,8 @@ pub use environment::{
 pub use physics::PhysicsConfig;
 pub use render::{RenderConfig, RenderScale};
 pub use transformations::{
-    AttitudeTransform, Frame, PositionTransform, ScaleTransform, TransformationResource,
+    AttitudeTransform, Frame, PositionTransform, ScaleTransform, TransformError,
+    TransformationBundle, TransformationResource, VelocityTransform,
 };
 
 // pub use config::environment::{

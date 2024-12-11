@@ -2,4 +2,7 @@ mod frames;
 mod traits;
 
 pub use frames::{Frame, TransformationResource};
-pub use traits::{AttitudeTransform, PositionTransform, ScaleTransform};
+pub use traits::{
+    AttitudeTransform, PositionTransform, ScaleTransform, TransformError, TransformationBundle,
+    VelocityTransform,
+};

@@ -22,6 +22,7 @@ pub struct TileData {
 }
 
 // Chunk Management
+#[allow(dead_code)] // these are used, but not explicitly called, mainly for debugging
 #[derive(Clone)]
 enum ChunkState {
     Loading {

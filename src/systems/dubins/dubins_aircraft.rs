@@ -42,7 +42,7 @@ fn update_aircraft(state: &mut DubinsAircraftState, config: &DubinsAircraftConfi
     // Update position
     spatial.position.x += new_speed * yaw.cos() * dt;
     spatial.position.y += new_speed * yaw.sin() * dt;
-    spatial.position.z += controls.vertical_speed * dt;
+    spatial.position.z -= controls.vertical_speed * dt;
 
     // Update heading: θ_t+1 = θ_t + c_φ*φ*dt
     let heading_change = turn_rate * dt;

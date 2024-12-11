@@ -1,11 +1,7 @@
 use bevy::prelude::*;
-use nalgebra::{UnitQuaternion, Vector3};
 
 use crate::components::{AircraftRenderState, AircraftType, Attitude, DubinsAircraftState};
-use crate::resources::{
-    AircraftAssets, AttitudeTransform, Frame, PositionTransform, ScaleTransform,
-    TransformationResource,
-};
+use crate::resources::{AircraftAssets, Frame, PositionTransform, TransformationResource};
 
 pub fn aircraft_render_system(
     mut query: Query<(
@@ -31,7 +27,7 @@ pub fn aircraft_render_system(
         info!("NED position: {:?}", ned_pos);
         if let Ok(screen_pos) = transform_res.transform_to_screen_coords(ned_pos, Frame::NED) {
             // Keep z-coordinate from original transform for proper layering
-            transform.translation = Vec3::new(screen_pos.x, screen_pos.y, transform.translation.z);
+            transform.translation = Vec3::new(screen_pos.x, screen_pos.y, screen_pos.z);
             info!("screen pos: {}", screen_pos);
         }
         transform.rotation = Quat::from_rotation_z(-yaw as f32);

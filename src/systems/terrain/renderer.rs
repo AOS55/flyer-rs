@@ -72,6 +72,7 @@ fn feature_visual_update_system(
     }
 }
 
+#[allow(dead_code)]
 fn get_sprite_index(biome: BiomeType, assets: &TerrainAssets) -> Option<usize> {
     assets.tile_mappings.get(&biome).copied()
 }

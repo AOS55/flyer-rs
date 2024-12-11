@@ -80,8 +80,10 @@ impl AirDataCalculation {
 #[cfg(test)]
 mod tests {
 
+    #[allow(dead_code)]
     fn setup_test_app() {}
 
+    #[allow(dead_code)]
     fn spawn_test_aircraft() {}
 
     #[test]

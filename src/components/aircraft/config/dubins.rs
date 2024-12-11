@@ -14,7 +14,7 @@ pub struct DubinsAircraftConfig {
 impl Default for DubinsAircraftConfig {
     fn default() -> Self {
         Self {
-            max_speed: 100.0,
+            max_speed: 200.0,
             min_speed: 40.0,
             acceleration: 10.0,
             max_bank_angle: 45.0 * std::f64::consts::PI / 180.0,
