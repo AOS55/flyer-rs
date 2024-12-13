@@ -17,15 +17,21 @@ pub struct BiomeThresholds {
 impl Default for BiomeConfig {
     fn default() -> Self {
         Self {
-            thresholds: BiomeThresholds {
-                water: 0.48,
-                mountain_start: 0.75,
-                mountain_width: 0.1,
-                beach_width: 0.025,
-                forest_moisture: 0.95,
-                desert_moisture: 0.2,
-                field_sizes: [96.0, 128.0, 256.0, 512.0],
-            },
+            thresholds: BiomeThresholds::default(),
+        }
+    }
+}
+
+impl Default for BiomeThresholds {
+    fn default() -> Self {
+        Self {
+            water: 0.48,
+            mountain_start: 0.75,
+            mountain_width: 0.1,
+            beach_width: 0.025,
+            forest_moisture: 0.95,
+            desert_moisture: 0.2,
+            field_sizes: [96.0, 128.0, 256.0, 512.0],
         }
     }
 }

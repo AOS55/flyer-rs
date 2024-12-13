@@ -1,3 +1,3 @@
-mod config;
+// mod config;
 
-pub use config::{RenderConfig, RenderScale};
+// pub use config::{RenderConfig, RenderScale};

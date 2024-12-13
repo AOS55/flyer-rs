@@ -2,7 +2,8 @@ mod aerodynamics;
 mod aircraft;
 mod environment;
 mod physics;
-mod render;
+// mod render;
+mod rewards;
 pub mod terrain;
 mod transformations;
 
@@ -12,7 +13,11 @@ pub use environment::{
     AtmosphereConfig, AtmosphereType, EnvironmentConfig, EnvironmentModel, WindConfig,
 };
 pub use physics::PhysicsConfig;
-pub use render::{RenderConfig, RenderScale};
+// pub use render::{RenderConfig, RenderScale};
+pub use terrain::{
+    BiomeConfig, BiomeThresholds, FeatureConfig, HeightNoiseConfig, MoistureNoiseConfig,
+    NoiseConfig, RenderConfig, RiverNoiseConfig, TerrainConfig,
+};
 pub use transformations::{
     AttitudeTransform, Frame, PositionTransform, ScaleTransform, TransformError,
     TransformationBundle, TransformationResource, VelocityTransform,

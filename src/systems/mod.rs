@@ -5,6 +5,7 @@ pub mod physics;
 mod controller;
 mod dubins;
 mod render;
+mod termination;
 pub mod terrain;
 
 pub use aerodynamics::{aero_force_system, air_data_system};

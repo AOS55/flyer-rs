@@ -4,9 +4,9 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Component, Debug, Clone, Serialize, Deserialize)]
 pub struct MassModel {
-    mass: f64,
-    inertia: Matrix3<f64>,
-    inertia_inv: Matrix3<f64>,
+    pub mass: f64,
+    pub inertia: Matrix3<f64>,
+    pub inertia_inv: Matrix3<f64>,
 }
 
 impl MassModel {

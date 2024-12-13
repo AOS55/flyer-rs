@@ -3,15 +3,14 @@ use nalgebra::Vector3;
 
 use crate::components::{CameraComponent, PlayerController};
 use crate::plugins::StartupSet;
-use crate::resources::{RenderConfig, RenderScale};
+use crate::resources::TransformationResource;
 use crate::systems::camera_follow_system;
 
 pub struct CameraPlugin;
 
 impl Plugin for CameraPlugin {
     fn build(&self, app: &mut App) {
-        app.insert_resource(RenderConfig::new(1.0))
-            .add_systems(Startup, spawn_camera.in_set(StartupSet::SpawnCamera))
+        app.add_systems(Startup, spawn_camera.in_set(StartupSet::SpawnCamera))
             .add_systems(FixedUpdate, camera_follow_system);
     }
 }
@@ -19,14 +18,14 @@ impl Plugin for CameraPlugin {
 fn spawn_camera(
     mut commands: Commands,
     player_query: Query<Entity, With<PlayerController>>,
-    render_config: Res<RenderConfig>,
+    transform_res: Res<TransformationResource>,
 ) {
     if let Ok(player_entity) = player_query.get_single() {
         // Initial camera position in physics space
         let initial_pos = Vector3::new(0.0, 0.0, 500.0);
 
         // Convert to render space
-        let render_pos = initial_pos.to_render(&render_config);
+        let render_pos = transform_res.screen_from_ned(&initial_pos).unwrap();
 
         commands.spawn((
             // Core camera components for 2D

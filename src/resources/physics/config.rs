@@ -2,7 +2,7 @@ use bevy::prelude::*;
 use nalgebra::Vector3;
 
 /// Configuration for the physics system
-#[derive(Resource)]
+#[derive(Resource, Debug, Clone)]
 pub struct PhysicsConfig {
     // Integration parameters
     pub max_velocity: f64,
