@@ -2,6 +2,9 @@ use crate::components::terrain::{
     BushVariant, FeatureType, FlowerVariant, RockVariant, SnowVariant, TreeVariant,
 };
 use rand::distributions::{Distribution, WeightedIndex};
+use rand::rngs::StdRng;
+use rand::SeedableRng;
+use std::hash::{Hash, Hasher};
 
 #[derive(Clone, Debug)]
 pub struct FeatureConfig {
@@ -14,6 +17,7 @@ pub struct FeatureConfig {
     pub desert: DesertFeatureConfig,
     pub mountain: MountainFeatureConfig,
     pub snow: SnowFeatureConfig,
+    pub rng: Option<StdRng>,
 }
 
 impl Default for FeatureConfig {
@@ -28,6 +32,7 @@ impl Default for FeatureConfig {
             desert: DesertFeatureConfig::default(),
             mountain: MountainFeatureConfig::default(),
             snow: SnowFeatureConfig::default(),
+            rng: None,
         }
     }
 }
@@ -90,7 +95,7 @@ pub trait BiomeFeatureConfig {
     fn density(&self) -> f32;
     fn feature_probs(&self) -> &[(FeatureType, f32)];
 
-    fn select_feature(&self, rng: &mut impl rand::Rng) -> Option<FeatureType> {
+    fn select_feature(&self, rng: &mut StdRng) -> Option<FeatureType> {
         let weights: Vec<f32> = self.feature_probs().iter().map(|(_, prob)| *prob).collect();
         let dist = WeightedIndex::new(&weights).ok()?;
         let index = dist.sample(rng);
@@ -231,5 +236,17 @@ impl Default for SnowFeatureConfig {
             density: 0.02,
             feature_probs: vec![(FeatureType::Snow(SnowVariant::SnowMan), 1.0)],
         }
+    }
+}
+
+impl FeatureConfig {
+    pub fn with_seed(mut self, master_seed: u64) -> Self {
+        let mut hasher = std::collections::hash_map::DefaultHasher::new();
+        master_seed.hash(&mut hasher);
+        "feature".hash(&mut hasher);
+        let feature_seed = hasher.finish();
+
+        self.rng = Some(StdRng::seed_from_u64(feature_seed));
+        self
     }
 }

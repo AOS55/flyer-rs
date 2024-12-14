@@ -20,11 +20,11 @@ pub struct TerrainGeneratorSystem {
 }
 
 impl TerrainGeneratorSystem {
-    pub fn new(state: &TerrainState, config: &TerrainConfig) -> Self {
-        let mut height_generator = NoiseGenerator::new(state.seed);
-        let mut moisture_generator = NoiseGenerator::new(state.seed.wrapping_add(1));
-        let mut river_generator = NoiseGenerator::new(state.seed.wrapping_add(2));
-        let detail_generator = NoiseGenerator::new(state.seed.wrapping_add(3));
+    pub fn new(config: &TerrainConfig) -> Self {
+        let mut height_generator = NoiseGenerator::new(config.seed);
+        let mut moisture_generator = NoiseGenerator::new(config.seed.wrapping_add(1));
+        let mut river_generator = NoiseGenerator::new(config.seed.wrapping_add(2));
+        let detail_generator = NoiseGenerator::new(config.seed.wrapping_add(3));
 
         // Configure generators based on config
         height_generator.set_value_range(0.0, 1.0);
@@ -44,7 +44,7 @@ impl TerrainGeneratorSystem {
             moisture_generator,
             river_generator,
             detail_generator,
-            rng: StdRng::seed_from_u64(state.seed),
+            rng: StdRng::seed_from_u64(config.seed),
         }
     }
 
@@ -92,7 +92,7 @@ impl TerrainGeneratorSystem {
                     result.height_map[idx],
                     result.moisture_map[idx],
                     &config.biome,
-                    state.seed,
+                    config.seed,
                     world_pos,
                 );
             }
@@ -170,82 +170,6 @@ impl TerrainGeneratorSystem {
         *biome_map = smoothed;
     }
 }
-
-// pub fn terrain_generation_system(
-//     mut commands: Commands,
-//     mut chunks: Query<(Entity, &mut TerrainChunkComponent), Added<TerrainChunkComponent>>,
-//     terrain_state: Res<TerrainState>,
-//     terrain_config: Res<TerrainConfig>,
-//     terrain_assets: Res<TerrainAssets>,
-//     mut generator: ResMut<TerrainGeneratorSystem>,
-// ) {
-//     if !chunks.is_empty() {
-//         info!("Generating chunks: {}", chunks.iter().count());
-//     }
-
-//     for (entity, mut chunk) in chunks.iter_mut() {
-//         generate_chunk_data(&mut chunk, &terrain_state, &terrain_config, &mut generator);
-//         spawn_chunk_features(
-//             &mut commands,
-//             entity,
-//             &chunk,
-//             &terrain_state,
-//             &terrain_config,
-//             &terrain_assets,
-//             &mut generator.rng,
-//         );
-//     }
-// }
-
-// pub fn generate_chunk_data(
-//     chunk: &mut TerrainChunkComponent,
-//     state: &TerrainState,
-//     config: &TerrainConfig,
-//     generator: &mut TerrainGeneratorSystem,
-// ) {
-//     let chunk_size = state.chunk_size as i32;
-//     let chunk_world_pos = chunk.world_position(state.chunk_size, state.scale);
-
-//     // First generate base terrain values
-//     for y in 0..chunk_size {
-//         for x in 0..chunk_size {
-//             let idx = (y * chunk_size + x) as usize;
-//             let world_pos = Vec2::new(
-//                 chunk_world_pos.x + x as f32 * state.scale,
-//                 chunk_world_pos.y + y as f32 * state.scale,
-//             );
-
-//             // Generate base terrain values
-//             chunk.height_map[idx] = generator.get_height(world_pos);
-//             chunk.moisture_map[idx] = generator.get_moisture(world_pos);
-//         }
-//     }
-
-//     // Then generate and apply rivers to modify the terrain
-//     generate_rivers(chunk, state, generator, &config.noise.river);
-
-//     // Finally, determine biomes based on the modified terrain
-//     for y in 0..chunk_size {
-//         for x in 0..chunk_size {
-//             let idx = (y * chunk_size + x) as usize;
-//             let world_pos = Vec2::new(
-//                 chunk_world_pos.x + x as f32 * state.scale,
-//                 chunk_world_pos.y + y as f32 * state.scale,
-//             );
-
-//             // Determine biome using modified height and moisture values
-//             chunk.biome_map[idx] = determine_biome(
-//                 chunk.height_map[idx],
-//                 chunk.moisture_map[idx],
-//                 &config.biome,
-//                 state.seed,
-//                 world_pos,
-//             );
-//         }
-//     }
-
-//     smooth_biome_transitions(chunk, chunk_size);
-// }
 
 fn determine_biome(
     height: f32,
@@ -361,64 +285,6 @@ fn get_grid_cell(world_pos: Vec2, seed: u64, config: &BiomeConfig) -> BiomeType 
         _ => BiomeType::Grass,       // 0% grass
     }
 }
-
-// fn spawn_chunk_features(
-//     commands: &mut Commands,
-//     chunk_entity: Entity,
-//     chunk: &TerrainChunkComponent,
-//     state: &TerrainState,
-//     config: &TerrainConfig,
-//     assets: &TerrainAssets,
-//     rng: &mut StdRng,
-// ) {
-//     let chunk_size = state.chunk_size as usize;
-//     let chunk_world_pos = chunk.world_position(state.chunk_size, state.scale);
-
-//     for y in 0..chunk_size {
-//         for x in 0..chunk_size {
-//             let idx = y * chunk_size + x;
-//             let biome = chunk.biome_map[idx];
-//             let world_pos = Vec2::new(
-//                 chunk_world_pos.x + x as f32 * state.scale,
-//                 chunk_world_pos.y + y as f32 * state.scale,
-//             );
-
-//             if let Some(feature) = try_spawn_feature(world_pos, biome, config, rng) {
-//                 // Only pass `feature` to `spawn_feature` if it exists
-//                 spawn_feature(commands, chunk_entity, feature, assets);
-//             }
-//         }
-//     }
-// }
-
-// fn spawn_feature(
-//     commands: &mut Commands,
-//     chunk_entity: Entity,
-//     feature: TerrainFeatureComponent,
-//     assets: &TerrainAssets,
-// ) {
-//     if let Some(&sprite_index) = assets.feature_mappings.get(&feature.feature_type) {
-//         commands
-//             .spawn((
-//                 feature.clone(),
-//                 Sprite::from_atlas_image(
-//                     assets.feature_texture.clone(),
-//                     TextureAtlas {
-//                         layout: assets.feature_layout.clone(),
-//                         index: sprite_index,
-//                     },
-//                 ),
-//                 Transform::from_translation(feature.position.extend(10.0))
-//                     .with_rotation(Quat::from_rotation_z(feature.rotation))
-//                     .with_scale(Vec3::splat(feature.scale)),
-//                 GlobalTransform::default(),
-//                 Visibility::default(),
-//                 InheritedVisibility::default(),
-//                 ViewVisibility::default(),
-//             ))
-//             .set_parent(chunk_entity);
-//     }
-// }
 
 pub fn try_spawn_feature(
     pos: Vec2,

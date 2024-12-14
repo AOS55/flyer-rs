@@ -24,11 +24,11 @@ pub fn aircraft_render_system(
         }
 
         let ned_pos = &state.spatial.position;
-        info!("NED position: {:?}", ned_pos);
+        // info!("NED position: {:?}", ned_pos);
         if let Ok(screen_pos) = transform_res.transform_to_screen_coords(ned_pos, Frame::NED) {
             // Keep z-coordinate from original transform for proper layering
             transform.translation = Vec3::new(screen_pos.x, screen_pos.y, screen_pos.z);
-            info!("screen pos: {}", screen_pos);
+            // info!("screen pos: {}", screen_pos);
         }
         transform.rotation = Quat::from_rotation_z(-yaw as f32);
     }

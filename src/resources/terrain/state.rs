@@ -12,7 +12,6 @@ pub struct TerrainState {
     pub chunk_size: usize,
     pub tile_size: f32,
     pub scale: f32, // px to meter scale, TODO: implement conversions
-    pub seed: u64,
 
     // Loading parameters
     pub loading_radius: i32,

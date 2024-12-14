@@ -9,6 +9,7 @@ pub use noise::{HeightNoiseConfig, MoistureNoiseConfig, NoiseConfig, RiverNoiseC
 
 #[derive(Resource, Clone, Debug)]
 pub struct TerrainConfig {
+    pub seed: u64,
     pub noise: NoiseConfig,
     pub biome: BiomeConfig,
     pub feature: FeatureConfig,
@@ -23,6 +24,7 @@ pub struct RenderConfig {
 impl Default for TerrainConfig {
     fn default() -> Self {
         Self {
+            seed: 42,
             noise: NoiseConfig::default(),
             biome: BiomeConfig::default(),
             feature: FeatureConfig::default(),

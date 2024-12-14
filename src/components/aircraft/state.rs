@@ -1,5 +1,7 @@
 use bevy::prelude::*;
-use nalgebra::{Matrix3, Vector3};
+use nalgebra::{Matrix3, Vector2, Vector3};
+use rand::{Rng, SeedableRng};
+use rand_chacha::ChaCha8Rng;
 use serde::{Deserialize, Serialize};
 
 use crate::components::{PhysicsComponent, SpatialComponent};
@@ -89,6 +91,68 @@ impl Default for DubinsAircraftState {
     fn default() -> Self {
         Self {
             spatial: SpatialComponent::default(),
+            controls: DubinsAircraftControls::default(),
+        }
+    }
+}
+
+impl DubinsAircraftState {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Start the vehicle at an exact position in NED coordinates
+    pub fn precise_position(position: Vector3<f64>) -> Self {
+        let spatial = SpatialComponent::at_position(position);
+        let controls = DubinsAircraftControls::default();
+
+        Self { spatial, controls }
+    }
+
+    /// Start the vehicle at a random position on a hemisphere
+    pub fn random_position(
+        origin: Option<Vector2<f64>>,
+        variance: Option<f64>,
+        min_altitude: Option<f64>,
+        max_altitude: Option<f64>,
+        rng: Option<ChaCha8Rng>,
+    ) -> Self {
+        let origin = origin.unwrap_or_else(|| Vector2::new(0.0, 0.0));
+        let variance = variance.unwrap_or(1000.0);
+        let min_altitude = min_altitude.unwrap_or(-300.0);
+        let max_altitude = max_altitude.unwrap_or(-1000.0);
+
+        let (min_altitude, max_altitude) = if min_altitude < max_altitude {
+            (min_altitude, max_altitude)
+        } else {
+            warn!(
+                "Invalid altitude range: min_altitude ({}) >= max_altitude ({}). Swapping values.",
+                min_altitude, max_altitude
+            );
+            (max_altitude, min_altitude)
+        };
+
+        let mut rng = match rng {
+            Some(rng) => rng,
+            None => ChaCha8Rng::from_entropy(),
+        };
+
+        let u1 = rng.gen::<f64>();
+        let u2 = rng.gen::<f64>();
+        let radius = variance * (-2.0 * u1.ln()).sqrt();
+        let theta = 2.0 * std::f64::consts::PI * u2;
+
+        let x = origin.x + radius * theta.cos();
+        let y = origin.y + radius * theta.sin();
+        let z = rng.gen_range(min_altitude..max_altitude);
+
+        info!("x: {}, y: {}, z: {}", x, y, z);
+
+        let position = origin.push(0.0) + Vector3::new(x, y, z);
+        let spatial = SpatialComponent::at_position(position);
+
+        Self {
+            spatial,
             controls: DubinsAircraftControls::default(),
         }
     }

@@ -4,6 +4,7 @@ pub mod controller;
 pub mod physics;
 pub mod propulsion;
 pub mod spatial;
+mod termination;
 pub mod terrain;
 
 pub use aircraft::{
@@ -16,3 +17,4 @@ pub use controller::PlayerController;
 pub use physics::{Force, ForceCategory, Moment, PhysicsComponent, ReferenceFrame};
 pub use propulsion::{PropulsionComponent, PropulsionType};
 pub use spatial::SpatialComponent;
+pub use termination::TerminalConditions;

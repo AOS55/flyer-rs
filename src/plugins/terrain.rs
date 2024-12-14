@@ -27,7 +27,6 @@ impl TerrainPlugin {
                 // Core parameters from config
                 chunk_size: 16,
                 scale: 1.0,
-                seed: rand::random(), // Or from config
 
                 // Runtime state
                 active_chunks: Vec::new(),
@@ -70,12 +69,8 @@ impl TerrainPlugin {
         commands.insert_resource(terrain_assets);
     }
 
-    fn setup_generator(
-        mut commands: Commands,
-        terrain_state: Res<TerrainState>,
-        terrain_config: Res<TerrainConfig>,
-    ) {
-        let generator = TerrainGeneratorSystem::new(&terrain_state, &terrain_config);
+    fn setup_generator(mut commands: Commands, terrain_config: Res<TerrainConfig>) {
+        let generator = TerrainGeneratorSystem::new(&terrain_config);
         commands.insert_resource(generator);
     }
 }

@@ -14,6 +14,7 @@ pub use environment::{
 };
 pub use physics::PhysicsConfig;
 // pub use render::{RenderConfig, RenderScale};
+pub use rewards::RewardWeights;
 pub use terrain::{
     BiomeConfig, BiomeThresholds, FeatureConfig, HeightNoiseConfig, MoistureNoiseConfig,
     NoiseConfig, RenderConfig, RiverNoiseConfig, TerrainConfig,

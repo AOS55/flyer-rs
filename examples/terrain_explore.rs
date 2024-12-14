@@ -19,6 +19,7 @@ struct MainCamera;
 fn setup(mut commands: Commands) {
     // Initialize terrain configuration
     let terrain_config = TerrainConfig {
+        seed: 41,
         noise: Default::default(),
         biome: Default::default(),
         feature: Default::default(),
@@ -32,7 +33,6 @@ fn setup(mut commands: Commands) {
         // Core parameters
         chunk_size: 32,
         scale: 1.0,
-        seed: 42,
 
         // Runtime state
         active_chunks: Vec::new(),

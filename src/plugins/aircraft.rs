@@ -39,7 +39,7 @@ impl AircraftPlugin {
     fn setup_dubins_aircraft(mut commands: Commands) {
         commands.spawn((
             DubinsAircraftConfig::default(),
-            DubinsAircraftState::default(),
+            DubinsAircraftState::random_position(None, None, None, None, None),
             PlayerController::new(),
             Name::new("Simple Dubins Aircraft"),
             AircraftRenderState {
