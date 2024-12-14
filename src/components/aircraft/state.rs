@@ -1,10 +1,9 @@
 use bevy::prelude::*;
-use nalgebra::{Matrix3, Vector2, Vector3};
-use rand::{Rng, SeedableRng};
-use rand_chacha::ChaCha8Rng;
+use nalgebra::{Matrix3, Vector3};
+use rand::Rng;
 use serde::{Deserialize, Serialize};
 
-use crate::components::{PhysicsComponent, SpatialComponent};
+use crate::components::{PhysicsComponent, RandomStartPosConfig, SpatialComponent};
 
 #[derive(Component, Debug, Clone, Serialize, Deserialize)]
 pub struct AircraftState {
@@ -110,45 +109,35 @@ impl DubinsAircraftState {
     }
 
     /// Start the vehicle at a random position on a hemisphere
-    pub fn random_position(
-        origin: Option<Vector2<f64>>,
-        variance: Option<f64>,
-        min_altitude: Option<f64>,
-        max_altitude: Option<f64>,
-        rng: Option<ChaCha8Rng>,
-    ) -> Self {
-        let origin = origin.unwrap_or_else(|| Vector2::new(0.0, 0.0));
-        let variance = variance.unwrap_or(1000.0);
-        let min_altitude = min_altitude.unwrap_or(-300.0);
-        let max_altitude = max_altitude.unwrap_or(-1000.0);
+    pub fn random_position(config: Option<RandomStartPosConfig>) -> Self {
+        let mut config = config.unwrap_or_default();
 
-        let (min_altitude, max_altitude) = if min_altitude < max_altitude {
-            (min_altitude, max_altitude)
+        let loc_min_altitude = config.min_altitude;
+        let loc_max_altitude = config.max_altitude;
+        let loc_origin = config.origin.clone();
+
+        let (loc_min_altitude, loc_max_altitude) = if loc_min_altitude < loc_max_altitude {
+            (loc_min_altitude, loc_max_altitude)
         } else {
             warn!(
                 "Invalid altitude range: min_altitude ({}) >= max_altitude ({}). Swapping values.",
-                min_altitude, max_altitude
+                loc_min_altitude, loc_max_altitude
             );
-            (max_altitude, min_altitude)
+            (loc_max_altitude, loc_min_altitude)
         };
 
-        let mut rng = match rng {
-            Some(rng) => rng,
-            None => ChaCha8Rng::from_entropy(),
-        };
-
-        let u1 = rng.gen::<f64>();
-        let u2 = rng.gen::<f64>();
-        let radius = variance * (-2.0 * u1.ln()).sqrt();
+        let u1 = config.rng.gen::<f64>();
+        let u2 = config.rng.gen::<f64>();
+        let radius = config.variance * (-2.0 * u1.ln()).sqrt();
         let theta = 2.0 * std::f64::consts::PI * u2;
 
-        let x = origin.x + radius * theta.cos();
-        let y = origin.y + radius * theta.sin();
-        let z = rng.gen_range(min_altitude..max_altitude);
+        let x = loc_origin.x + radius * theta.cos();
+        let y = loc_origin.y + radius * theta.sin();
+        let z = config.rng.gen_range(loc_min_altitude..loc_max_altitude);
 
         info!("x: {}, y: {}, z: {}", x, y, z);
 
-        let position = origin.push(0.0) + Vector3::new(x, y, z);
+        let position = loc_origin.push(0.0) + Vector3::new(x, y, z);
         let spatial = SpatialComponent::at_position(position);
 
         Self {

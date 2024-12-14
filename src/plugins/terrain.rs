@@ -5,12 +5,31 @@ use crate::components::terrain::*;
 use crate::resources::terrain::{TerrainAssets, TerrainConfig, TerrainState};
 use crate::systems::terrain::{ChunkManagerPlugin, TerrainGeneratorSystem};
 
-pub struct TerrainPlugin;
+#[derive(SystemSet, Debug, Hash, PartialEq, Eq, Clone)]
+enum TerrainStartupSet {
+    Config,
+    State,
+    Assets,
+    Generator,
+}
+
+pub struct TerrainPlugin {
+    pub config: Option<TerrainConfig>,
+}
 
 impl TerrainPlugin {
-    fn setup_config(mut commands: Commands) {
-        // Initialize with default config as single source of truth
-        commands.insert_resource(TerrainConfig::default());
+    pub fn new() -> Self {
+        Self { config: None }
+    }
+
+    pub fn with_config(config: TerrainConfig) -> Self {
+        Self {
+            config: Some(config),
+        }
+    }
+
+    fn setup_config(mut commands: Commands, config: Option<TerrainConfig>) {
+        commands.insert_resource(config.unwrap_or_default());
     }
 
     fn setup_state(
@@ -73,24 +92,44 @@ impl TerrainPlugin {
         let generator = TerrainGeneratorSystem::new(&terrain_config);
         commands.insert_resource(generator);
     }
+
+    fn setup_config_with_initial(
+        config: Option<TerrainConfig>,
+    ) -> impl FnMut(Commands) + Send + Sync + 'static {
+        move |commands: Commands| {
+            Self::setup_config(commands, config.clone());
+        }
+    }
 }
 
 impl Plugin for TerrainPlugin {
     fn build(&self, app: &mut App) {
-        app
-            // Resource initialization in correct order
-            .add_systems(
-                Startup,
-                (
-                    Self::setup_config,
-                    Self::setup_state.after(Self::setup_config),
-                    Self::setup_assets.after(Self::setup_state),
-                    Self::setup_generator.after(Self::setup_assets),
-                )
-                    .chain(),
+        let config = self.config.clone();
+
+        app.configure_sets(
+            Startup,
+            (
+                TerrainStartupSet::Config,
+                TerrainStartupSet::State,
+                TerrainStartupSet::Assets,
+                TerrainStartupSet::Generator,
             )
-            // Add sub-plugins
-            .add_plugins(ChunkManagerPlugin);
+                .chain(),
+        )
+        .add_systems(
+            Startup,
+            Self::setup_config_with_initial(config).in_set(TerrainStartupSet::Config),
+        )
+        .add_systems(Startup, Self::setup_state.in_set(TerrainStartupSet::State))
+        .add_systems(
+            Startup,
+            Self::setup_assets.in_set(TerrainStartupSet::Assets),
+        )
+        .add_systems(
+            Startup,
+            Self::setup_generator.in_set(TerrainStartupSet::Generator),
+        )
+        .add_plugins(ChunkManagerPlugin);
     }
 }
 

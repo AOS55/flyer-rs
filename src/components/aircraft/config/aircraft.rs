@@ -7,16 +7,18 @@ use crate::components::aircraft::config::{ConfigError, RawAircraftConfig};
 use crate::components::{AircraftAeroCoefficients, AircraftGeometry, MassModel};
 
 #[derive(Component, Debug, Clone, Deserialize)]
-pub struct AircraftConfig {
+pub struct FullAircraftConfig {
+    pub name: String,
     pub ac_type: AircraftType,
     pub mass: MassModel,
     pub geometry: AircraftGeometry,
     pub aero_coef: AircraftAeroCoefficients,
 }
 
-impl Default for AircraftConfig {
+impl Default for FullAircraftConfig {
     fn default() -> Self {
         Self {
+            name: "TwinOtter".to_string(),
             ac_type: AircraftType::TwinOtter,
             mass: MassModel::twin_otter(),
             geometry: AircraftGeometry::twin_otter(),
@@ -25,7 +27,7 @@ impl Default for AircraftConfig {
     }
 }
 
-impl AircraftConfig {
+impl FullAircraftConfig {
     pub fn new(source: AircraftSource) -> Result<Self, ConfigError> {
         match source {
             AircraftSource::Programmed(aircraft_type) => Ok(Self::from_programmed(aircraft_type)),
@@ -36,24 +38,28 @@ impl AircraftConfig {
     fn from_programmed(aircraft_type: AircraftType) -> Self {
         match aircraft_type {
             AircraftType::TwinOtter => Self {
+                name: "TwinOtter".to_string(),
                 ac_type: AircraftType::TwinOtter,
                 mass: MassModel::twin_otter(),
                 geometry: AircraftGeometry::twin_otter(),
                 aero_coef: AircraftAeroCoefficients::twin_otter(),
             },
             AircraftType::F4Phantom => Self {
+                name: "F4Phantom".to_string(),
                 ac_type: AircraftType::F4Phantom,
                 mass: MassModel::f4_phantom(),
                 geometry: AircraftGeometry::f4_phantom(),
                 aero_coef: AircraftAeroCoefficients::f4_phantom(),
             },
             AircraftType::GenericTransport => Self {
+                name: "GenericTransport".to_string(),
                 ac_type: AircraftType::GenericTransport,
                 mass: MassModel::generic_transport(),
                 geometry: AircraftGeometry::generic_transport(),
                 aero_coef: AircraftAeroCoefficients::generic_transport(),
             },
             AircraftType::Custom(string) => Self {
+                name: string.clone(),
                 ac_type: AircraftType::Custom(string),
                 mass: MassModel::twin_otter(),
                 geometry: AircraftGeometry::twin_otter(),
@@ -72,6 +78,7 @@ impl AircraftConfig {
         // Convert the raw config into your structured config
         // This is where you'll map the flat YAML structure to your nested structs
         Ok(Self {
+            name: raw.name.clone(),
             ac_type: AircraftType::Custom(raw.name.clone()),
             mass: MassModel::new(raw.mass, raw.ixx, raw.iyy, raw.izz, raw.ixz),
             geometry: AircraftGeometry::new(raw.wing_area, raw.wing_span, raw.mac),
