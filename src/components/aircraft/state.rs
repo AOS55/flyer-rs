@@ -135,7 +135,7 @@ impl DubinsAircraftState {
         let y = loc_origin.y + radius * theta.sin();
         let z = config.rng.gen_range(loc_min_altitude..loc_max_altitude);
 
-        info!("x: {}, y: {}, z: {}", x, y, z);
+        // info!("x: {}, y: {}, z: {}", x, y, z);
 
         let position = loc_origin.push(0.0) + Vector3::new(x, y, z);
         let spatial = SpatialComponent::at_position(position);

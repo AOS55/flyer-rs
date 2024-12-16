@@ -7,4 +7,6 @@ pub use config::{
     DubinsAircraftConfig, FullAircraftConfig, MassModel, RandomStartPosConfig, RawAircraftConfig,
 };
 pub use render::{AircraftRenderState, Attitude};
-pub use state::{AirData, AircraftControlSurfaces, AircraftState, DubinsAircraftState};
+pub use state::{
+    AirData, AircraftControlSurfaces, AircraftState, DubinsAircraftControls, DubinsAircraftState,
+};

@@ -10,7 +10,8 @@ pub mod terrain;
 pub use aircraft::{
     AirData, AircraftAeroCoefficients, AircraftConfig, AircraftControlSurfaces, AircraftGeometry,
     AircraftRenderState, AircraftState, AircraftType, Attitude, DubinsAircraftConfig,
-    DubinsAircraftState, FullAircraftConfig, MassModel, RandomStartPosConfig,
+    DubinsAircraftControls, DubinsAircraftState, FullAircraftConfig, MassModel,
+    RandomStartPosConfig,
 };
 pub use camera::CameraComponent;
 pub use controller::PlayerController;

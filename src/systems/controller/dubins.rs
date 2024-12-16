@@ -1,6 +1,6 @@
 use bevy::prelude::*;
 
-use crate::components::{DubinsAircraftState, PlayerController};
+use crate::components::{DubinsAircraftControls, DubinsAircraftState, PlayerController};
 
 pub fn dubins_keyboard_system(
     mut query: Query<&mut DubinsAircraftState, With<PlayerController>>,
@@ -20,5 +20,14 @@ pub fn dubins_keyboard_system(
         } else if keyboard.pressed(KeyCode::KeyS) {
             aircraft_state.controls.vertical_speed -= 0.1
         }
+    }
+}
+
+pub fn dubins_gym_control_system(
+    mut query: Query<&mut DubinsAircraftState, With<PlayerController>>,
+    action: DubinsAircraftControls,
+) {
+    if let Ok(mut aircraft_state) = query.get_single_mut() {
+        aircraft_state.controls = action;
     }
 }
