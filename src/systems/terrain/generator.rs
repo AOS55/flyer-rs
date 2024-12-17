@@ -10,33 +10,44 @@ use crate::resources::terrain::{TerrainConfig, TerrainState};
 use crate::systems::terrain::noise::NoiseGenerator;
 // use crate::systems::terrain::rivers::generate_rivers;
 
+/// System responsible for generating procedural terrain.
+/// It uses noise generators to generate height maps, moisture maps,
+/// biome maps, and features like trees, crops, and rivers.
 #[derive(Resource, Clone)]
 pub struct TerrainGeneratorSystem {
+    /// Noise generator for terrain height.
     height_generator: NoiseGenerator,
+    /// Noise generator for terrain moisture.
     moisture_generator: NoiseGenerator,
+    /// Noise generator for river generation.
     river_generator: NoiseGenerator,
+    /// Noise generator for small terrain details.
     detail_generator: NoiseGenerator,
+    /// Random number generator for consistent procedural generation.
     rng: StdRng,
 }
 
 impl TerrainGeneratorSystem {
+    /// Creates a new terrain generator based on the provided `TerrainConfig`.
     pub fn new(config: &TerrainConfig) -> Self {
         let mut height_generator = NoiseGenerator::new(config.seed);
         let mut moisture_generator = NoiseGenerator::new(config.seed.wrapping_add(1));
         let mut river_generator = NoiseGenerator::new(config.seed.wrapping_add(2));
         let detail_generator = NoiseGenerator::new(config.seed.wrapping_add(3));
 
-        // Configure generators based on config
+        // Configure height noise generator with layers
         height_generator.set_value_range(0.0, 1.0);
         for layer in &config.noise.height.layers {
             height_generator.add_layer(layer.clone());
         }
 
+        // Configure moisture noise generator with layers
         moisture_generator.set_value_range(0.0, 1.0);
         for layer in &config.noise.moisture.layers {
             moisture_generator.add_layer(layer.clone());
         }
 
+        // Configure river noise generator
         river_generator.set_value_range(0.0, config.noise.river.max_length);
 
         Self {
@@ -48,6 +59,15 @@ impl TerrainGeneratorSystem {
         }
     }
 
+    /// Generates a single terrain chunk at the given position.
+    ///
+    /// # Arguments
+    /// * `position` - Chunk position in chunk coordinates.
+    /// * `state` - Reference to the terrain state.
+    /// * `config` - Reference to the terrain configuration.
+    ///
+    /// # Returns
+    /// A fully generated `TerrainChunkComponent` containing height, moisture, biomes, and features.
     pub fn generate_chunk(
         &mut self,
         position: IVec2,
@@ -57,15 +77,19 @@ impl TerrainGeneratorSystem {
         // Initialize result structures
         let mut result = TerrainChunkComponent::new(position, state);
 
+        // Generate height and moisture maps
         self.generate_base_terrain(state, &mut result);
 
+        // Determine biomes based on height and moisture
         self.generate_biomes(state, &mut result, config);
 
+        // Add features like trees, crops, etc.
         self.generate_features(state, &mut result, config);
 
         result
     }
 
+    /// Generates the base terrain by populating the height and moisture maps.
     fn generate_base_terrain(&self, state: &TerrainState, result: &mut TerrainChunkComponent) {
         for y in 0..state.chunk_size {
             for x in 0..state.chunk_size {
@@ -77,6 +101,7 @@ impl TerrainGeneratorSystem {
         }
     }
 
+    /// Generates the biome map based on height and moisture thresholds.
     fn generate_biomes(
         &self,
         state: &TerrainState,
@@ -97,9 +122,11 @@ impl TerrainGeneratorSystem {
                 );
             }
         }
+        // Smooth biome transitions to reduce harsh boundaries.
         self.smooth_biome_transitions(&mut result.biome_map, state.chunk_size as i32);
     }
 
+    /// Generates terrain features (e.g., trees, crops) based on biome and configuration.
     fn generate_features(
         &mut self,
         state: &TerrainState,
@@ -120,22 +147,27 @@ impl TerrainGeneratorSystem {
         }
     }
 
+    /// Fetches height noise value at a given position.
     pub fn get_height(&self, pos: Vec2) -> f32 {
         self.height_generator.get_noise(pos)
     }
 
+    /// Fetches moisture noise value at a given position.
     pub fn get_moisture(&self, pos: Vec2) -> f32 {
         self.moisture_generator.get_noise(pos)
     }
 
+    /// Fetches river noise value at a given position.
     pub fn get_river_value(&self, pos: Vec2) -> f32 {
         self.river_generator.get_noise(pos)
     }
 
+    /// Fetches detail noise value at a given position.
     pub fn get_detail_value(&self, pos: Vec2) -> f32 {
         self.detail_generator.get_noise(pos)
     }
 
+    /// Smoothes biome transitions using a weighted kernel to reduce abrupt biome changes.
     fn smooth_biome_transitions(&self, biome_map: &mut Vec<BiomeType>, chunk_size: i32) {
         let mut smoothed = biome_map.clone();
         let kernel_size = 2;
@@ -171,6 +203,7 @@ impl TerrainGeneratorSystem {
     }
 }
 
+/// Determines the biome for a tile based on height, moisture, and thresholds.
 fn determine_biome(
     height: f32,
     moisture: f32,
@@ -216,27 +249,11 @@ fn determine_biome(
     get_grid_cell(world_pos, seed, config)
 }
 
-// Smoothstep function for smooth transitions
+/// Smoothstep function to create smooth transitions between thresholds.
 fn smoothstep(edge0: f32, edge1: f32, x: f32) -> f32 {
     let t = ((x - edge0) / (edge1 - edge0)).clamp(0.0, 1.0);
     t * t * (3.0 - 2.0 * t)
 }
-
-// fn should_be_forest(world_pos: Vec2, seed: u64, moisture: f32, config: &BiomeConfig) -> bool {
-//     // Create large, simple organic shapes using a single hash
-//     let mut hasher = std::collections::hash_map::DefaultHasher::new();
-
-//     // Use larger scale for forest regions
-//     let scaled_pos = world_pos / 400.0; // Large scale variation for bigger forest patches
-//     scaled_pos.x.to_bits().hash(&mut hasher);
-//     scaled_pos.y.to_bits().hash(&mut hasher);
-//     seed.hash(&mut hasher);
-
-//     let forest_noise = hasher.finish() as f32 / u64::MAX as f32;
-
-//     // Simple moisture check - more moisture = more likely to be forest
-//     forest_noise < moisture - config.thresholds.forest_moisture
-// }
 
 fn get_grid_cell(world_pos: Vec2, seed: u64, config: &BiomeConfig) -> BiomeType {
     // Use different scales for field size variation

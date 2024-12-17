@@ -3,20 +3,35 @@ use crate::resources::PhysicsConfig;
 use bevy::prelude::*;
 use nalgebra::UnitQuaternion;
 
-/// Physics integration system that updates spatial state based on forces
+/// System to integrate physics and update spatial states for entities.
+/// This system applies forces, calculates accelerations, and updates positions,
+/// velocities, and orientations of entities based on the physics state.
+///
+/// # Arguments
+/// - `query`: A query for entities with `PhysicsComponent` and `SpatialComponent`.
+/// - `time`: A fixed timestep resource (`Time<Fixed>`).
+/// - `config`: Physics configuration resource for velocity limits.
 pub fn physics_integrator_system(
     mut query: Query<(&PhysicsComponent, &mut SpatialComponent)>,
     time: Res<Time<Fixed>>,
     config: Res<PhysicsConfig>,
 ) {
+    // Get the timestep duration in seconds
     let dt = time.delta_secs_f64();
 
+    // Iterate over all entities with physics and spatial components
     for (physics, mut spatial) in query.iter_mut() {
         integrate_state(physics, &mut spatial, dt, &config);
     }
 }
 
-/// Core integration logic
+/// Core integration logic to update spatial state based on physics forces and moments.
+///
+/// # Arguments
+/// - `physics`: The `PhysicsComponent` containing forces, moments, and physical properties.
+/// - `spatial`: The `SpatialComponent` to update position, velocity, and orientation.
+/// - `dt`: The timestep duration (in seconds).
+/// - `config`: The physics configuration resource for constraints and limits.
 fn integrate_state(
     physics: &PhysicsComponent,
     spatial: &mut SpatialComponent,
@@ -44,13 +59,19 @@ fn integrate_state(
     }
 }
 
-/// Apply velocity and angular velocity limits
+/// Applies velocity and angular velocity limits to prevent excessive motion.
+///
+/// # Arguments
+/// - `spatial`: The `SpatialComponent` containing velocity and angular velocity.
+/// - `config`: The physics configuration resource containing max limits.
 fn apply_velocity_limits(spatial: &mut SpatialComponent, config: &PhysicsConfig) {
+    // Limit linear velocity magnitude
     let velocity_norm = spatial.velocity.norm();
     if velocity_norm > config.max_velocity {
         spatial.velocity *= config.max_velocity / velocity_norm;
     }
 
+    // Limit angular velocity magnitude
     let angular_velocity_norm = spatial.angular_velocity.norm();
     if angular_velocity_norm > config.max_angular_velocity {
         spatial.angular_velocity *= config.max_angular_velocity / angular_velocity_norm;

@@ -8,40 +8,46 @@ use crate::components::terrain::*;
 use crate::resources::terrain::{TerrainAssets, TerrainConfig, TerrainState};
 use crate::systems::terrain::generator::TerrainGeneratorSystem;
 
-// Generation types
+/// Represents an asynchronous task for terrain chunk generation.
 #[derive(Component)]
 pub struct ChunkGenerationTask {
+    /// The asynchronous task generating the terrain chunk.
     pub task: Task<TerrainChunkComponent>,
+    /// The position of the chunk being generated in chunk coordinates.
     pub position: IVec2,
 }
 
+/// Represents tile data for individual terrain tiles.
 #[derive(Clone, Debug)]
 pub struct TileData {
+    /// The position of the tile in local space.
     pub position: Vec2,
+    /// The biome type of the tile.
     pub biome_type: BiomeType,
 }
 
+/// Enum representing the various states a chunk can be in.
 // Chunk Management
-#[allow(dead_code)] // these are used, but not explicitly called, mainly for debugging
+#[allow(dead_code)] // States are used internally, but not explicitly called, mainly for debugging
 #[derive(Clone)]
 enum ChunkState {
-    Loading {
-        entity: Entity,
-        started_at: Instant,
-    },
+    /// The chunk is currently being loaded.
+    Loading { entity: Entity, started_at: Instant },
+    /// The chunk is active and visible.
     Active {
         entity: Entity,
         last_accessed: Instant,
     },
-    PendingUnload {
-        entity: Entity,
-        marked_at: Instant,
-    },
+    /// The chunk is marked for unloading.
+    PendingUnload { entity: Entity, marked_at: Instant },
 }
 
+/// Manages terrain chunks, their states, and visibility.
 #[derive(Resource)]
 struct ChunkManager {
+    /// A map of chunk positions to their respective states.
     chunks: HashMap<IVec2, ChunkState>,
+    /// The visible area represented by the camera viewport.
     visible_area: ViewportArea,
 }
 
@@ -57,13 +63,17 @@ impl Default for ChunkManager {
     }
 }
 
+/// Represents the visible area in chunk coordinates.
 #[derive(Clone)]
 struct ViewportArea {
+    /// Center of the visible area (in chunk coordinates).
     center: IVec2,
+    /// Radius around the center that defines the visible chunks.
     radius: i32,
 }
 
 impl ViewportArea {
+    /// Computes the visible area based on the camera's position and zoom.
     fn from_camera(
         camera: Query<(&Transform, &OrthographicProjection), With<Camera2d>>,
         state: &TerrainState,
@@ -84,6 +94,7 @@ impl ViewportArea {
         }
     }
 
+    /// Determines if a chunk position is within the visible area.
     fn contains(&self, pos: IVec2) -> bool {
         let diff = pos - self.center;
         diff.x.abs() <= self.radius && diff.y.abs() <= self.radius
@@ -91,6 +102,7 @@ impl ViewportArea {
 }
 
 impl ChunkManager {
+    /// Updates the visible area based on the camera's position.
     fn update_visible_area(
         &mut self,
         camera: Query<(&Transform, &OrthographicProjection), With<Camera2d>>,
@@ -98,7 +110,7 @@ impl ChunkManager {
     ) {
         let new_area = ViewportArea::from_camera(camera, state);
 
-        // Get chunks that need to change state
+        // Mark chunks outside the visible area for unloading
         for (pos, state) in self.chunks.iter_mut() {
             match state {
                 ChunkState::Active { entity, .. } if !new_area.contains(*pos) => {
@@ -130,6 +142,7 @@ impl ChunkManager {
         self.visible_area = new_area;
     }
 
+    /// Returns a list of chunk positions that need to be loaded.
     fn get_chunks_to_load(&self) -> Vec<IVec2> {
         self.chunks
             .iter()
@@ -160,6 +173,7 @@ impl ChunkManager {
         );
     }
 
+    /// Marks a chunk as active once it has been successfully loaded.
     fn activate_chunk(&mut self, pos: IVec2, entity: Entity) {
         if let Some(ChunkState::Loading { .. }) = self.chunks.get(&pos) {
             self.chunks.insert(
@@ -179,12 +193,13 @@ impl ChunkManager {
         }
     }
 
+    /// Removes a chunk from the manager.
     fn remove_chunk(&mut self, pos: IVec2) {
         self.chunks.remove(&pos);
     }
 }
 
-// Systems
+// System to update the visible chunks based on the camera's position.
 fn update_chunks(
     camera: Query<(&Transform, &OrthographicProjection), With<Camera2d>>,
     state: Res<TerrainState>,
@@ -193,7 +208,7 @@ fn update_chunks(
     chunk_manager.update_visible_area(camera, &state);
 }
 
-// Generation and task handling systems
+/// System to clean up chunks marked for unloading.
 fn handle_chunk_loading(
     mut commands: Commands,
     mut chunk_manager: ResMut<ChunkManager>,
@@ -358,7 +373,7 @@ fn cleanup_stale_tasks(
     }
 }
 
-// Plugin
+/// Plugin to manage terrain chunks.
 pub struct ChunkManagerPlugin;
 
 impl Plugin for ChunkManagerPlugin {

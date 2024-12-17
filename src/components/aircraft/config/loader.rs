@@ -19,22 +19,22 @@ pub enum ConfigError {
 #[allow(non_snake_case)]
 #[derive(Debug, Deserialize)]
 pub struct RawAircraftConfig {
-    // Aircraft identification
+    /// Aircraft identification
     pub name: String,
 
-    // Mass properties
+    /// Mass properties
     pub mass: f64,
     pub ixx: f64,
     pub iyy: f64,
     pub izz: f64,
     pub ixz: f64,
 
-    // Geometry
+    /// Geometry
     pub wing_area: f64,
     pub wing_span: f64,
     pub mac: f64,
 
-    // Drag coefficients
+    /// Drag coefficients
     pub c_D_0: f64,
     pub c_D_alpha: f64,
     pub c_D_alpha_q: f64,
@@ -46,14 +46,14 @@ pub struct RawAircraftConfig {
     pub c_D_alpha3_q: f64,
     pub c_D_alpha4: f64,
 
-    // Side-force coefficients
+    /// Side-force coefficients
     pub c_Y_beta: f64,
     pub c_Y_p: f64,
     pub c_Y_r: f64,
     pub c_Y_deltaa: f64,
     pub c_Y_deltar: f64,
 
-    // Lift coefficients
+    /// Lift coefficients
     pub c_L_0: f64,
     pub c_L_alpha: f64,
     pub c_L_q: f64,
@@ -63,14 +63,14 @@ pub struct RawAircraftConfig {
     pub c_L_alpha3: f64,
     pub c_L_alpha4: f64,
 
-    // Roll coefficients
+    /// Roll coefficients
     pub c_l_beta: f64,
     pub c_l_p: f64,
     pub c_l_r: f64,
     pub c_l_deltaa: f64,
     pub c_l_deltar: f64,
 
-    // Pitch coefficients
+    /// Pitch coefficients
     pub c_m_0: f64,
     pub c_m_alpha: f64,
     pub c_m_q: f64,
@@ -82,7 +82,7 @@ pub struct RawAircraftConfig {
     pub c_m_alpha3_deltae: f64,
     pub c_m_alpha4: f64,
 
-    // Yaw coefficients
+    /// Yaw coefficients
     pub c_n_beta: f64,
     pub c_n_p: f64,
     pub c_n_r: f64,

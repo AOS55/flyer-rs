@@ -1,36 +1,66 @@
 use crate::systems::terrain::noise::NoiseLayer;
 use bevy::prelude::*;
 
+/// Configuration for different noise layers used to generate procedural terrain.
+/// The noise configuration includes separate settings for height, moisture, and rivers,
+/// allowing fine control over the appearance and features of the terrain.
 #[derive(Clone, Debug)]
 pub struct NoiseConfig {
+    /// Configuration for height noise, which controls the terrain elevation.
     pub height: HeightNoiseConfig,
+    /// Configuration for moisture noise, which determines the distribution of biomes or climate.
     pub moisture: MoistureNoiseConfig,
+    /// Configuration for river noise, which defines river shapes, flow, and related features.
     pub river: RiverNoiseConfig,
 }
 
+/// Configuration for generating height-based terrain noise.
+/// Controls the terrain elevation through multiple noise layers with varying scales and details.
 #[derive(Clone, Debug)]
 pub struct HeightNoiseConfig {
+    /// The overall scale of the height noise. Larger values produce smoother, broader features.
     pub scale: f32,
+    /// The number of noise octaves used. Each octave adds finer detail at smaller scales.
     pub octaves: u32,
+    /// The persistence factor for successive octaves. Lower values reduce the contribution of higher octaves.
     pub persistence: f32,
+    /// The lacunarity factor, which determines the frequency of each successive octave.
+    /// Larger values make higher octaves have greater frequency.
     pub lacunarity: f32,
+    /// A list of noise layers defining how different scales of noise combine to form the height map.
     pub layers: Vec<NoiseLayer>,
 }
 
+/// Configuration for generating moisture-based noise.
+/// Moisture noise is used to simulate climate zones and biome distribution.
 #[derive(Clone, Debug)]
 pub struct MoistureNoiseConfig {
+    /// The overall scale of the moisture noise. Larger values result in broader climate zones.
     pub scale: f32,
+    /// A list of noise layers that combine to create moisture variations.
     pub layers: Vec<NoiseLayer>,
 }
 
+/// Configuration for generating rivers within the terrain.
+/// This controls how rivers are shaped, their flow patterns, and erosion effects.
 #[derive(Clone, Debug)]
 pub struct RiverNoiseConfig {
+    /// The minimum source height for a river to originate.
+    /// Higher values prevent rivers from starting in low-lying areas.
     pub min_source_height: f32,
+    /// The meander factor, which determines how winding or straight rivers are.
     pub meander_factor: f32,
+    /// The minimum slope required for river flow.
+    /// Prevents rivers from forming on completely flat terrain.
     pub min_slope: f32,
+    /// The rate at which the river width increases as it flows downstream.
     pub width_growth_rate: f32,
+    /// The rate at which the river depth increases as it flows downstream.
     pub depth_growth_rate: f32,
+    /// The strength of erosion caused by the river, affecting the surrounding terrain.
     pub erosion_strength: f32,
+    /// The maximum allowable length of a river.
+    /// Limits how far a river can flow across the terrain.
     pub max_length: f32,
 }
 

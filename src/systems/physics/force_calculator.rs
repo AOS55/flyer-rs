@@ -3,6 +3,15 @@ use crate::resources::PhysicsConfig;
 use bevy::prelude::*;
 use nalgebra::Vector3;
 
+/// A system to calculate the net forces and moments acting on entities with a `PhysicsComponent`.
+/// It processes:
+/// - Gravitational force.
+/// - Forces and moments applied in different reference frames (Body, Inertial, Wind).
+/// The results are stored in the `net_force` and `net_moment` fields of the `PhysicsComponent`.
+///
+/// # Arguments
+/// - `query`: Query to access entities with both `PhysicsComponent` and `SpatialComponent`.
+/// - `config`: A resource containing global physics configuration parameters, like gravity.
 pub fn force_calculator_system(
     mut query: Query<(&mut PhysicsComponent, &SpatialComponent)>,
     config: Res<PhysicsConfig>,

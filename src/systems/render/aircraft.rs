@@ -3,6 +3,12 @@ use bevy::prelude::*;
 use crate::components::{AircraftRenderState, AircraftType, Attitude, DubinsAircraftState};
 use crate::resources::{AircraftAssets, Frame, PositionTransform, TransformationResource};
 
+/// System to update the rendering of aircraft entities based on their state.
+/// It adjusts the sprite's attitude (orientation), position, and rotation.
+///
+/// # Arguments
+/// - `query`: A query for entities with `DubinsAircraftState`, `AircraftRenderState`, `Sprite`, and `Transform`.
+/// - `transform_res`: A resource to handle position transformation (e.g., NED to screen coordinates).
 pub fn aircraft_render_system(
     mut query: Query<(
         &DubinsAircraftState,
@@ -34,6 +40,13 @@ pub fn aircraft_render_system(
     }
 }
 
+/// System to spawn aircraft sprites for entities that require them.
+/// It assigns a `Sprite` and `Transform` to entities based on their `AircraftType` and available assets.
+///
+/// # Arguments
+/// - `commands`: Used to insert components into entities.
+/// - `query`: Queries entities with `AircraftType` and `AircraftRenderState` but without a `Sprite`.
+/// - `aircraft_assets`: A resource containing aircraft textures and layouts.
 pub fn spawn_aircraft_sprite(
     mut commands: Commands,
     query: Query<(Entity, &AircraftType), (With<AircraftRenderState>, Without<Sprite>)>,

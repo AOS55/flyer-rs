@@ -4,12 +4,27 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Component, Debug, Clone, Serialize, Deserialize)]
 pub struct MassModel {
+    /// Total mass of the aircraft (Kg).
     pub mass: f64,
+    /// The inertia matrix (3x3) representing the moments and products of inertia.
     pub inertia: Matrix3<f64>,
+    /// Precomputed inverse of the inertia matrix.
     pub inertia_inv: Matrix3<f64>,
 }
 
 impl MassModel {
+    /// Creates a new `MassModel` instance with specified mass and inertia components.
+    ///
+    /// # Arguments
+    /// * `mass` - Total mass of the aircraft (kg).
+    /// * `ixx` - Moment of inertia about the x-axis (kg·m²).
+    /// * `iyy` - Moment of inertia about the y-axis (kg·m²).
+    /// * `izz` - Moment of inertia about the z-axis (kg·m²).
+    /// * `ixz` - Product of inertia between the x and z axes (kg·m²).
+    ///
+    /// # Returns
+    /// A `MassModel` instance with the specified parameters.
+    /// If the inertia matrix is not invertible, a zero matrix is used for the inverse, and a warning is logged.
     pub fn new(mass: f64, ixx: f64, iyy: f64, izz: f64, ixz: f64) -> Self {
         let inertia = Matrix3::from_columns(&[
             Vector3::new(ixx, 0.0, -ixz),

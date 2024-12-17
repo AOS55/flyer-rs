@@ -1,14 +1,27 @@
 use bevy::prelude::*;
 use serde::{Deserialize, Serialize};
 
+/// Configuration for the geometry of an aircraft.
 #[derive(Component, Debug, Clone, Serialize, Deserialize)]
 pub struct AircraftGeometry {
+    /// The total wing area of the aircraft (m²).
     pub wing_area: f64,
+    /// The wingspan of the aircraft (m).
     pub wing_span: f64,
+    /// The mean aerodynamic chord of the aircraft (m).
     pub mac: f64,
 }
 
 impl AircraftGeometry {
+    /// Creates a new `AircraftGeometry` instance with the specified parameters.
+    ///
+    /// # Arguments
+    /// * `wing_area` - The total wing area of the aircraft (m²).
+    /// * `wing_span` - The wing span of the aircraft (m).
+    /// * `mac` - The mean aerodynamic chord (m).
+    ///
+    /// # Returns
+    /// A new instance of `AircraftGeometry` initialized with the given values.
     pub fn new(wing_area: f64, wing_span: f64, mac: f64) -> Self {
         AircraftGeometry {
             wing_area,

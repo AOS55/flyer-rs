@@ -11,72 +11,123 @@ pub struct AircraftAeroCoefficients {
     pub yaw: YawCoefficients,
 }
 
+/// Drag coefficients for full aerodynamic model
 #[derive(Component, Debug, Clone, Copy, Serialize, Deserialize)]
 pub struct DragCoefficients {
+    // Base drag coefficient (zero angle of attack).
     pub c_d_0: f64,
+    /// Linear drag coefficient with respect to angle of attack (α).
     pub c_d_alpha: f64,
+    /// Drag coefficient due to angle of attack rate (α̇) and pitch rate (q).
     pub c_d_alpha_q: f64,
+    /// Drag coefficient due to angle of attack and elevator deflection.
     pub c_d_alpha_deltae: f64,
+    /// Quadratic drag coefficient with respect to angle of attack squared (α²).
     pub c_d_alpha2: f64,
+    /// Quadratic drag coefficient with respect to α² and angle of attack rate (α̇).
     pub c_d_alpha2_q: f64,
+    /// Quadratic drag coefficient with respect to α² and elevator deflection.
     pub c_d_alpha2_deltae: f64,
+    /// Cubic drag coefficient with respect to α³.
     pub c_d_alpha3: f64,
+    /// Cubic drag coefficient with respect to α³ and angle of attack rate (α̇).
     pub c_d_alpha3_q: f64,
+    /// Quartic drag coefficient with respect to α⁴.
     pub c_d_alpha4: f64,
 }
 
+/// Lift coefficients for full aerodynamic model
 #[derive(Component, Debug, Clone, Copy, Serialize, Deserialize)]
 pub struct LiftCoefficients {
+    /// Base lift coefficient (zero angle of attack).
     pub c_l_0: f64,
+    /// Linear lift coefficient with respect to angle of attack (α).
     pub c_l_alpha: f64,
+    /// Lift coefficient due to pitch rate (q).
     pub c_l_q: f64,
+    /// Lift coefficient due to elevator deflection.
     pub c_l_deltae: f64,
+    /// Combined lift coefficient due to angle of attack and pitch rate.
     pub c_l_alpha_q: f64,
+    /// Quadratic lift coefficient with respect to α².
     pub c_l_alpha2: f64,
+    /// Cubic lift coefficient with respect to α³.
     pub c_l_alpha3: f64,
+    /// Quartic lift coefficient with respect to α⁴.
     pub c_l_alpha4: f64,
 }
 
+/// Side force coefficients for full aerodynamic model
 #[derive(Component, Debug, Clone, Copy, Serialize, Deserialize)]
 pub struct SideForceCoefficients {
+    /// Side-force coefficient due to sideslip angle (β).
     pub c_y_beta: f64,
+    /// Side-force coefficient due to roll rate (p).
     pub c_y_p: f64,
+    /// Side-force coefficient due to yaw rate (r).
     pub c_y_r: f64,
+    /// Side-force coefficient due to aileron deflection.
     pub c_y_deltaa: f64,
+    /// Side-force coefficient due to rudder deflection.
     pub c_y_deltar: f64,
 }
 
+/// Roll coefficients for full aerodynamic model
 #[derive(Component, Debug, Clone, Copy, Serialize, Deserialize)]
 pub struct RollCoefficients {
+    /// Roll moment coefficient due to sideslip angle (β).
     pub c_l_beta: f64,
+    /// Roll moment coefficient due to roll rate (p).
     pub c_l_p: f64,
+    /// Roll moment coefficient due to yaw rate (r).
     pub c_l_r: f64,
+    /// Roll moment coefficient due to aileron deflection.
     pub c_l_deltaa: f64,
+    /// Roll moment coefficient due to rudder deflection.
     pub c_l_deltar: f64,
 }
 
+/// Pitch coefficients for full aerodynamic model
 #[derive(Component, Debug, Clone, Copy, Serialize, Deserialize)]
 pub struct PitchCoefficients {
+    /// Base pitch moment coefficient (zero angle of attack).
     pub c_m_0: f64,
+    /// Linear pitch moment coefficient with respect to angle of attack (α).
     pub c_m_alpha: f64,
+    /// Pitch moment coefficient due to pitch rate (q).
     pub c_m_q: f64,
+    /// Pitch moment coefficient due to elevator deflection.
     pub c_m_deltae: f64,
+    /// Combined pitch moment coefficient due to α and q.
     pub c_m_alpha_q: f64,
+    /// Quadratic pitch moment coefficient due to α² and q.
     pub c_m_alpha2_q: f64,
+    /// Quadratic pitch moment coefficient due to α² and elevator deflection.
     pub c_m_alpha2_deltae: f64,
+    /// Cubic pitch moment coefficient due to α³ and q.
     pub c_m_alpha3_q: f64,
+    /// Cubic pitch moment coefficient due to α³ and elevator deflection.
     pub c_m_alpha3_deltae: f64,
+    /// Quartic pitch moment coefficient with respect to α⁴.
     pub c_m_alpha4: f64,
 }
 
+/// Yaw coefficients for full aerodynamic model
 #[derive(Component, Debug, Clone, Copy, Serialize, Deserialize)]
 pub struct YawCoefficients {
+    /// Yaw moment coefficient due to sideslip angle (β).
     pub c_n_beta: f64,
+    /// Yaw moment coefficient due to roll rate (p).
     pub c_n_p: f64,
+    /// Yaw moment coefficient due to yaw rate (r).
     pub c_n_r: f64,
+    /// Yaw moment coefficient due to aileron deflection.
     pub c_n_deltaa: f64,
+    /// Yaw moment coefficient due to rudder deflection.
     pub c_n_deltar: f64,
+    /// Quadratic yaw moment coefficient due to β².
     pub c_n_beta2: f64,
+    /// Cubic yaw moment coefficient due to β³.
     pub c_n_beta3: f64,
 }
 
