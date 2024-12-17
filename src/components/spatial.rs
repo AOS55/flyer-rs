@@ -3,7 +3,7 @@ use nalgebra::{UnitQuaternion, Vector3};
 use serde::{Deserialize, Serialize};
 
 /// Component for storing spatial state of an entity
-#[derive(Component, Debug, Clone, Serialize, Deserialize)]
+#[derive(Component, Debug, Clone, Copy, Serialize, Deserialize)]
 pub struct SpatialComponent {
     /// Position in world space [m]
     pub position: Vector3<f64>,

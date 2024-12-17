@@ -80,7 +80,7 @@ impl Default for AirData {
     }
 }
 
-#[derive(Component, Debug, Clone, Serialize, Deserialize)]
+#[derive(Component, Debug, Clone, Copy, Serialize, Deserialize)]
 pub struct DubinsAircraftState {
     pub spatial: SpatialComponent,
     pub controls: DubinsAircraftControls,
@@ -147,7 +147,7 @@ impl DubinsAircraftState {
     }
 }
 
-#[derive(Component, Debug, Clone, Serialize, Deserialize)]
+#[derive(Component, Debug, Clone, Copy, Serialize, Deserialize)]
 pub struct DubinsAircraftControls {
     pub acceleration: f64,
     pub bank_angle: f64,
