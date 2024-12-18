@@ -3,6 +3,7 @@ mod aircraft;
 mod environment;
 mod physics;
 // mod render;
+mod agent;
 mod rewards;
 pub mod terrain;
 mod transformations;
@@ -14,6 +15,7 @@ pub use environment::{
 };
 pub use physics::PhysicsConfig;
 // pub use render::{RenderConfig, RenderScale};
+pub use agent::{AgentConfig, AgentState, SimulationMode};
 pub use rewards::RewardWeights;
 pub use terrain::{
     BiomeConfig, BiomeThresholds, FeatureConfig, HeightNoiseConfig, MoistureNoiseConfig,

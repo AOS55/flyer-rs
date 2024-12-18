@@ -39,6 +39,7 @@ fn spawn_camera(
     transform_res: Res<TransformationResource>,
 ) {
     // Attempt to get the single player entity from the query
+    // TODO: Handle the case where there are multiple player entities
     if let Ok(player_entity) = player_query.get_single() {
         // 1. Set the initial camera position in the NED (North-East-Down) coordinate system
         let initial_pos = Vector3::new(0.0, 0.0, 500.0);

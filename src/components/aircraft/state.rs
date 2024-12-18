@@ -199,3 +199,9 @@ impl Default for DubinsAircraftControls {
         }
     }
 }
+
+#[derive(Debug, Clone)]
+pub enum AircraftControls {
+    Dubins(DubinsAircraftControls),
+    Full(AircraftControlSurfaces),
+}

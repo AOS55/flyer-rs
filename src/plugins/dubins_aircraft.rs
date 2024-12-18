@@ -4,7 +4,7 @@ use crate::components::{
     AircraftRenderState, AircraftType, Attitude, DubinsAircraftConfig, DubinsAircraftState,
     PlayerController,
 };
-use crate::plugins::{AircraftPluginBase, SimplePhysicsSet, StartupSet};
+use crate::plugins::{AircraftPluginBase, Id, Identifier, SimplePhysicsSet, StartupSet};
 use crate::systems::{aircraft_render_system, dubins_aircraft_system, dubins_keyboard_system};
 
 /// A plugin to handle Dubins aircraft behavior, rendering, and input.
@@ -33,7 +33,10 @@ impl DubinsAircraftPlugin {
             config.clone(),
             DubinsAircraftState::random_position(config.random_start_config),
             PlayerController::new(),
-            Name::new(config.name.to_string()),
+            Name::new(config.name.to_string()), // Name of Bevy component
+            Identifier {
+                id: Id::Named(config.name.to_string()), // Id name
+            },
             AircraftRenderState {
                 attitude: Attitude::Level,
             },
