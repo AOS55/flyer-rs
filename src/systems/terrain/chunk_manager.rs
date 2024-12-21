@@ -75,10 +75,10 @@ struct ViewportArea {
 impl ViewportArea {
     /// Computes the visible area based on the camera's position and zoom.
     fn from_camera(
-        camera: Query<(&Transform, &OrthographicProjection), With<Camera2d>>,
+        transform: &Transform,
+        projection: &OrthographicProjection,
         state: &TerrainState,
     ) -> Self {
-        let (transform, projection) = camera.single();
         let pos = transform.translation.truncate();
         let chunk_pos = state.world_to_chunk(pos);
         let chunk_world_size = state.chunk_world_size();
@@ -105,10 +105,11 @@ impl ChunkManager {
     /// Updates the visible area based on the camera's position.
     fn update_visible_area(
         &mut self,
-        camera: Query<(&Transform, &OrthographicProjection), With<Camera2d>>,
+        camera_transform: &Transform,
+        camera_projection: &OrthographicProjection,
         state: &TerrainState,
     ) {
-        let new_area = ViewportArea::from_camera(camera, state);
+        let new_area = ViewportArea::from_camera(camera_transform, camera_projection, state);
 
         // Mark chunks outside the visible area for unloading
         for (pos, state) in self.chunks.iter_mut() {
@@ -205,7 +206,10 @@ fn update_chunks(
     state: Res<TerrainState>,
     mut chunk_manager: ResMut<ChunkManager>,
 ) {
-    chunk_manager.update_visible_area(camera, &state);
+    // chunk_manager.update_visible_area(camera, &state);
+    if let Some((camera_transform, camera_projection)) = camera.iter().next() {
+        chunk_manager.update_visible_area(camera_transform, camera_projection, &state);
+    }
 }
 
 /// System to clean up chunks marked for unloading.
