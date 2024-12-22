@@ -1,9 +1,11 @@
 use bevy::prelude::*;
 
-use crate::components::{AircraftState, FullAircraftConfig, SpatialComponent};
-use crate::plugins::{AircraftPluginBase, ComplexPhysicsSet, StartupSet};
-use crate::systems::{
-    aero_force_system, air_data_system, force_calculator_system, physics_integrator_system,
+use crate::{
+    components::{FullAircraftConfig, FullAircraftState, SpatialComponent},
+    plugins::{AircraftPluginBase, ComplexPhysicsSet, StartupStage},
+    systems::{
+        aero_force_system, air_data_system, force_calculator_system, physics_integrator_system,
+    },
 };
 
 /// Plugin to handle "Full Aircraft" systems.
@@ -34,7 +36,7 @@ impl FullAircraftPlugin {
     fn setup_aircraft(mut commands: Commands, config: FullAircraftConfig) {
         commands.spawn((
             config.clone(),
-            AircraftState::default(),
+            FullAircraftState::default(),
             SpatialComponent::default(),
             Name::new(config.name.to_string()),
         ));
@@ -47,35 +49,38 @@ impl Plugin for FullAircraftPlugin {
         let config = self.config.clone();
 
         // 1. Setup aircraft assets (textures, sprite layouts)
-        app.add_systems(Startup, (AircraftPluginBase::setup_assets,).chain())
-            // 2. Configure the physics update sets:
-            // AirData -> Aerodynamics -> Forces -> Integration
-            .configure_sets(
-                FixedUpdate,
-                (
-                    ComplexPhysicsSet::AirData,
-                    ComplexPhysicsSet::Aerodynamics,
-                    ComplexPhysicsSet::Forces,
-                    ComplexPhysicsSet::Integration,
-                )
-                    .chain(),
+        app.add_systems(
+            Startup,
+            (AircraftPluginBase::setup_assets,).in_set(StartupStage::BuildUtilities),
+        )
+        // 2. Configure the physics update sets:
+        // AirData -> Aerodynamics -> Forces -> Integration
+        .configure_sets(
+            FixedUpdate,
+            (
+                ComplexPhysicsSet::AirData,
+                ComplexPhysicsSet::Aerodynamics,
+                ComplexPhysicsSet::Forces,
+                ComplexPhysicsSet::Integration,
             )
-            // 3. Spawn the full aircraft entity during startup
-            .add_systems(
-                Startup,
-                (move |commands: Commands| Self::setup_aircraft(commands, config.clone()))
-                    .in_set(StartupSet::SpawnPlayer),
-            )
-            // 4. Add systems to handle full aircraft physics and integration
-            .add_systems(
-                FixedUpdate,
-                (
-                    air_data_system.in_set(ComplexPhysicsSet::AirData),
-                    aero_force_system.in_set(ComplexPhysicsSet::Aerodynamics),
-                    force_calculator_system.in_set(ComplexPhysicsSet::Forces),
-                    physics_integrator_system.in_set(ComplexPhysicsSet::Integration),
-                ),
-            );
+                .chain(),
+        )
+        // 3. Spawn the full aircraft entity during startup
+        .add_systems(
+            Startup,
+            (move |commands: Commands| Self::setup_aircraft(commands, config.clone()))
+                .in_set(StartupStage::BuildAircraft),
+        )
+        // 4. Add systems to handle full aircraft physics and integration
+        .add_systems(
+            FixedUpdate,
+            (
+                air_data_system.in_set(ComplexPhysicsSet::AirData),
+                aero_force_system.in_set(ComplexPhysicsSet::Aerodynamics),
+                force_calculator_system.in_set(ComplexPhysicsSet::Forces),
+                physics_integrator_system.in_set(ComplexPhysicsSet::Integration),
+            ),
+        );
 
         // 5. Set the fixed timestep resource for physics calculations
         app.init_resource::<Time<Fixed>>()

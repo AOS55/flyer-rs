@@ -1,10 +1,12 @@
 use bevy::prelude::*;
 use nalgebra::Vector3;
 
-use crate::components::{CameraComponent, PlayerController};
-use crate::plugins::StartupSet;
-use crate::resources::TransformationResource;
-use crate::systems::camera_follow_system;
+use crate::{
+    components::{CameraComponent, PlayerController},
+    plugins::StartupStage,
+    resources::TransformationResource,
+    systems::camera_follow_system,
+};
 
 /// Plugin to manage the camera setup and behavior in the game.
 /// - Spawns the camera at startup.
@@ -17,7 +19,7 @@ impl Plugin for CameraPlugin {
         app.add_systems(
             // Run the camera spawn system during the startup phase
             Startup,
-            spawn_camera.in_set(StartupSet::SpawnCamera),
+            spawn_camera.in_set(StartupStage::BuildCameras),
         )
         .add_systems(
             // Run the camera-follow system during fixed updates for consistent movement
@@ -57,7 +59,7 @@ fn spawn_camera(
             },
             Transform::from_translation(render_pos), // Set the camera position in world space
             GlobalTransform::default(),              // Initialize the global transform
-            // Our custom camera component
+            // The custom camera component
             CameraComponent {
                 target: Some(player_entity), // Set the player entity as the target for the camera
                 ..default()

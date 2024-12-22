@@ -17,6 +17,7 @@ name = "flyer"
 tiny-skia = "0.11.1"
 image = "0.24.7"
 bevy = { version = "0.15" }
+crossbeam-channel = "0.5.14"
 
 # Math and physics
 glam = { version = "0.24.2", features = ["mint", "serde"] }
@@ -47,6 +48,7 @@ thiserror = "1.0"
 uuid = { version = "1.11", features = ["v4", "serde"] }
 petgraph = "0.6"
 tempfile = "3.8"
+pyo3 = { version = "0.23.3", features = ["extension-module"] }
 
 [dev-dependencies]
 pretty_assertions = "1.4"

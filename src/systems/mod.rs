@@ -16,3 +16,4 @@ pub use controller::{dubins_gym_control_system, dubins_keyboard_system};
 pub use dubins::dubins_aircraft_system;
 pub use physics::{force_calculator_system, physics_integrator_system};
 pub use render::{aircraft_render_system, spawn_aircraft_sprite};
+pub use terrain::{ChunkManagerPlugin, TerrainGeneratorSystem};

@@ -7,7 +7,7 @@ use crate::components::{PhysicsComponent, RandomStartPosConfig, SpatialComponent
 
 /// Represents the overall state of an aircraft.
 #[derive(Component, Debug, Clone, Serialize, Deserialize)]
-pub struct AircraftState {
+pub struct FullAircraftState {
     /// Aerodynamic data of the aircraft (e.g., airspeed, angle of attack).
     pub air_data: AirData,
     /// Positions of control surfaces like elevator, aileron, rudder, and flaps.
@@ -18,7 +18,7 @@ pub struct AircraftState {
     pub physics: PhysicsComponent,
 }
 
-impl Default for AircraftState {
+impl Default for FullAircraftState {
     /// Provides a default state for the aircraft.
     /// Default values are based on the Twin Otter aircraft configuration.
     fn default() -> Self {
@@ -39,7 +39,7 @@ impl Default for AircraftState {
 }
 
 /// Represents the positions of the aircraft's control surfaces.
-#[derive(Component, Debug, Clone, Serialize, Deserialize)]
+#[derive(Component, Debug, Clone, Serialize, Deserialize, Copy)]
 pub struct AircraftControlSurfaces {
     /// Elevator deflection (radians).
     pub elevator: f64,
@@ -200,8 +200,14 @@ impl Default for DubinsAircraftControls {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub enum AircraftControls {
     Dubins(DubinsAircraftControls),
     Full(AircraftControlSurfaces),
+}
+
+#[derive(Debug, Clone)]
+pub enum AircraftState {
+    Dubins(DubinsAircraftState),
+    Full(FullAircraftState),
 }

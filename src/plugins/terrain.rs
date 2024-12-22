@@ -1,9 +1,12 @@
 use bevy::prelude::*;
 use std::collections::HashMap;
 
-use crate::components::terrain::*;
-use crate::resources::terrain::{TerrainAssets, TerrainConfig, TerrainState};
-use crate::systems::terrain::{ChunkManagerPlugin, TerrainGeneratorSystem};
+use crate::{
+    components::terrain::*,
+    plugins::StartupStage,
+    resources::{TerrainAssets, TerrainConfig, TerrainState},
+    systems::{ChunkManagerPlugin, TerrainGeneratorSystem},
+};
 
 /// Startup sets for organizing the initialization sequence of the terrain plugin.
 #[derive(SystemSet, Debug, Hash, PartialEq, Eq, Clone)]
@@ -150,19 +153,30 @@ impl Plugin for TerrainPlugin {
         // Setup configuration
         .add_systems(
             Startup,
-            Self::setup_config_with_initial(config).in_set(TerrainStartupSet::Config),
+            Self::setup_config_with_initial(config)
+                .in_set(TerrainStartupSet::Config)
+                .in_set(StartupStage::BuildTerrain),
         )
         // Setup state
-        .add_systems(Startup, Self::setup_state.in_set(TerrainStartupSet::State))
+        .add_systems(
+            Startup,
+            Self::setup_state
+                .in_set(TerrainStartupSet::State)
+                .in_set(StartupStage::BuildTerrain),
+        )
         // Setup assets
         .add_systems(
             Startup,
-            Self::setup_assets.in_set(TerrainStartupSet::Assets),
+            Self::setup_assets
+                .in_set(TerrainStartupSet::Assets)
+                .in_set(StartupStage::BuildTerrain),
         )
         // Setup terrain generator
         .add_systems(
             Startup,
-            Self::setup_generator.in_set(TerrainStartupSet::Generator),
+            Self::setup_generator
+                .in_set(TerrainStartupSet::Generator)
+                .in_set(StartupStage::BuildTerrain),
         )
         // Integrate chunk management systems
         .add_plugins(ChunkManagerPlugin);

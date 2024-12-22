@@ -15,11 +15,11 @@ pub use environment::{
 };
 pub use physics::PhysicsConfig;
 // pub use render::{RenderConfig, RenderScale};
-pub use agent::{AgentConfig, AgentState, SimulationMode};
+pub use agent::{AgentConfig, AgentState, RenderMode};
 pub use rewards::RewardWeights;
 pub use terrain::{
     BiomeConfig, BiomeThresholds, FeatureConfig, HeightNoiseConfig, MoistureNoiseConfig,
-    NoiseConfig, RenderConfig, RiverNoiseConfig, TerrainConfig,
+    NoiseConfig, RenderConfig, RiverNoiseConfig, TerrainAssets, TerrainConfig, TerrainState,
 };
 pub use transformations::{
     AttitudeTransform, Frame, PositionTransform, ScaleTransform, TransformError,

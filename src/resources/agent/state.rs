@@ -1,6 +1,6 @@
-use crate::components::AircraftControls;
+use crate::components::{AircraftControls, AircraftState};
 use crate::plugins::Id;
-use crate::resources::agent::config::{AgentConfig, SimulationMode};
+use crate::resources::agent::config::{AgentConfig, RenderMode};
 use bevy::prelude::*;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
@@ -11,11 +11,11 @@ pub struct AgentState {
     pub episode_count: u32,
     pub current_step: u32,
 
-    pub state_buffer: Arc<Mutex<HashMap<Id, Vec<f64>>>>,
+    pub state_buffer: Arc<Mutex<HashMap<Id, AircraftState>>>,
     pub action_queue: Arc<Mutex<HashMap<Id, AircraftControls>>>,
     pub render_buffer: Arc<Mutex<Option<Vec<u8>>>>,
 
-    pub mode: SimulationMode,
+    pub mode: RenderMode,
     pub terminated: bool,
     pub truncated: bool,
 }

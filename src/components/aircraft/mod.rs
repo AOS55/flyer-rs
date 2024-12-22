@@ -9,5 +9,5 @@ pub use config::{
 pub use render::{AircraftRenderState, Attitude};
 pub use state::{
     AirData, AircraftControlSurfaces, AircraftControls, AircraftState, DubinsAircraftControls,
-    DubinsAircraftState,
+    DubinsAircraftState, FullAircraftState,
 };

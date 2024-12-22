@@ -1,11 +1,13 @@
 use bevy::prelude::*;
 
-use crate::components::{
-    AircraftRenderState, AircraftType, Attitude, DubinsAircraftConfig, DubinsAircraftState,
-    PlayerController,
+use crate::{
+    components::{
+        AircraftRenderState, AircraftType, Attitude, DubinsAircraftConfig, DubinsAircraftState,
+        PlayerController,
+    },
+    plugins::{AircraftPluginBase, Id, Identifier, SimplePhysicsSet, StartupStage},
+    systems::{aircraft_render_system, dubins_aircraft_system, dubins_keyboard_system},
 };
-use crate::plugins::{AircraftPluginBase, Id, Identifier, SimplePhysicsSet, StartupSet};
-use crate::systems::{aircraft_render_system, dubins_aircraft_system, dubins_keyboard_system};
 
 /// A plugin to handle Dubins aircraft behavior, rendering, and input.
 /// Dubins aircraft follow simplified motion rules, suitable for lightweight physics simulations.
@@ -51,27 +53,30 @@ impl Plugin for DubinsAircraftPlugin {
         let config = self.config.clone(); // Clone the config here
 
         // 1. Load and setup the aircraft assets (textures, layouts).
-        app.add_systems(Startup, (AircraftPluginBase::setup_assets,).chain())
-            // 2. Configure the physics update pipeline into Input -> Update.
-            .configure_sets(
-                FixedUpdate,
-                (SimplePhysicsSet::Input, SimplePhysicsSet::Update).chain(),
-            )
-            // 3. Spawn the Dubins aircraft entity during the startup phase.
-            .add_systems(
-                Startup,
-                (move |commands: Commands| Self::setup_aircraft(commands, config.clone()))
-                    .in_set(StartupSet::SpawnPlayer), // Configure the system, not its result
-            )
-            // 4. Add systems to handle input, update physics, and render the Dubins aircraft.
-            .add_systems(
-                FixedUpdate,
-                (
-                    dubins_keyboard_system.in_set(SimplePhysicsSet::Input),
-                    dubins_aircraft_system.in_set(SimplePhysicsSet::Update),
-                    aircraft_render_system,
-                ),
-            );
+        app.add_systems(
+            Startup,
+            (AircraftPluginBase::setup_assets).in_set(StartupStage::BuildUtilities),
+        )
+        // 2. Configure the physics update pipeline into Input -> Update.
+        .configure_sets(
+            FixedUpdate,
+            (SimplePhysicsSet::Input, SimplePhysicsSet::Update).chain(),
+        )
+        // 3. Spawn the Dubins aircraft entity during the startup phase.
+        .add_systems(
+            Startup,
+            (move |commands: Commands| Self::setup_aircraft(commands, config.clone()))
+                .in_set(StartupStage::BuildAircraft), // Configure the system, not its result
+        )
+        // 4. Add systems to handle input, update physics, and render the Dubins aircraft.
+        .add_systems(
+            FixedUpdate,
+            (
+                dubins_keyboard_system.in_set(SimplePhysicsSet::Input),
+                dubins_aircraft_system.in_set(SimplePhysicsSet::Update),
+                aircraft_render_system,
+            ),
+        );
 
         // 5. Initialize the fixed timestep resource for the physics simulation.
         app.init_resource::<Time<Fixed>>()
