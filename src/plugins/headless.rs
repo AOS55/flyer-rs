@@ -29,7 +29,7 @@ use std::{
 
 use crate::{
     components::{CameraComponent, PlayerController},
-    plugins::StartupStage,
+    plugins::{LatestFrame, StartupStage},
     resources::TransformationResource,
 };
 
@@ -68,7 +68,8 @@ impl Plugin for HeadlessPlugin {
             AssetPlugin::default()
         };
 
-        app.insert_resource(SceneController::new(self.width, self.height, false))
+        app.insert_resource(SceneController::new(self.width, self.height))
+            .insert_resource(LatestFrame::new(self.width, self.height))
             .insert_resource(ClearColor(Color::srgb_u8(0, 0, 0)))
             .add_plugins(
                 DefaultPlugins
@@ -141,20 +142,16 @@ struct RenderWorldSender(Sender<Vec<u8>>);
 #[derive(Debug, Default, Resource)]
 struct SceneController {
     state: SceneState,
-    name: String,
     width: u32,
     height: u32,
-    single_image: bool,
 }
 
 impl SceneController {
-    pub fn new(width: u32, height: u32, single_image: bool) -> SceneController {
+    pub fn new(width: u32, height: u32) -> SceneController {
         SceneController {
             state: SceneState::BuildScene,
-            name: String::from(""),
             width,
             height,
-            single_image,
         }
     }
 }
@@ -231,7 +228,6 @@ fn setup_render_target(
     commands.spawn(ImageToSave(cpu_image_handle));
 
     scene_controller.state = SceneState::Render(pre_roll_frames);
-    scene_controller.name = scene_name;
     RenderTarget::Image(render_target_image_handle)
 }
 
@@ -387,8 +383,7 @@ fn update(
     receiver: Res<MainWorldReceiver>,
     mut images: ResMut<Assets<Image>>,
     mut scene_controller: ResMut<SceneController>,
-    mut app_exit_writer: EventWriter<AppExit>,
-    mut file_number: Local<u32>,
+    mut latest_frame: ResMut<LatestFrame>,
 ) {
     if let SceneState::Render(n) = scene_controller.state {
         if n < 1 {
@@ -396,8 +391,7 @@ fn update(
             // so we use try_recv which attempts to receive without blocking
             let mut image_data = Vec::new();
             while let Ok(data) = receiver.try_recv() {
-                // image generation could be faster than saving to fs,
-                // that's why use only last of them
+                // keep only the latest frame
                 image_data = data;
             }
             if !image_data.is_empty() {
@@ -405,48 +399,25 @@ fn update(
                     // Fill correct data from channel to image
                     let img_bytes = images.get_mut(image.id()).unwrap();
 
-                    // We need to ensure that this works regardless of the image dimensions
-                    // If the image became wider when copying from the texture to the buffer,
-                    // then the data is reduced to its original size when copying from the buffer to the image.
+                    // Handle padding alignment
                     let row_bytes = img_bytes.width() as usize
                         * img_bytes.texture_descriptor.format.pixel_size();
                     let aligned_row_bytes = RenderDevice::align_copy_bytes_per_row(row_bytes);
-                    if row_bytes == aligned_row_bytes {
-                        img_bytes.data.clone_from(&image_data);
+
+                    let final_data = if row_bytes == aligned_row_bytes {
+                        image_data.clone()
                     } else {
-                        // shrink data to original image size
-                        img_bytes.data = image_data
+                        // Remove padding to get original image size
+                        image_data
                             .chunks(aligned_row_bytes)
                             .take(img_bytes.height() as usize)
                             .flat_map(|row| &row[..row_bytes.min(row.len())])
                             .cloned()
-                            .collect();
-                    }
-
-                    // Create RGBA Image Buffer
-                    let img = match img_bytes.clone().try_into_dynamic() {
-                        Ok(img) => img.to_rgba8(),
-                        Err(e) => panic!("Failed to create image buffer {e:?}"),
+                            .collect()
                     };
 
-                    // Prepare directory for images, test_images in bevy folder is used here for example
-                    // You should choose the path depending on your needs
-                    let images_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("test_images");
-                    info!("Saving image to: {images_dir:?}");
-                    std::fs::create_dir_all(&images_dir).unwrap();
-
-                    // Choose filename starting from 000.png
-                    let image_path = images_dir.join(format!("{:03}.png", file_number.deref()));
-                    *file_number.deref_mut() += 1;
-
-                    // Finally saving image to file, this heavy blocking operation is kept here
-                    // for example simplicity, but in real app you should move it to a separate task
-                    if let Err(e) = img.save(image_path) {
-                        panic!("Failed to save image: {e}");
-                    };
-                }
-                if scene_controller.single_image {
-                    app_exit_writer.send(AppExit::Success);
+                    // Update the latest frame resource
+                    latest_frame.update(final_data);
                 }
             }
         } else {

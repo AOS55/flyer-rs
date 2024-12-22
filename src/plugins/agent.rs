@@ -5,6 +5,27 @@ use crate::{
 
 use bevy::prelude::*;
 
+#[derive(Resource, Default)]
+pub struct LatestFrame {
+    pub data: Vec<u8>,
+    pub width: u32,
+    pub height: u32,
+}
+
+impl LatestFrame {
+    pub fn new(width: u32, height: u32) -> Self {
+        Self {
+            data: Vec::new(),
+            width,
+            height,
+        }
+    }
+
+    pub fn update(&mut self, data: Vec<u8>) {
+        self.data = data;
+    }
+}
+
 /// Plugin that manages agent interactions with the simulation
 pub struct AgentPlugin {
     config: AgentConfig,

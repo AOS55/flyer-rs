@@ -8,7 +8,7 @@ mod staging;
 pub mod terrain;
 mod transformation;
 
-pub use agent::{AgentPlugin, Id, Identifier};
+pub use agent::{AgentPlugin, Id, Identifier, LatestFrame};
 pub use aircraft::{add_aircraft_plugin, AircraftPluginBase, ComplexPhysicsSet, SimplePhysicsSet};
 pub use camera::CameraPlugin;
 pub use dubins_aircraft::DubinsAircraftPlugin;
