@@ -8,6 +8,13 @@ pub enum StartupStage {
     BuildTerrain,
 }
 
+#[derive(SystemSet, Debug, Hash, PartialEq, Eq, Clone)]
+pub enum UpdateStage {
+    UpdateAction,
+    UpdateBevy,
+    UpdateStates,
+}
+
 pub struct StartupSequencePlugin;
 
 impl Plugin for StartupSequencePlugin {
@@ -19,6 +26,22 @@ impl Plugin for StartupSequencePlugin {
                 StartupStage::BuildAircraft,
                 StartupStage::BuildCameras,
                 StartupStage::BuildTerrain,
+            )
+                .chain(),
+        );
+    }
+}
+
+pub struct UpdateSequencePlugin;
+
+impl Plugin for UpdateSequencePlugin {
+    fn build(&self, app: &mut App) {
+        app.configure_sets(
+            Update,
+            (
+                UpdateStage::UpdateAction,
+                UpdateStage::UpdateBevy,
+                UpdateStage::UpdateStates,
             )
                 .chain(),
         );
