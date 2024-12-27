@@ -15,7 +15,10 @@ pub use environment::{
 };
 pub use physics::PhysicsConfig;
 // pub use render::{RenderConfig, RenderScale};
-pub use agent::{AgentConfig, AgentState, RenderMode};
+pub use agent::{
+    step_condition, AgentConfig, AgentState, RenderMode, StepCommand, UpdateControl,
+    UpdateControlPlugin, UpdateMode,
+};
 pub use rewards::RewardWeights;
 pub use terrain::{
     BiomeConfig, BiomeThresholds, FeatureConfig, HeightNoiseConfig, MoistureNoiseConfig,

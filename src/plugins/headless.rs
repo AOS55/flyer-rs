@@ -83,9 +83,9 @@ impl Plugin for HeadlessPlugin {
             )
             .add_plugins(ImageCopyPlugin)
             .add_plugins(CaptureFramePlugin)
-            // .add_plugins(ScheduleRunnerPlugin::run_loop(Duration::from_secs_f64(
-            //     1.0 / 60.0,
-            // )))
+            .add_plugins(ScheduleRunnerPlugin::run_loop(Duration::from_secs_f64(
+                1.0 / 60.0,
+            )))
             .init_resource::<SceneController>()
             .add_systems(Startup, setup.in_set(StartupStage::BuildCameras));
     }

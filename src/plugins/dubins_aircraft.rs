@@ -6,6 +6,7 @@ use crate::{
         PlayerController,
     },
     plugins::{AircraftPluginBase, Id, Identifier, SimplePhysicsSet, StartupStage},
+    resources::{step_condition, UpdateControl, UpdateMode},
     systems::{aircraft_render_system, dubins_aircraft_system, dubins_keyboard_system},
 };
 
@@ -75,7 +76,8 @@ impl Plugin for DubinsAircraftPlugin {
                 dubins_keyboard_system.in_set(SimplePhysicsSet::Input),
                 dubins_aircraft_system.in_set(SimplePhysicsSet::Update),
                 aircraft_render_system,
-            ),
+            )
+                .run_if(step_condition),
         );
 
         // 5. Initialize the fixed timestep resource for the physics simulation.
