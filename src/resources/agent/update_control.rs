@@ -2,12 +2,12 @@ use bevy::prelude::*;
 
 #[derive(Event)]
 pub struct StepCommand {
-    pub steps: u32,
+    pub steps: usize,
 }
 
 #[derive(Resource, Debug)]
 pub struct UpdateControl {
-    pub remaining_steps: u32,
+    pub remaining_steps: usize,
     pub mode: UpdateMode,
 }
 
@@ -50,7 +50,7 @@ impl UpdateControl {
         }
     }
 
-    pub fn set_steps(&mut self, steps: u32) {
+    pub fn set_steps(&mut self, steps: usize) {
         self.remaining_steps = steps;
     }
 }
