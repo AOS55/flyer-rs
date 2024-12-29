@@ -33,4 +33,20 @@ impl AgentState {
             truncated: false,
         }
     }
+
+    pub fn reset(&mut self) {
+        self.episode_count += 1;
+        self.current_step = 0;
+
+        if let Ok(mut buffer) = self.state_buffer.lock() {
+            buffer.clear();
+        }
+
+        if let Ok(mut queue) = self.action_queue.lock() {
+            queue.clear();
+        }
+
+        self.terminated = false;
+        self.truncated = false;
+    }
 }

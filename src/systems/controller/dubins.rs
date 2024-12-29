@@ -2,6 +2,10 @@ use bevy::prelude::*;
 
 use crate::components::{DubinsAircraftControls, DubinsAircraftState, PlayerController};
 
+/// System for controlling a Dubins aircraft using keyboard input.
+///
+/// This system maps specific keyboard inputs to control the aircraft's acceleration,
+/// bank angle, and vertical speed. The controls are only applied to the player-controlled aircraft.
 pub fn dubins_keyboard_system(
     mut query: Query<&mut DubinsAircraftState, With<PlayerController>>,
     keyboard: Res<ButtonInput<KeyCode>>,
@@ -23,6 +27,11 @@ pub fn dubins_keyboard_system(
     }
 }
 
+/// System for controlling a Dubins aircraft via external actions (e.g., gym interface).
+///
+/// This system applies externally provided control inputs (e.g., from reinforcement learning
+/// agents or simulation scripts) to the player-controlled aircraft. It replaces the current
+/// controls with the provided action.
 pub fn dubins_gym_control_system(
     mut query: Query<&mut DubinsAircraftState, With<PlayerController>>,
     action: DubinsAircraftControls,

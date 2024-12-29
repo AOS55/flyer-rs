@@ -4,12 +4,24 @@ use aerso::{AeroEffect, AirState};
 use nalgebra::Vector3;
 use std::f64::consts::PI;
 
+/// Adapter system for interfacing aircraft aerodynamic computations with the Aerso library.
+///
+/// This adapter computes aerodynamic forces and moments based on aircraft geometry,
+/// control surface deflections, and aerodynamic coefficients. It is designed to integrate
+/// with the Aerso library's `AeroEffect` trait for seamless simulation.
 pub struct AersoAdapter {
+    /// Geometric properties of the aircraft (e.g., wing area, wing span, MAC).
     geometry: AircraftGeometry,
+    /// Aerodynamic coefficients defining lift, drag, side force, and moments.
     coefficients: AircraftAeroCoefficients,
 }
 
 impl AersoAdapter {
+    /// Constructs a new `AersoAdapter` with the given geometry and aerodynamic coefficients.
+    ///
+    /// # Arguments
+    /// * `geometry` - The physical properties of the aircraft.
+    /// * `coefficients` - The aerodynamic coefficients for the aircraft model.
     pub fn new(geometry: AircraftGeometry, coefficients: AircraftAeroCoefficients) -> Self {
         Self {
             coefficients,
@@ -17,6 +29,17 @@ impl AersoAdapter {
         }
     }
 
+    /// Computes aerodynamic forces and moments acting on the aircraft.
+    ///
+    /// # Arguments
+    /// * `air_state` - The current air state (e.g., alpha, beta, airspeed).
+    /// * `control_surfaces` - Current deflections of control surfaces (e.g., ailerons, rudder).
+    /// * `rates` - Angular rates of the aircraft in body frame coordinates.
+    ///
+    /// # Returns
+    /// A tuple containing:
+    /// * `Vector3<f64>` - Forces in the body frame.
+    /// * `Vector3<f64>` - Moments in the body frame.
     fn compute_forces(
         &self,
         air_state: &AirState<f64>,
@@ -26,18 +49,19 @@ impl AersoAdapter {
         let controls = &control_surfaces;
         let coeffs = &self.coefficients;
 
-        // Clamp the angles and rates like in the reference implementation
+        // Clamp angles of attack, sideslip, and angular rates to limit valid ranges.
         let alpha = air_state.alpha.clamp(-10.0 * PI / 180.0, 40.0 * PI / 180.0);
         let beta = air_state.beta.clamp(-20.0 * PI / 180.0, 20.0 * PI / 180.0);
         let p = rates.x.clamp(-100.0 * PI / 180.0, 100.0 * PI / 180.0);
         let q = rates.y.clamp(-50.0 * PI / 180.0, 50.0 * PI / 180.0);
         let r = rates.z.clamp(-50.0 * PI / 180.0, 50.0 * PI / 180.0);
 
-        // Non-dimensional rates
+        // Compute non-dimensional angular rates.
         let p_hat = (self.geometry.wing_span * p) / (2.0 * air_state.airspeed);
         let q_hat = (self.geometry.mac * q) / (2.0 * air_state.airspeed);
         let r_hat = (self.geometry.wing_span * r) / (2.0 * air_state.airspeed);
-        // Calculate coefficients following the reference implementation
+
+        // Aerodynamic force and moment coefficients.
         let c_d = coeffs.drag.c_d_0
             + (coeffs.drag.c_d_alpha * alpha)
             + (coeffs.drag.c_d_alpha_q * alpha * q_hat)
@@ -89,13 +113,14 @@ impl AersoAdapter {
             + (coeffs.yaw.c_n_beta2 * beta.powi(2))
             + (coeffs.yaw.c_n_beta3 * beta.powi(3));
 
-        // Calculate forces and moments
+        // Compute aerodynamic forces in the body frame.
         let forces = Vector3::new(
             -air_state.q * self.geometry.wing_area * c_d,
             air_state.q * self.geometry.wing_area * c_y,
             -air_state.q * self.geometry.wing_area * c_l,
         );
 
+        // Compute aerodynamic moments in the body frame.
         let moments = Vector3::new(
             air_state.q * self.geometry.wing_span * self.geometry.wing_area * c_l_roll,
             air_state.q * self.geometry.mac * self.geometry.wing_area * c_m,
@@ -105,6 +130,13 @@ impl AersoAdapter {
         (forces, moments)
     }
 
+    /// Generates a vector of inputs representing control surface deflections.
+    ///
+    /// # Arguments
+    /// * `controls` - Current state of control surfaces.
+    ///
+    /// # Returns
+    /// A vector of normalized control inputs: [aileron, elevator, rudder, flaps].
     #[allow(dead_code)]
     pub fn create_input_vector(&self, controls: &AircraftControlSurfaces) -> Vec<f64> {
         vec![
@@ -117,6 +149,18 @@ impl AersoAdapter {
 }
 
 impl AeroEffect<Vec<f64>> for AersoAdapter {
+    /// Computes aerodynamic forces and moments based on the current air state, angular rates,
+    /// and control inputs.
+    ///
+    /// # Arguments
+    /// * `airstate` - The current air state (e.g., alpha, beta, airspeed).
+    /// * `rates` - Angular rates of the aircraft in body frame coordinates.
+    /// * `input` - A vector of control surface inputs.
+    ///
+    /// # Returns
+    /// A tuple containing:
+    /// * `Force<f64>` - Aerodynamic forces in the body frame.
+    /// * `Torque<f64>` - Aerodynamic moments in the body frame.
     fn get_effect(
         &self,
         airstate: AirState<f64>,

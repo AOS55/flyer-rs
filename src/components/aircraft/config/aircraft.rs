@@ -1,6 +1,6 @@
 use bevy::prelude::*;
 use core::fmt::Debug;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 
 use crate::components::aircraft::config::{ConfigError, RawAircraftConfig};
@@ -144,7 +144,7 @@ pub enum AircraftSource {
 }
 
 /// Enumeration of available aircraft types.
-#[derive(Component, Debug, Clone, Deserialize, Hash, PartialEq, Eq)]
+#[derive(Component, Debug, Clone, Serialize, Deserialize, Hash, PartialEq, Eq)]
 pub enum AircraftType {
     TwinOtter,
     F4Phantom,

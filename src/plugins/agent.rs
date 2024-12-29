@@ -1,6 +1,6 @@
 use crate::{
-    resources::{AgentConfig, AgentState, RenderMode},
-    systems::{apply_action, capture_frame, collect_state, ScreenshotState},
+    resources::{AgentConfig, AgentState},
+    systems::{apply_action, collect_state},
 };
 
 use bevy::prelude::*;
@@ -40,6 +40,15 @@ pub enum Id {
 #[derive(Component, Hash, Eq, PartialEq, Debug, Clone)]
 pub struct Identifier {
     pub id: Id,
+}
+
+impl Identifier {
+    pub fn to_string(&self) -> String {
+        match &self.id {
+            Id::Named(name) => name.clone(),
+            Id::Entity(entity) => entity.to_string(),
+        }
+    }
 }
 
 #[derive(SystemSet, Debug, Hash, PartialEq, Eq, Clone)]

@@ -1,10 +1,11 @@
 use crate::systems::terrain::noise::NoiseLayer;
 use bevy::prelude::*;
+use serde::{Deserialize, Serialize};
 
 /// Configuration for different noise layers used to generate procedural terrain.
 /// The noise configuration includes separate settings for height, moisture, and rivers,
 /// allowing fine control over the appearance and features of the terrain.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct NoiseConfig {
     /// Configuration for height noise, which controls the terrain elevation.
     pub height: HeightNoiseConfig,
@@ -16,7 +17,7 @@ pub struct NoiseConfig {
 
 /// Configuration for generating height-based terrain noise.
 /// Controls the terrain elevation through multiple noise layers with varying scales and details.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct HeightNoiseConfig {
     /// The overall scale of the height noise. Larger values produce smoother, broader features.
     pub scale: f32,
@@ -33,7 +34,7 @@ pub struct HeightNoiseConfig {
 
 /// Configuration for generating moisture-based noise.
 /// Moisture noise is used to simulate climate zones and biome distribution.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct MoistureNoiseConfig {
     /// The overall scale of the moisture noise. Larger values result in broader climate zones.
     pub scale: f32,
@@ -43,7 +44,7 @@ pub struct MoistureNoiseConfig {
 
 /// Configuration for generating rivers within the terrain.
 /// This controls how rivers are shaped, their flow patterns, and erosion effects.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct RiverNoiseConfig {
     /// The minimum source height for a river to originate.
     /// Higher values prevent rivers from starting in low-lying areas.

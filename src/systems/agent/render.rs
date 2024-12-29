@@ -11,6 +11,11 @@ pub struct ScreenshotState {
     triggered: bool,
 }
 
+/// System for capturing and processing screenshots.
+///
+/// This system triggers a screenshot of the primary window and captures its pixel data
+/// when the screenshot is ready. The captured image data is stored in the `AgentState`
+/// resource's render buffer for further processing or analysis.
 pub fn capture_frame(
     mut commands: Commands,
     mut events: EventReader<ScreenshotCaptured>,

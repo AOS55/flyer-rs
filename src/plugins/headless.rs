@@ -1,5 +1,5 @@
 use bevy::{
-    app::{AppExit, ScheduleRunnerPlugin},
+    app::ScheduleRunnerPlugin,
     image::TextureFormatPixelInfo,
     prelude::*,
     render::{
@@ -18,8 +18,6 @@ use bevy::{
 use crossbeam_channel::{Receiver, Sender};
 use nalgebra::Vector3;
 use std::{
-    ops::{Deref, DerefMut},
-    path::PathBuf,
     sync::{
         atomic::{AtomicBool, Ordering},
         Arc,
@@ -105,7 +103,6 @@ fn setup(
         &render_device,
         &mut scene_controller,
         40,
-        "main_scene".into(),
     );
 
     commands.insert_resource(ClearColor(Color::srgb(0.5, 0.5, 1.0)));
@@ -189,7 +186,6 @@ fn setup_render_target(
     render_device: &Res<RenderDevice>,
     scene_controller: &mut ResMut<SceneController>,
     pre_roll_frames: u32,
-    scene_name: String,
 ) -> RenderTarget {
     let size = Extent3d {
         width: scene_controller.width,

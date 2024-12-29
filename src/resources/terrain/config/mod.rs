@@ -2,10 +2,12 @@ mod biome;
 mod feature;
 mod noise;
 
-use bevy::prelude::*;
 pub use biome::{BiomeConfig, BiomeThresholds};
 pub use feature::{BiomeFeatureConfig, FeatureConfig};
 pub use noise::{HeightNoiseConfig, MoistureNoiseConfig, NoiseConfig, RiverNoiseConfig};
+
+use bevy::prelude::*;
+use serde::{Deserialize, Serialize};
 
 #[derive(Resource, Clone, Debug)]
 pub struct TerrainConfig {
@@ -16,7 +18,7 @@ pub struct TerrainConfig {
     pub render: RenderConfig,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct RenderConfig {
     pub feature_layer_offset: f32,
 }

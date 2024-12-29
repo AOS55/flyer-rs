@@ -1,9 +1,10 @@
 use bevy::prelude::*;
 use noise::NoiseFn;
+use serde::{Deserialize, Serialize};
 use std::ops::Range;
 
 /// Represents a single layer of noise with its parameters
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct NoiseLayer {
     pub scale: f32,
     pub amplitude: f32,

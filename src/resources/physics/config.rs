@@ -1,8 +1,9 @@
 use bevy::prelude::*;
 use nalgebra::Vector3;
+use serde::{Deserialize, Serialize};
 
 /// Configuration for the physics system
-#[derive(Resource, Debug, Clone)]
+#[derive(Resource, Debug, Clone, Serialize, Deserialize)]
 pub struct PhysicsConfig {
     // Integration parameters
     pub max_velocity: f64,

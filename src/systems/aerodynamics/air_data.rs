@@ -3,7 +3,10 @@ use crate::resources::{AerodynamicsConfig, EnvironmentModel};
 use bevy::prelude::*;
 use nalgebra::Vector3;
 
-/// System for calculating air data parameters
+/// System responsible for calculating air data parameters for entities.
+///
+/// This system computes the airspeed, angle of attack (alpha), sideslip angle (beta),
+/// and other parameters for each entity based on its spatial data and environmental conditions.
 pub fn air_data_system(
     mut query: Query<(&mut AirData, &SpatialComponent)>,
     environment: Res<EnvironmentModel>,
@@ -28,32 +31,54 @@ pub fn air_data_system(
     }
 }
 
-/// Helper struct for air data calculations
+/// Helper structure for performing air data calculations.
+///
+/// Encapsulates the results of calculations for airspeed, alpha, beta, and other
+/// air data metrics. Provides a reusable calculation function for modularity and clarity.
 #[derive(Debug)]
 struct AirDataCalculation {
+    /// True airspeed of the entity in m/s.
     true_airspeed: f64,
+    /// Angle of attack (alpha) in radians.
     alpha: f64,
+    /// Sideslip angle (beta) in radians.
     beta: f64,
+    /// Air density at the entity's position in kg/m³.
     density: f64,
+    /// Dynamic pressure in Pa.
     dynamic_pressure: f64,
+    /// Relative velocity of the entity in the body frame in m/s.
     relative_velocity: Vector3<f64>,
+    /// Wind velocity at the entity's position in the body frame in m/s.
     wind_velocity: Vector3<f64>,
 }
 
 impl AirDataCalculation {
+    /// Performs air data calculations based on spatial properties, wind, and density.
+    ///
+    /// # Arguments
+    /// * `spatial` - The spatial component containing position, velocity, and attitude.
+    /// * `wind` - Wind velocity vector at the entity's position in the world frame.
+    /// * `density` - Air density at the entity's position.
+    /// * `min_airspeed_threshold` - Minimum airspeed threshold for valid alpha and beta calculations.
+    ///
+    /// # Returns
+    /// An instance of `AirDataCalculation` containing the computed values.
     fn calculate(
         spatial: &SpatialComponent,
         wind: Vector3<f64>,
         density: f64,
         min_airspeed_threshold: f64,
     ) -> Self {
-        // Calculate relative velocity in body frame
+        // Transform velocities to the body frame
         let velocity_body = spatial.attitude.inverse() * spatial.velocity;
         let wind_body = spatial.attitude.inverse() * wind;
         let relative_velocity = velocity_body - wind_body;
+
+        // Compute true airspeed (magnitude of relative velocity)
         let airspeed = relative_velocity.norm();
 
-        // Calculate alpha and beta
+        // Compute angle of attack (alpha) and sideslip angle (beta)
         let (alpha, beta) = if airspeed > min_airspeed_threshold {
             (
                 (relative_velocity.z / relative_velocity.x).atan(),
@@ -63,8 +88,10 @@ impl AirDataCalculation {
             (0.0, 0.0)
         };
 
+        // Compute dynamic pressure (q = 0.5 * rho * V²)
         let dynamic_pressure = 0.5 * density * airspeed * airspeed;
 
+        // Return computed values encapsulated in `AirDataCalculation`
         Self {
             true_airspeed: airspeed,
             alpha,

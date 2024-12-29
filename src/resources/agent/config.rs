@@ -1,8 +1,9 @@
 use pyo3::prelude::*;
+use serde::{Deserialize, Serialize};
 use std::str::FromStr;
 
 /// Modes the simulation can run in
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub enum RenderMode {
     RGBArray,
     Human,
@@ -24,7 +25,7 @@ impl FromStr for RenderMode {
 }
 
 /// Configuration for the agent plugin
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub struct AgentConfig {
     pub mode: RenderMode,
     pub render_width: f32,
@@ -35,7 +36,7 @@ pub struct AgentConfig {
 impl Default for AgentConfig {
     fn default() -> Self {
         Self {
-            mode: RenderMode::RGBArray,
+            mode: RenderMode::Human,
             render_width: 800.0,
             render_height: 600.0,
             frame_skip: 4,

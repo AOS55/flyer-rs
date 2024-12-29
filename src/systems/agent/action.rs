@@ -6,7 +6,11 @@ use crate::components::{
 use crate::plugins::Identifier;
 use crate::resources::AgentState;
 
-// System for applying agent actions
+/// System for applying agent actions to aircraft.
+///
+/// This system processes queued actions from agents (e.g., AI or players) and applies
+/// them to the appropriate aircraft. It distinguishes between Dubins and Full aircraft
+/// models and ensures the correct controls are applied to each type.
 pub fn apply_action(
     mut dubins_query: Query<
         (Entity, &Identifier, &mut DubinsAircraftState),
@@ -15,6 +19,7 @@ pub fn apply_action(
     mut full_query: Query<(Entity, &Identifier, &mut FullAircraftState), With<PlayerController>>,
     agent_state: Res<AgentState>,
 ) {
+    // Access the action queue shared among agents
     if let Ok(action_queue) = agent_state.action_queue.lock() {
         // Handle Dubins aircraft
         for (_entity, identifier, mut aircraft) in dubins_query.iter_mut() {

@@ -3,6 +3,7 @@ use bevy::prelude::*;
 use crate::{
     components::{FullAircraftConfig, FullAircraftState, SpatialComponent},
     plugins::{AircraftPluginBase, ComplexPhysicsSet, StartupStage},
+    resources::step_condition,
     systems::{
         aero_force_system, air_data_system, force_calculator_system, physics_integrator_system,
     },
@@ -79,7 +80,8 @@ impl Plugin for FullAircraftPlugin {
                 aero_force_system.in_set(ComplexPhysicsSet::Aerodynamics),
                 force_calculator_system.in_set(ComplexPhysicsSet::Forces),
                 physics_integrator_system.in_set(ComplexPhysicsSet::Integration),
-            ),
+            )
+                .run_if(step_condition),
         );
 
         // 5. Set the fixed timestep resource for physics calculations

@@ -6,7 +6,7 @@ use crate::{
         PlayerController,
     },
     plugins::{AircraftPluginBase, Id, Identifier, SimplePhysicsSet, StartupStage},
-    resources::{step_condition, UpdateControl, UpdateMode},
+    resources::step_condition,
     systems::{aircraft_render_system, dubins_aircraft_system, dubins_keyboard_system},
 };
 

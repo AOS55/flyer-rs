@@ -1,9 +1,11 @@
-#[derive(Clone, Debug)]
+use serde::{Deserialize, Serialize};
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct BiomeConfig {
     pub thresholds: BiomeThresholds,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct BiomeThresholds {
     pub water: f32,
     pub mountain_start: f32,

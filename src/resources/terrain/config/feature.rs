@@ -4,6 +4,7 @@ use crate::components::terrain::{
 use rand::distributions::{Distribution, WeightedIndex};
 use rand::rngs::StdRng;
 use rand::SeedableRng;
+use serde::{Deserialize, Serialize};
 use std::hash::{Hash, Hasher};
 
 #[derive(Clone, Debug)]
@@ -37,55 +38,55 @@ impl Default for FeatureConfig {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct GrassFeatureConfig {
     pub density: f32, // probability of a feature being placed in a tile
     pub feature_probs: Vec<(FeatureType, f32)>, // selection of each feature type
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ForestFeatureConfig {
     pub density: f32,
     pub feature_probs: Vec<(FeatureType, f32)>,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct CropsFeatureConfig {
     pub density: f32,
     pub feature_probs: Vec<(FeatureType, f32)>,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct OrchardFeatureConfig {
     pub density: f32,
     pub feature_probs: Vec<(FeatureType, f32)>,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct WaterFeatureConfig {
     pub density: f32,
     pub feature_probs: Vec<(FeatureType, f32)>,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct BeachFeatureConfig {
     pub density: f32,
     pub feature_probs: Vec<(FeatureType, f32)>,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct DesertFeatureConfig {
     pub density: f32,
     pub feature_probs: Vec<(FeatureType, f32)>,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct MountainFeatureConfig {
     pub density: f32,
     pub feature_probs: Vec<(FeatureType, f32)>,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct SnowFeatureConfig {
     pub density: f32,
     pub feature_probs: Vec<(FeatureType, f32)>,
