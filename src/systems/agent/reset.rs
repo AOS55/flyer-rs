@@ -1,11 +1,10 @@
 use crate::components::{
-    AircraftConfig, AircraftState, DubinsAircraftConfig, DubinsAircraftState, FullAircraftConfig,
-    FullAircraftState, PlayerController, RandomStartPosConfig,
+    AircraftState, DubinsAircraftConfig, DubinsAircraftState, FullAircraftConfig,
+    FullAircraftState, PlayerController,
 };
 use crate::plugins::{Identifier, ResetRequestEvent};
 use crate::resources::AgentState;
 use bevy::prelude::*;
-use rand_chacha::ChaCha8Rng;
 
 /// System to handle resetting both Dubins and Full Aircraft state resets
 pub fn reset_env(

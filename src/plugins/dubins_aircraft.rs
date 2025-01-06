@@ -5,10 +5,7 @@ use crate::{
         AircraftRenderState, AircraftType, Attitude, DubinsAircraftConfig, DubinsAircraftState,
         PlayerController,
     },
-    plugins::{
-        AircraftPluginBase, Id, Identifier, ResetCompleteEvent, ResetRequestEvent,
-        SimplePhysicsSet, StartupStage,
-    },
+    plugins::{AircraftPluginBase, Id, Identifier, SimplePhysicsSet, StartupStage},
     resources::step_condition,
     systems::{aircraft_render_system, dubins_aircraft_system, dubins_keyboard_system},
 };
