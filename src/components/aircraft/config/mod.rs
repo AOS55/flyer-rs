@@ -14,9 +14,9 @@ pub use loader::{ConfigError, RawAircraftConfig};
 pub use mass::MassModel;
 pub use start::RandomStartPosConfig;
 
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum AircraftConfig {
     Full(FullAircraftConfig),
     Dubins(DubinsAircraftConfig),
