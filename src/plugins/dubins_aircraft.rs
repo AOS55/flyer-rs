@@ -5,7 +5,10 @@ use crate::{
         AircraftRenderState, AircraftType, Attitude, DubinsAircraftConfig, DubinsAircraftState,
         PlayerController,
     },
-    plugins::{AircraftPluginBase, Id, Identifier, SimplePhysicsSet, StartupStage},
+    plugins::{
+        AircraftPluginBase, Id, Identifier, ResetCompleteEvent, ResetRequestEvent,
+        SimplePhysicsSet, StartupStage,
+    },
     resources::step_condition,
     systems::{aircraft_render_system, dubins_aircraft_system, dubins_keyboard_system},
 };
@@ -37,6 +40,7 @@ impl DubinsAircraftPlugin {
             DubinsAircraftState::random_position(config.random_start_config),
             PlayerController::new(),
             Name::new(config.name.to_string()), // Name of Bevy component
+            info!("Spawning Dubins aircraft: {}", config.name),
             Identifier {
                 id: Id::Named(config.name.to_string()), // Id name
             },

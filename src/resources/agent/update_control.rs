@@ -82,7 +82,6 @@ pub fn step_condition(step_control: Res<UpdateControl>) -> bool {
 
 /// Consumes a single step after the update stage.
 fn consume_step(mut update_control: ResMut<UpdateControl>) {
-    update_control.remaining_steps;
     update_control.consume_step();
     info!(
         "CONSUME, remaining_steps: {}",
@@ -97,6 +96,6 @@ impl Plugin for UpdateControlPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<UpdateControl>()
             .add_event::<StepCommand>()
-            .add_systems(Update, (handle_step_commands, consume_step));
+            .add_systems(FixedUpdate, (handle_step_commands, consume_step).chain());
     }
 }
