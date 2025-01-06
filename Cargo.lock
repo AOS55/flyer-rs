@@ -1365,7 +1365,7 @@ dependencies = [
  "proc-macro2",
  "quote",
  "regex",
- "rustc-hash",
+ "rustc-hash 1.1.0",
  "shlex",
  "syn 2.0.89",
 ]
@@ -1754,7 +1754,7 @@ dependencies = [
  "log",
  "rangemap",
  "rayon",
- "rustc-hash",
+ "rustc-hash 1.1.0",
  "rustybuzz",
  "self_cell",
  "swash",
@@ -2165,6 +2165,7 @@ dependencies = [
  "kiddo",
  "nalgebra",
  "noise",
+ "numpy",
  "petgraph",
  "pretty_assertions",
  "pyo3",
@@ -3029,7 +3030,7 @@ dependencies = [
  "indexmap",
  "log",
  "pp-rs",
- "rustc-hash",
+ "rustc-hash 1.1.0",
  "spirv",
  "termcolor",
  "thiserror",
@@ -3050,7 +3051,7 @@ dependencies = [
  "once_cell",
  "regex",
  "regex-syntax 0.8.5",
- "rustc-hash",
+ "rustc-hash 1.1.0",
  "thiserror",
  "tracing",
  "unicode-ident",
@@ -3082,6 +3083,21 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 1.0.109",
+]
+
+[[package]]
+name = "ndarray"
+version = "0.16.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "882ed72dce9365842bf196bdeedf5055305f11fc8c03dee7bb0194a6cad34841"
+dependencies = [
+ "matrixmultiply",
+ "num-complex 0.4.6",
+ "num-integer",
+ "num-traits",
+ "portable-atomic",
+ "portable-atomic-util",
+ "rawpointer",
 ]
 
 [[package]]
@@ -3328,6 +3344,21 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 2.0.89",
+]
+
+[[package]]
+name = "numpy"
+version = "0.23.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b94caae805f998a07d33af06e6a3891e38556051b8045c615470a71590e13e78"
+dependencies = [
+ "libc",
+ "ndarray",
+ "num-complex 0.4.6",
+ "num-integer",
+ "num-traits",
+ "pyo3",
+ "rustc-hash 2.1.0",
 ]
 
 [[package]]
@@ -3743,6 +3774,15 @@ name = "portable-atomic"
 version = "1.10.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "280dc24453071f1b63954171985a0b0d30058d287960968b9b2aca264c8d4ee6"
+
+[[package]]
+name = "portable-atomic-util"
+version = "0.2.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d8a2f0d8d040d7848a709caf78912debcc3f33ee4b3cac47d73d1e1069e83507"
+dependencies = [
+ "portable-atomic",
+]
 
 [[package]]
 name = "powerfmt"
@@ -4202,6 +4242,12 @@ name = "rustc-hash"
 version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "08d43f7aa6b08d49f382cde6a7982047c3426db949b1424bc4b7ec9ae12c6ce2"
+
+[[package]]
+name = "rustc-hash"
+version = "2.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c7fb8039b3032c191086b10f11f319a6e99e1e82889c5cc6046f515c9db1d497"
 
 [[package]]
 name = "rustc_version"
@@ -5140,7 +5186,7 @@ dependencies = [
  "parking_lot",
  "profiling",
  "raw-window-handle",
- "rustc-hash",
+ "rustc-hash 1.1.0",
  "smallvec",
  "thiserror",
  "wgpu-hal",
@@ -5182,7 +5228,7 @@ dependencies = [
  "range-alloc",
  "raw-window-handle",
  "renderdoc-sys",
- "rustc-hash",
+ "rustc-hash 1.1.0",
  "smallvec",
  "thiserror",
  "wasm-bindgen",
