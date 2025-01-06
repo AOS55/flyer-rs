@@ -7,7 +7,7 @@ use crate::components::aircraft::config::{ConfigError, RawAircraftConfig};
 use crate::components::{AircraftAeroCoefficients, AircraftGeometry, MassModel};
 
 /// The full aircraft configuration, including mass, geometry, and aerodynamic coefficients
-#[derive(Component, Debug, Clone, Deserialize)]
+#[derive(Component, Debug, Clone, Serialize, Deserialize)]
 pub struct FullAircraftConfig {
     /// Name of the aircraft, defaults to type name.
     pub name: String,
