@@ -1,9 +1,3 @@
-pub mod constants;
-pub mod errors;
-pub mod math;
-pub mod types;
+mod rng;
 
-pub use constants::*;
-pub use errors::*;
-pub use math::*;
-pub use types::*;
+pub use rng::{RngManager, WithRng};

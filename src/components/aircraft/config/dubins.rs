@@ -1,7 +1,7 @@
+use crate::{components::RandomStartPosConfig, utils::WithRng};
 use bevy::prelude::*;
+use rand_chacha::ChaCha8Rng;
 use serde::{Deserialize, Serialize};
-
-use crate::components::RandomStartPosConfig;
 
 /// Configuration for a Dubins Aircraft model.
 /// This model is used for path planning and motion representation, often in scenarios
@@ -44,6 +44,16 @@ impl Default for DubinsAircraftConfig {
             max_descent_rate: 15.0,
             random_start_config: Some(RandomStartPosConfig::default()),
         }
+    }
+}
+
+impl WithRng for DubinsAircraftConfig {
+    fn with_rng(mut self, rng: ChaCha8Rng) -> Self {
+        info!("Setting RNG for Dubins aircraft config: {:?}", rng);
+        if let Some(start_config) = self.random_start_config {
+            self.random_start_config = Some(start_config.with_rng(rng));
+        }
+        self
     }
 }
 

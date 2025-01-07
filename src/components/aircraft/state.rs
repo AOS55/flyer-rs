@@ -141,38 +141,12 @@ impl DubinsAircraftState {
     /// # Returns
     /// A `DubinsAircraftState` with a random position and neutral controls.
     pub fn random_position(config: Option<RandomStartPosConfig>) -> Self {
-        let mut config = config.unwrap_or_default();
-
-        let loc_min_altitude = config.min_altitude;
-        let loc_max_altitude = config.max_altitude;
-        let loc_origin = config.origin.clone();
-
-        // Ensure min_altitude < max_altitude
-        let (loc_min_altitude, loc_max_altitude) = if loc_min_altitude < loc_max_altitude {
-            (loc_min_altitude, loc_max_altitude)
-        } else {
-            warn!(
-                "Invalid altitude range: min_altitude ({}) >= max_altitude ({}). Swapping values.",
-                loc_min_altitude, loc_max_altitude
-            );
-            (loc_max_altitude, loc_min_altitude)
-        };
-
-        // Generate random position using polar coordinates
-        let u1 = config.rng.gen::<f64>();
-        let u2 = config.rng.gen::<f64>();
-        let radius = config.variance * (-2.0 * u1.ln()).sqrt();
-        let theta = 2.0 * std::f64::consts::PI * u2;
-
-        let x = loc_origin.x + radius * theta.cos();
-        let y = loc_origin.y + radius * theta.sin();
-        let z = config.rng.gen_range(loc_min_altitude..loc_max_altitude);
-
-        let position = loc_origin.push(0.0) + Vector3::new(x, y, z);
-        let spatial = SpatialComponent::at_position(position);
+        let config = config.unwrap_or_default().build();
+        let position = config.generate_position();
+        info!("Final state: {:?}", position);
 
         Self {
-            spatial,
+            spatial: SpatialComponent::at_position(position),
             controls: DubinsAircraftControls::default(),
         }
     }
