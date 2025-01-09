@@ -27,7 +27,9 @@ pub fn apply_action(
                 match controls {
                     AircraftControls::Dubins(dubins_controls) => {
                         // Apply Dubins controls directly to the aircraft state
+                        info!("Apply Action: {:?}", dubins_controls);
                         aircraft.controls = *dubins_controls;
+                        info!("Aircraft Controls: {:?}", aircraft.controls);
                     }
                     AircraftControls::Full(_) => {
                         warn!(

@@ -23,12 +23,9 @@ pub fn reset_env(
     for _event in reset_events.read() {
         // Reset the agent state
         agent_state.reset();
-        info!("In Event!");
         // Reset Dubins aircraft
         for (identifier, config, mut state) in dubins_query.iter_mut() {
-            info!("Pre-reset state: {:?}", state);
-            *state = DubinsAircraftState::random_position(config.random_start_config.clone());
-            info!("Post-reset state: {:?}", state);
+            *state = DubinsAircraftState::random_start(config.random_start_config.clone());
 
             // Update state buffer
             if let Ok(mut state_buffer) = agent_state.state_buffer.lock() {

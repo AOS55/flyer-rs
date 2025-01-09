@@ -10,12 +10,12 @@ pub mod terrain;
 mod transformation;
 
 pub use agent::{AgentPlugin, Id, Identifier, LatestFrame};
-pub use aircraft::{add_aircraft_plugin, AircraftPluginBase, ComplexPhysicsSet, SimplePhysicsSet};
+pub use aircraft::{add_aircraft_plugin, AircraftPluginBase, ComplexPhysicsSet};
 pub use camera::CameraPlugin;
 pub use dubins_aircraft::DubinsAircraftPlugin;
 pub use events::{ResetCompleteEvent, ResetRequestEvent};
 pub use full_aircraft::FullAircraftPlugin;
 pub use headless::HeadlessPlugin;
-pub use staging::{StartupSequencePlugin, StartupStage};
+pub use staging::{StartupSequencePlugin, StartupStage, UpdateSequencePlugin, UpdateStage};
 pub use terrain::TerrainPlugin;
 pub use transformation::TransformationPlugin;

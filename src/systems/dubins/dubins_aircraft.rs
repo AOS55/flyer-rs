@@ -10,9 +10,9 @@ use crate::components::aircraft::{DubinsAircraftConfig, DubinsAircraftState};
 /// and attitudes for each aircraft in the simulation.
 pub fn dubins_aircraft_system(
     mut query: Query<(&mut DubinsAircraftState, &DubinsAircraftConfig)>,
-    time: Res<Time<Fixed>>,
+    _time: Res<Time<Fixed>>,
 ) {
-    let dt = time.delta_secs_f64();
+    let dt = 1.0 / 120.0;
 
     for (mut aircraft, config) in query.iter_mut() {
         update_aircraft(&mut aircraft, config, dt);
@@ -26,6 +26,8 @@ pub fn dubins_aircraft_system(
 /// * `config` - The configuration parameters defining the aircraft's limits and capabilities.
 /// * `dt` - The time step (in seconds) over which to apply the update.
 fn update_aircraft(state: &mut DubinsAircraftState, config: &DubinsAircraftConfig, dt: f64) {
+    info!("Updating Aircraft State");
+
     let controls = &state.controls;
     let spatial = &mut state.spatial;
 
@@ -51,10 +53,15 @@ fn update_aircraft(state: &mut DubinsAircraftState, config: &DubinsAircraftConfi
         0.0
     };
 
+    info!(
+        "position before update: {:?}, vspeed: {}",
+        spatial.position, controls.vertical_speed
+    );
     // Update position based on speed, heading, and vertical speed
     spatial.position.x += new_speed * yaw.cos() * dt;
     spatial.position.y += new_speed * yaw.sin() * dt;
     spatial.position.z -= controls.vertical_speed * dt;
+    info!("position after update: {:?}", spatial.position);
 
     // Update heading: θ_t+1 = θ_t + c_φ*φ*dt
     let heading_change = turn_rate * dt;

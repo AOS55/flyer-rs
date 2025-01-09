@@ -77,6 +77,7 @@ fn handle_step_commands(
 
 /// Determines whether the system should update based on `UpdateControl`.
 pub fn step_condition(step_control: Res<UpdateControl>) -> bool {
+    info!("Should UPDATE");
     step_control.should_update()
 }
 

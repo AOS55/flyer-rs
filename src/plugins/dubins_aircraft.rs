@@ -5,7 +5,7 @@ use crate::{
         AircraftRenderState, AircraftType, Attitude, DubinsAircraftConfig, DubinsAircraftState,
         PlayerController,
     },
-    plugins::{AircraftPluginBase, Id, Identifier, SimplePhysicsSet, StartupStage},
+    plugins::{AircraftPluginBase, Id, Identifier, StartupStage},
     resources::step_condition,
     systems::{aircraft_render_system, dubins_aircraft_system, dubins_keyboard_system},
 };
@@ -34,7 +34,7 @@ impl DubinsAircraftPlugin {
     fn setup_aircraft(mut commands: Commands, config: DubinsAircraftConfig) {
         commands.spawn((
             config.clone(),
-            DubinsAircraftState::random_position(config.random_start_config),
+            DubinsAircraftState::random_start(config.random_start_config),
             PlayerController::new(),
             Name::new(config.name.to_string()), // Name of Bevy component
             info!("Spawning Dubins aircraft: {}", config.name),
@@ -59,25 +59,17 @@ impl Plugin for DubinsAircraftPlugin {
             Startup,
             (AircraftPluginBase::setup_assets).in_set(StartupStage::BuildUtilities),
         )
-        // 2. Configure the physics update pipeline into Input -> Update.
-        .configure_sets(
-            FixedUpdate,
-            (SimplePhysicsSet::Input, SimplePhysicsSet::Update).chain(),
-        )
-        // 3. Spawn the Dubins aircraft entity during the startup phase.
+        // 2. Spawn the Dubins aircraft entity during the startup phase.
         .add_systems(
             Startup,
             (move |commands: Commands| Self::setup_aircraft(commands, config.clone()))
                 .in_set(StartupStage::BuildAircraft), // Configure the system, not its result
         )
-        // 4. Add systems to handle input, update physics, and render the Dubins aircraft.
+        // 3. Add systems to handle input, update physics, and render the Dubins aircraft.
         .add_systems(
             FixedUpdate,
-            (
-                dubins_keyboard_system.in_set(SimplePhysicsSet::Input),
-                dubins_aircraft_system.in_set(SimplePhysicsSet::Update),
-                aircraft_render_system,
-            )
+            (dubins_aircraft_system, aircraft_render_system)
+                .chain()
                 .run_if(step_condition),
         );
 

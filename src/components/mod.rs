@@ -11,7 +11,8 @@ pub use aircraft::{
     AirData, AircraftAeroCoefficients, AircraftConfig, AircraftControlSurfaces, AircraftControls,
     AircraftGeometry, AircraftRenderState, AircraftState, AircraftType, Attitude,
     DubinsAircraftConfig, DubinsAircraftControls, DubinsAircraftState, FullAircraftConfig,
-    FullAircraftState, MassModel, RandomStartPosConfig,
+    FullAircraftState, MassModel, RandomHeadingConfig, RandomPosConfig, RandomSpeedConfig,
+    RandomStartConfig,
 };
 pub use camera::CameraComponent;
 pub use controller::PlayerController;

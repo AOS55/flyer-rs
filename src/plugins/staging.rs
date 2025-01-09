@@ -11,7 +11,7 @@ pub enum StartupStage {
 #[derive(SystemSet, Debug, Hash, PartialEq, Eq, Clone)]
 pub enum UpdateStage {
     UpdateAction,
-    UpdateBevy,
+    UpdateVehicles,
     UpdateStates,
 }
 
@@ -37,10 +37,10 @@ pub struct UpdateSequencePlugin;
 impl Plugin for UpdateSequencePlugin {
     fn build(&self, app: &mut App) {
         app.configure_sets(
-            Update,
+            FixedUpdate,
             (
                 UpdateStage::UpdateAction,
-                UpdateStage::UpdateBevy,
+                UpdateStage::UpdateVehicles,
                 UpdateStage::UpdateStates,
             )
                 .chain(),

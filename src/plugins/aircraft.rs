@@ -12,15 +12,6 @@ pub struct AircraftPluginBase {
     pub config: AircraftConfig,
 }
 
-// System sets for the DubinsAircraft (simplified physics)
-#[derive(SystemSet, Debug, Hash, PartialEq, Eq, Clone)]
-pub enum SimplePhysicsSet {
-    /// Input handling for Aircraft.
-    Input,
-    /// Update logic for position and orientation.
-    Update,
-}
-
 // System sets for the FullAircraft (complex physics)
 #[derive(SystemSet, Debug, Hash, PartialEq, Eq, Clone)]
 pub enum ComplexPhysicsSet {

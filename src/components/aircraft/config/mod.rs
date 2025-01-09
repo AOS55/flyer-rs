@@ -12,7 +12,7 @@ pub use dubins::DubinsAircraftConfig;
 pub use geometry::AircraftGeometry;
 pub use loader::{ConfigError, RawAircraftConfig};
 pub use mass::MassModel;
-pub use start::RandomStartPosConfig;
+pub use start::{RandomHeadingConfig, RandomPosConfig, RandomSpeedConfig, RandomStartConfig};
 
 use serde::{Deserialize, Serialize};
 

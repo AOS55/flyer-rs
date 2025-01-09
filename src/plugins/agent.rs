@@ -51,13 +51,6 @@ impl Identifier {
     }
 }
 
-#[derive(SystemSet, Debug, Hash, PartialEq, Eq, Clone)]
-pub enum AgentSystemSet {
-    StateCollection,
-    ActionApplication,
-    // RenderCapture,
-}
-
 impl AgentPlugin {
     pub fn new(config: AgentConfig) -> Self {
         Self { config }
@@ -68,26 +61,7 @@ impl Plugin for AgentPlugin {
     fn build(&self, app: &mut App) {
         // Add agent state resource
         app.insert_resource(AgentState::new(&self.config))
-            // .insert_resource(ScreenshotState::default())
-            // Configure system sets for ordered execution
-            .configure_sets(
-                Update,
-                (
-                    AgentSystemSet::StateCollection,
-                    AgentSystemSet::ActionApplication,
-                    // AgentSystemSet::RenderCapture,
-                )
-                    .chain(),
-            )
-            // Add core agent systems
-            .add_systems(
-                Update,
-                (
-                    collect_state.in_set(AgentSystemSet::StateCollection),
-                    apply_action.in_set(AgentSystemSet::ActionApplication),
-                )
-                    .chain(),
-            );
+            .add_systems(FixedUpdate, (apply_action, collect_state).chain());
 
         // Add render capture system only in render mode
         // if self.config.mode == SimulationMode::RGBArray {

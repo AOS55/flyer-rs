@@ -4,7 +4,8 @@ pub mod state;
 
 pub use config::{
     AircraftAeroCoefficients, AircraftConfig, AircraftGeometry, AircraftSource, AircraftType,
-    DubinsAircraftConfig, FullAircraftConfig, MassModel, RandomStartPosConfig, RawAircraftConfig,
+    DubinsAircraftConfig, FullAircraftConfig, MassModel, RandomHeadingConfig, RandomPosConfig,
+    RandomSpeedConfig, RandomStartConfig, RawAircraftConfig,
 };
 pub use render::{AircraftRenderState, Attitude};
 pub use state::{

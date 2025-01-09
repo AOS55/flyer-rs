@@ -1,6 +1,5 @@
-use crate::{components::RandomStartPosConfig, utils::WithRng};
+use crate::components::RandomStartConfig;
 use bevy::prelude::*;
-use rand_chacha::ChaCha8Rng;
 use serde::{Deserialize, Serialize};
 
 /// Configuration for a Dubins Aircraft model.
@@ -27,7 +26,7 @@ pub struct DubinsAircraftConfig {
     pub max_descent_rate: f64,
     /// Optional configuration for randomized starting positions.
     /// If set, the aircraft will start at a random position defined by this configuration.
-    pub random_start_config: Option<RandomStartPosConfig>,
+    pub random_start_config: Option<RandomStartConfig>,
 }
 
 impl Default for DubinsAircraftConfig {
@@ -42,18 +41,8 @@ impl Default for DubinsAircraftConfig {
             max_turn_rate: 0.5,
             max_climb_rate: 5.0,
             max_descent_rate: 15.0,
-            random_start_config: Some(RandomStartPosConfig::default()),
+            random_start_config: Some(RandomStartConfig::default()),
         }
-    }
-}
-
-impl WithRng for DubinsAircraftConfig {
-    fn with_rng(mut self, rng: ChaCha8Rng) -> Self {
-        info!("Setting RNG for Dubins aircraft config: {:?}", rng);
-        if let Some(start_config) = self.random_start_config {
-            self.random_start_config = Some(start_config.with_rng(rng));
-        }
-        self
     }
 }
 
@@ -82,7 +71,7 @@ impl DubinsAircraftConfig {
         max_turn_rate: f64,
         max_climb_rate: f64,
         max_descent_rate: f64,
-        random_start_config: Option<RandomStartPosConfig>,
+        random_start_config: Option<RandomStartConfig>,
     ) -> Self {
         Self {
             name,

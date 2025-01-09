@@ -1,9 +1,8 @@
 use bevy::prelude::*;
-use nalgebra::{Matrix3, Vector3};
-use rand::Rng;
+use nalgebra::{Matrix3, UnitQuaternion, Vector3};
 use serde::{Deserialize, Serialize};
 
-use crate::components::{PhysicsComponent, RandomStartPosConfig, SpatialComponent};
+use crate::components::{PhysicsComponent, RandomStartConfig, SpatialComponent};
 
 /// Represents the overall state of an aircraft.
 #[derive(Component, Debug, Clone, Serialize, Deserialize)]
@@ -122,11 +121,13 @@ impl DubinsAircraftState {
         Self::default()
     }
 
+    // TODO: Make a single system that takes config and Precise/Random start are on an enum
+
     /// Starts the aircraft at an exact position specified in NED coordinates.
     ///
     /// # Arguments
     /// * `position` - A `Vector3` representing the position in NED coordinates.
-    pub fn precise_position(position: Vector3<f64>) -> Self {
+    pub fn precise_start(position: Vector3<f64>) -> Self {
         let spatial = SpatialComponent::at_position(position);
         let controls = DubinsAircraftControls::default();
 
@@ -140,13 +141,19 @@ impl DubinsAircraftState {
     ///
     /// # Returns
     /// A `DubinsAircraftState` with a random position and neutral controls.
-    pub fn random_position(config: Option<RandomStartPosConfig>) -> Self {
-        let config = config.unwrap_or_default().build();
-        let position = config.generate_position();
-        info!("Final state: {:?}", position);
+    pub fn random_start(config: Option<RandomStartConfig>) -> Self {
+        let config = config.unwrap_or_default();
+        let (position, speed, heading) = config.generate();
+        let mut spatial = SpatialComponent::at_position(position);
+        spatial.velocity = Vector3::new(
+            speed * heading.cos(),
+            speed * heading.sin(),
+            0.0, // Initial vertical velocity set to 0
+        );
+        spatial.attitude = UnitQuaternion::from_euler_angles(0.0, 0.0, heading);
 
         Self {
-            spatial: SpatialComponent::at_position(position),
+            spatial,
             controls: DubinsAircraftControls::default(),
         }
     }
