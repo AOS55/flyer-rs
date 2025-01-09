@@ -6,8 +6,8 @@ use crate::{
         PlayerController,
     },
     plugins::{AircraftPluginBase, Id, Identifier, StartupStage},
-    resources::step_condition,
-    systems::{aircraft_render_system, dubins_aircraft_system, dubins_keyboard_system},
+    // resources::step_condition,
+    // systems::{aircraft_render_system, dubins_aircraft_system, dubins_keyboard_system},
 };
 
 /// A plugin to handle Dubins aircraft behavior, rendering, and input.
@@ -64,17 +64,19 @@ impl Plugin for DubinsAircraftPlugin {
             Startup,
             (move |commands: Commands| Self::setup_aircraft(commands, config.clone()))
                 .in_set(StartupStage::BuildAircraft), // Configure the system, not its result
-        )
-        // 3. Add systems to handle input, update physics, and render the Dubins aircraft.
-        .add_systems(
-            FixedUpdate,
-            (dubins_aircraft_system, aircraft_render_system)
-                .chain()
-                .run_if(step_condition),
         );
 
-        // 5. Initialize the fixed timestep resource for the physics simulation.
-        app.init_resource::<Time<Fixed>>()
-            .insert_resource(Time::<Fixed>::from_seconds(1.0 / 120.0));
+        // Done in the main app loop now
+        // // 3. Add systems to handle input, update physics, and render the Dubins aircraft.
+        // .add_systems(
+        //     FixedUpdate,
+        //     (dubins_aircraft_system, aircraft_render_system)
+        //         .chain()
+        //         .run_if(step_condition),
+        // );
+
+        // // 5. Initialize the fixed timestep resource for the physics simulation.
+        // app.init_resource::<Time<Fixed>>()
+        //     .insert_resource(Time::<Fixed>::from_seconds(1.0 / 120.0));
     }
 }

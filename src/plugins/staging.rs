@@ -8,13 +8,6 @@ pub enum StartupStage {
     BuildTerrain,
 }
 
-#[derive(SystemSet, Debug, Hash, PartialEq, Eq, Clone)]
-pub enum UpdateStage {
-    UpdateAction,
-    UpdateVehicles,
-    UpdateStates,
-}
-
 pub struct StartupSequencePlugin;
 
 impl Plugin for StartupSequencePlugin {
@@ -32,18 +25,12 @@ impl Plugin for StartupSequencePlugin {
     }
 }
 
-pub struct UpdateSequencePlugin;
-
-impl Plugin for UpdateSequencePlugin {
-    fn build(&self, app: &mut App) {
-        app.configure_sets(
-            FixedUpdate,
-            (
-                UpdateStage::UpdateAction,
-                UpdateStage::UpdateVehicles,
-                UpdateStage::UpdateStates,
-            )
-                .chain(),
-        );
-    }
+/// StateMachine for the server loop
+#[derive(States, Debug, Clone, Eq, PartialEq, Hash, Default)]
+pub enum SimState {
+    #[default]
+    WaitingForAction,
+    RunningPhysics,
+    SendingResponse,
+    Resetting,
 }

@@ -2,9 +2,7 @@ use bevy::prelude::*;
 use bevy::window::WindowPlugin;
 
 use flyer::components::{AircraftConfig, AircraftType, DubinsAircraftConfig, FullAircraftConfig};
-use flyer::plugins::{
-    add_aircraft_plugin, CameraPlugin, StartupSet, TerrainPlugin, TransformationPlugin,
-};
+use flyer::plugins::{add_aircraft_plugin, CameraPlugin, TerrainPlugin, TransformationPlugin};
 use flyer::resources::terrain::TerrainConfig;
 
 /// Example demonstrating how to set up and run an aircraft with an agent
@@ -32,10 +30,10 @@ fn main() {
     app.add_plugins(CameraPlugin);
 
     // 5. Configure startup sets to ensure proper initialization order
-    app.configure_sets(
-        Startup,
-        (StartupSet::SpawnPlayer, StartupSet::SpawnCamera).chain(),
-    );
+    // app.configure_sets(
+    //     Startup,
+    //     (StartupSet::SpawnPlayer, StartupSet::SpawnCamera).chain(),
+    // );
 
     // 6. Run the simulation
     app.run();

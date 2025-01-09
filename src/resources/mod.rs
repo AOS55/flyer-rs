@@ -16,7 +16,7 @@ pub use environment::{
 pub use physics::PhysicsConfig;
 // pub use render::{RenderConfig, RenderScale};
 pub use agent::{
-    step_condition, AgentConfig, AgentState, RenderMode, StepCommand, UpdateControl,
+    consume_step, step_condition, AgentConfig, AgentState, RenderMode, StepCommand, UpdateControl,
     UpdateControlPlugin, UpdateMode,
 };
 pub use rewards::RewardWeights;
