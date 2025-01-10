@@ -11,9 +11,11 @@ use flyer::{
         handle_reset_response, running_physics, sending_response, waiting_for_action,
         ResetCompleteEvent, ResetRequestEvent, SimState, StepCompleteEvent, StepRequestEvent,
     },
-    resources::{consume_step, AgentState},
     server::{setup_app, Command, EnvConfig, ServerState},
-    systems::{aircraft_render_system, apply_action, dubins_aircraft_system, reset_env},
+    systems::{
+        aero_force_system, air_data_system, aircraft_render_system, dubins_aircraft_system,
+        force_calculator_system, physics_integrator_system, reset_env,
+    },
 };
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -117,6 +119,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 )
                     .chain()
                     .run_if(running_state),
+                (
+                    air_data_system,
+                    aero_force_system,
+                    force_calculator_system,
+                    physics_integrator_system,
+                )
+                    .chain()
+                    .run_if(running_state),
                 sending_response.run_if(sending_state),
             )
                 .chain(),
@@ -212,7 +222,6 @@ fn receive_initial_config(stream: &Arc<Mutex<TcpStream>>) -> std::io::Result<ser
 
 fn handle_commands(
     mut server: ResMut<ServerState>,
-    agent_state: ResMut<AgentState>,
     mut step_events: EventWriter<StepRequestEvent>,
     mut reset_events: EventWriter<ResetRequestEvent>,
 ) {

@@ -109,6 +109,7 @@ fn setup_attitude_mappings(aircraft_assets: &mut AircraftAssets) {
 /// # Returns:
 /// A mutable reference to the Bevy application.
 pub fn add_aircraft_plugin(app: &mut App, config: AircraftConfig) -> &mut App {
+    info!("Adding aircraft plugin... {:?}", config);
     match config {
         // Add the FullAircraftPlugin for detailed physics simulation
         AircraftConfig::Full(config) => app.add_plugins(FullAircraftPlugin::new(config)),

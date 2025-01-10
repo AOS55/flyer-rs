@@ -2,7 +2,7 @@ use bevy::prelude::*;
 use std::{collections::HashMap, io::Write};
 
 use crate::{
-    components::{AircraftControls, DubinsAircraftState, PlayerController},
+    components::{AircraftControls, DubinsAircraftState, FullAircraftState, PlayerController},
     plugins::{Id, Identifier, SimState},
     resources::{AgentState, UpdateControl},
     server::{Response, ServerState, ToControls, ToObservation},
@@ -69,6 +69,7 @@ pub fn running_physics(
         (Entity, &Identifier, &mut DubinsAircraftState),
         With<PlayerController>,
     >,
+    mut full_query: Query<(Entity, &Identifier, &mut FullAircraftState), With<PlayerController>>,
 ) {
     info!("Running physics");
     if update_control.remaining_steps > 0 {
@@ -78,12 +79,27 @@ pub fn running_physics(
                     match controls {
                         AircraftControls::Dubins(dubins_controls) => {
                             info!(
-                                "Applying controls to aircraft {:?}: {:?}",
+                                "Applying controls to dubins aircraft {:?}: {:?}",
                                 identifier.id, dubins_controls
                             );
                             aircraft.controls = *dubins_controls;
                         }
                         _ => warn!("Received non-Dubins controls for Dubins aircraft"),
+                    }
+                }
+            }
+
+            for (_entity, identifier, mut aircraft) in full_query.iter_mut() {
+                if let Some(controls) = action_queue.get(&identifier.id) {
+                    match controls {
+                        AircraftControls::Full(full_controls) => {
+                            info!(
+                                "Applying controls to full aircraft {:?}: {:?}",
+                                identifier.id, full_controls
+                            );
+                            aircraft.control_surfaces = *full_controls;
+                        }
+                        _ => warn!("Received non-Full controls for Full aircraft"),
                     }
                 }
             }
@@ -166,6 +182,7 @@ pub fn handle_reset_response(
 
             // Collect initial observations
             for (id, state) in state_buffer.iter() {
+                info!("reset_response, id: {:?}, state: {:?}", id, state);
                 let id_str = match id {
                     Id::Named(name) => name.clone(),
                     Id::Entity(entity) => entity.to_string(),

@@ -65,16 +65,6 @@ impl UpdateControl {
     }
 }
 
-/// Handles incoming `StepCommand` events and updates the step count.
-pub fn handle_step_commands(
-    mut update_control: ResMut<UpdateControl>,
-    mut step_commands: EventReader<StepCommand>,
-) {
-    for step_command in step_commands.read() {
-        update_control.set_steps(step_command.steps);
-    }
-}
-
 /// Determines whether the system should update based on `UpdateControl`.
 pub fn step_condition(step_control: Res<UpdateControl>) -> bool {
     info!("Should UPDATE");
@@ -94,6 +84,5 @@ impl Plugin for UpdateControlPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<UpdateControl>()
             .add_event::<StepCommand>();
-        // .add_systems(FixedUpdate, (handle_step_commands, consume_step).chain());
     }
 }

@@ -1,8 +1,8 @@
 use bevy::prelude::*;
 
 use crate::{
-    components::{FullAircraftConfig, FullAircraftState, SpatialComponent},
-    plugins::{AircraftPluginBase, ComplexPhysicsSet, StartupStage},
+    components::{FullAircraftConfig, FullAircraftState, PlayerController, SpatialComponent},
+    plugins::{AircraftPluginBase, ComplexPhysicsSet, Id, Identifier, StartupStage},
     systems::{
         aero_force_system, air_data_system, force_calculator_system, physics_integrator_system,
     },
@@ -34,11 +34,16 @@ impl FullAircraftPlugin {
     /// * `commands` - Used to spawn the entity into the ECS.
     /// * `config` - The full aircraft configuration, cloned for the new entity.
     fn setup_aircraft(mut commands: Commands, config: FullAircraftConfig) {
+        info!("Spawning full aircraft entity...");
         commands.spawn((
             config.clone(),
+            PlayerController::new(),
             FullAircraftState::default(),
             SpatialComponent::default(),
             Name::new(config.name.to_string()),
+            Identifier {
+                id: Id::Named(config.name.to_string()), // Id name
+            },
         ));
     }
 }
@@ -55,16 +60,16 @@ impl Plugin for FullAircraftPlugin {
         )
         // 2. Configure the physics update sets:
         // AirData -> Aerodynamics -> Forces -> Integration
-        .configure_sets(
-            FixedUpdate,
-            (
-                ComplexPhysicsSet::AirData,
-                ComplexPhysicsSet::Aerodynamics,
-                ComplexPhysicsSet::Forces,
-                ComplexPhysicsSet::Integration,
-            )
-                .chain(),
-        )
+        // .configure_sets(
+        //     FixedUpdate,
+        //     (
+        //         ComplexPhysicsSet::AirData,
+        //         ComplexPhysicsSet::Aerodynamics,
+        //         ComplexPhysicsSet::Forces,
+        //         ComplexPhysicsSet::Integration,
+        //     )
+        //         .chain(),
+        // )
         // 3. Spawn the full aircraft entity during startup
         .add_systems(
             Startup,

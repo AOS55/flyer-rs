@@ -1,8 +1,7 @@
-use crate::components::AircraftState;
-
-use bevy::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+
+use crate::components::AircraftState;
 
 pub trait ToObservation {
     fn to_observation(&self, state: &AircraftState) -> HashMap<String, f64>;
