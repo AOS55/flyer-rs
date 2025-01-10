@@ -28,10 +28,9 @@ pub struct ResetCompleteEvent;
 
 pub fn waiting_for_action(
     mut step_requests: EventReader<StepRequestEvent>,
-    mut next_state: ResMut<NextState<SimState>>,
     mut update_control: ResMut<UpdateControl>,
     agent_state: ResMut<AgentState>,
-    server: Res<ServerState>,
+    mut server: ResMut<ServerState>,
 ) {
     if update_control.remaining_steps == 0 {
         for request in step_requests.read() {
@@ -56,20 +55,22 @@ pub fn waiting_for_action(
             );
 
             // Transition to physics state
-            next_state.set(SimState::RunningPhysics);
+            server.sim_state = SimState::RunningPhysics;
+            info!("state: {:?}", server.sim_state);
         }
     }
 }
 
 pub fn running_physics(
-    mut next_state: ResMut<NextState<SimState>>,
     mut update_control: ResMut<UpdateControl>,
     agent_state: ResMut<AgentState>,
+    mut server: ResMut<ServerState>,
     mut dubins_query: Query<
         (Entity, &Identifier, &mut DubinsAircraftState),
         With<PlayerController>,
     >,
 ) {
+    info!("Running physics");
     if update_control.remaining_steps > 0 {
         if let Ok(action_queue) = agent_state.action_queue.lock() {
             for (_entity, identifier, mut aircraft) in dubins_query.iter_mut() {
@@ -98,16 +99,12 @@ pub fn running_physics(
         // If this was the last step, transition to response state
         if update_control.remaining_steps == 0 {
             info!("Physics steps complete, transitioning to response state");
-            next_state.set(SimState::SendingResponse);
+            server.sim_state = SimState::SendingResponse;
         }
     }
 }
 
-pub fn sending_response(
-    mut next_state: ResMut<NextState<SimState>>,
-    agent_state: Res<AgentState>,
-    server: Res<ServerState>,
-) {
+pub fn sending_response(agent_state: Res<AgentState>, mut server: ResMut<ServerState>) {
     if let Ok(state_buffer) = agent_state.state_buffer.lock() {
         let mut all_observations = HashMap::new();
 
@@ -152,15 +149,17 @@ pub fn sending_response(
     }
 
     // Return to waiting state
-    next_state.set(SimState::WaitingForAction);
+    server.sim_state = SimState::WaitingForAction;
 }
 
 pub fn handle_reset_response(
     mut reset_complete: EventReader<ResetCompleteEvent>,
     agent_state: Res<AgentState>,
-    server: Res<ServerState>,
-    mut next_state: ResMut<NextState<SimState>>,
+    mut server: ResMut<ServerState>,
 ) {
+    let observation_spaces = &server.config.observation_spaces.clone();
+    let conn = server.conn.clone();
+    info!("Handing Reset Response");
     for _ in reset_complete.read() {
         if let Ok(state_buffer) = agent_state.state_buffer.lock() {
             let mut all_observations = HashMap::new();
@@ -172,14 +171,14 @@ pub fn handle_reset_response(
                     Id::Entity(entity) => entity.to_string(),
                 };
 
-                if let Some(obs_space) = server.config.observation_spaces.get(&id_str) {
+                if let Some(obs_space) = observation_spaces.get(&id_str) {
                     let obs = obs_space.to_observation(state);
                     all_observations.insert(id_str, obs);
                 }
             }
 
             // Send reset response
-            if let Ok(guard) = server.conn.lock() {
+            if let Ok(guard) = conn.lock() {
                 if let Ok(mut stream) = guard.try_clone() {
                     let response = Response {
                         obs: all_observations,
@@ -193,7 +192,7 @@ pub fn handle_reset_response(
                         if stream.write_all((response_str + "\n").as_bytes()).is_ok() {
                             stream.flush().ok();
                             // Transition back to waiting state
-                            next_state.set(SimState::WaitingForAction);
+                            server.sim_state = SimState::WaitingForAction;
                         }
                     }
                 }

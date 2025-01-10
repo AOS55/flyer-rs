@@ -3,7 +3,6 @@ use bevy::prelude::*;
 use crate::{
     components::{FullAircraftConfig, FullAircraftState, SpatialComponent},
     plugins::{AircraftPluginBase, ComplexPhysicsSet, StartupStage},
-    resources::step_condition,
     systems::{
         aero_force_system, air_data_system, force_calculator_system, physics_integrator_system,
     },
@@ -71,21 +70,20 @@ impl Plugin for FullAircraftPlugin {
             Startup,
             (move |commands: Commands| Self::setup_aircraft(commands, config.clone()))
                 .in_set(StartupStage::BuildAircraft),
-        )
-        // 4. Add systems to handle full aircraft physics and integration
-        .add_systems(
-            FixedUpdate,
-            (
-                air_data_system.in_set(ComplexPhysicsSet::AirData),
-                aero_force_system.in_set(ComplexPhysicsSet::Aerodynamics),
-                force_calculator_system.in_set(ComplexPhysicsSet::Forces),
-                physics_integrator_system.in_set(ComplexPhysicsSet::Integration),
-            )
-                .run_if(step_condition),
         );
+        // 4. Add systems to handle full aircraft physics and integration
+        // .add_systems(
+        //     FixedUpdate,
+        //     (
+        //         air_data_system.in_set(ComplexPhysicsSet::AirData),
+        //         aero_force_system.in_set(ComplexPhysicsSet::Aerodynamics),
+        //         force_calculator_system.in_set(ComplexPhysicsSet::Forces),
+        //         physics_integrator_system.in_set(ComplexPhysicsSet::Integration),
+        //     ),
+        // );
 
         // 5. Set the fixed timestep resource for physics calculations
-        app.init_resource::<Time<Fixed>>()
-            .insert_resource(Time::<Fixed>::from_seconds(1.0 / 120.0));
+        // app.init_resource::<Time<Fixed>>()
+        //     .insert_resource(Time::<Fixed>::from_seconds(1.0 / 120.0));
     }
 }

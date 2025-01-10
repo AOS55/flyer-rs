@@ -59,8 +59,6 @@ impl ToObservation for ContinuousObservationSpace {
                 obs.insert("altitude".to_string(), altitude);
                 obs.insert("airspeed".to_string(), airspeed);
 
-                info!("Raw Observation: {:?}", obs);
-
                 obs
             }
             (ContinuousObservationSpace::FullAircraft, AircraftState::Full(full_state)) => {

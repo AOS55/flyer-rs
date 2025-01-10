@@ -66,7 +66,7 @@ impl UpdateControl {
 }
 
 /// Handles incoming `StepCommand` events and updates the step count.
-fn handle_step_commands(
+pub fn handle_step_commands(
     mut update_control: ResMut<UpdateControl>,
     mut step_commands: EventReader<StepCommand>,
 ) {
@@ -83,6 +83,7 @@ pub fn step_condition(step_control: Res<UpdateControl>) -> bool {
 
 /// Consumes a single step after the update stage.
 pub fn consume_step(mut update_control: ResMut<UpdateControl>) {
+    info!("Consume Step, {}", update_control.remaining_steps);
     update_control.consume_step();
 }
 
@@ -92,7 +93,7 @@ pub struct UpdateControlPlugin;
 impl Plugin for UpdateControlPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<UpdateControl>()
-            .add_event::<StepCommand>()
-            .add_systems(FixedUpdate, (handle_step_commands, consume_step).chain());
+            .add_event::<StepCommand>();
+        // .add_systems(FixedUpdate, (handle_step_commands, consume_step).chain());
     }
 }

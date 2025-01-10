@@ -6,7 +6,7 @@ use std::{
     sync::{Arc, Mutex},
 };
 
-use crate::server::config::EnvConfig;
+use crate::{plugins::SimState, server::config::EnvConfig};
 
 /// Enum representing commands sent to the server.
 #[derive(Debug, Serialize, Deserialize)]
@@ -33,6 +33,8 @@ pub struct ServerState {
     pub initialized: bool,
     /// Configuration of the environment.
     pub config: EnvConfig,
+    /// simulation state
+    pub sim_state: SimState,
 }
 
 /// Struct representing the response from the server after handling a command.

@@ -8,8 +8,8 @@ use std::{
 
 use flyer::{
     plugins::{
-        handle_reset_response, sending_response, waiting_for_action, ResetCompleteEvent,
-        ResetRequestEvent, SimState, StepCompleteEvent, StepRequestEvent,
+        handle_reset_response, running_physics, sending_response, waiting_for_action,
+        ResetCompleteEvent, ResetRequestEvent, SimState, StepCompleteEvent, StepRequestEvent,
     },
     resources::{consume_step, AgentState},
     server::{setup_app, Command, EnvConfig, ServerState},
@@ -81,6 +81,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         conn: stream.clone(),
         initialized: false,
         config: env_config.clone(),
+        sim_state: SimState::WaitingForAction,
     });
 
     // Configure asset directory
@@ -102,25 +103,23 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Add event and systems for handling step requests
     app
         // Command handling in PreUpdate
-        .add_systems(
-            FixedPreUpdate,
-            handle_commands.run_if(not(in_state(SimState::RunningPhysics))),
-        )
+        .add_systems(FixedFirst, debug_state)
+        .add_systems(FixedPreUpdate, handle_commands.run_if(waiting_state))
         // Action handling and Physics in Update
         .add_systems(
             FixedUpdate,
             (
-                waiting_for_action.run_if(in_state(SimState::WaitingForAction)),
+                waiting_for_action.run_if(waiting_state),
                 (
-                    apply_action,
+                    running_physics,
                     dubins_aircraft_system,
-                    aircraft_render_system,
-                    consume_step,
+                    // aircraft_render_system,
                 )
                     .chain()
-                    .run_if(in_state(SimState::RunningPhysics)),
-                sending_response.run_if(in_state(SimState::SendingResponse)),
-            ),
+                    .run_if(running_state),
+                sending_response.run_if(sending_state),
+            )
+                .chain(),
         )
         // Events
         .add_event::<StepRequestEvent>()
@@ -131,16 +130,33 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .add_systems(FixedUpdate, reset_env);
 
     // Add event for handling reset requests
-    app.add_event::<ResetRequestEvent>()
-        .add_event::<ResetCompleteEvent>()
-        .add_systems(FixedUpdate, reset_env)
-        .add_systems(FixedPostUpdate, handle_reset_response);
+    app.add_systems(FixedPostUpdate, handle_reset_response);
 
     // Run app
     println!("Starting Bevy app...");
     app.run();
 
     Ok(())
+}
+
+fn debug_state(current_state: ResMut<ServerState>) {
+    info!("CURRENT STATE: {:?}", current_state.sim_state);
+}
+
+fn waiting_state(state: Res<ServerState>) -> bool {
+    state.sim_state == SimState::WaitingForAction
+}
+
+fn running_state(state: Res<ServerState>) -> bool {
+    state.sim_state == SimState::RunningPhysics
+}
+
+fn sending_state(state: Res<ServerState>) -> bool {
+    state.sim_state == SimState::SendingResponse
+}
+
+fn resetting_state(state: Res<ServerState>) -> bool {
+    state.sim_state == SimState::Resetting
 }
 
 /// Function to receive the initial configuration from the client.
@@ -199,8 +215,6 @@ fn handle_commands(
     agent_state: ResMut<AgentState>,
     mut step_events: EventWriter<StepRequestEvent>,
     mut reset_events: EventWriter<ResetRequestEvent>,
-    mut next_state: ResMut<NextState<SimState>>,
-    current_state: Res<State<SimState>>,
 ) {
     let cmd = {
         let guard = server.conn.lock().unwrap();
@@ -231,7 +245,7 @@ fn handle_commands(
 
     if let Some(cmd) = cmd {
         // Only process commands if we're not in RunningPhysics state
-        if *current_state.get() != SimState::RunningPhysics {
+        if server.sim_state != SimState::RunningPhysics {
             match cmd {
                 Command::Initialize { .. } => {
                     // Handle late initialization attempts
@@ -251,7 +265,7 @@ fn handle_commands(
                 }
 
                 Command::Step { actions } => {
-                    if *current_state.get() == SimState::WaitingForAction {
+                    if server.sim_state == SimState::WaitingForAction {
                         info!("Step Command Received!");
                         info!("actions: {:?}", actions);
                         step_events.send(StepRequestEvent { actions });
@@ -259,7 +273,7 @@ fn handle_commands(
                     } else {
                         warn!(
                             "Received Step command while in {:?} state",
-                            current_state.get()
+                            server.sim_state
                         );
                     }
                 }
@@ -295,7 +309,7 @@ fn handle_commands(
                     // Send reset event and transition to Resetting state
                     info!("Transitioning to Resetting state");
                     reset_events.send(ResetRequestEvent { seed });
-                    next_state.set(SimState::Resetting);
+                    server.sim_state = SimState::Resetting;
                 }
 
                 Command::Close => {

@@ -11,7 +11,6 @@ use bevy::prelude::*;
 
 pub fn setup_app(mut app: App, config: EnvConfig, asset_path: String) -> App {
     app.add_plugins(StartupSequencePlugin);
-
     app.add_plugins((
         TransformationPlugin::new(1.0),
         AgentPlugin::new(config.agent_config),

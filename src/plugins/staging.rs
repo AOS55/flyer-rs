@@ -26,7 +26,7 @@ impl Plugin for StartupSequencePlugin {
 }
 
 /// StateMachine for the server loop
-#[derive(States, Debug, Clone, Eq, PartialEq, Hash, Default)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Default)]
 pub enum SimState {
     #[default]
     WaitingForAction,

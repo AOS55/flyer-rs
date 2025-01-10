@@ -54,8 +54,8 @@ fn update_aircraft(state: &mut DubinsAircraftState, config: &DubinsAircraftConfi
     };
 
     info!(
-        "position before update: {:?}, vspeed: {}",
-        spatial.position, controls.vertical_speed
+        "position before update: {:?}, controls: {:?}",
+        spatial.position, controls
     );
     // Update position based on speed, heading, and vertical speed
     spatial.position.x += new_speed * yaw.cos() * dt;
