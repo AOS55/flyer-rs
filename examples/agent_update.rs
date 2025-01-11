@@ -1,7 +1,7 @@
 use bevy::prelude::*;
 use bevy::window::WindowPlugin;
 
-use flyer::components::{AircraftConfig, AircraftType, DubinsAircraftConfig, FullAircraftConfig};
+use flyer::components::{AircraftConfig, DubinsAircraftConfig};
 use flyer::plugins::{add_aircraft_plugin, CameraPlugin, TerrainPlugin, TransformationPlugin};
 use flyer::resources::terrain::TerrainConfig;
 
