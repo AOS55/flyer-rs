@@ -10,7 +10,10 @@ mod termination;
 pub mod terrain;
 
 pub use aerodynamics::{aero_force_system, air_data_system};
-pub use agent::{apply_action, capture_frame, collect_state, reset_env, ScreenshotState};
+pub use agent::{
+    capture_frame, collect_state, handle_reset_response, reset_env, running_physics,
+    sending_response, waiting_for_action, ScreenshotState,
+};
 pub use camera::camera_follow_system;
 pub use controller::{dubins_gym_control_system, dubins_keyboard_system};
 pub use dubins::dubins_aircraft_system;

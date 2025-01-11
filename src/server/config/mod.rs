@@ -45,7 +45,7 @@ pub struct EnvConfig {
 
     // Environment/physics Configuration
     pub physics_config: PhysicsConfig,
-    // pub environment_config: EnvironmentConfig,
+    pub environment_config: EnvironmentConfig,
 
     // Terrain Configuration
     pub terrain_config: TerrainConfig,

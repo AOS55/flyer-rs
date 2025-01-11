@@ -4,9 +4,10 @@ mod wind;
 pub use atmosphere::{AtmosphereConfig, AtmosphereType};
 pub use wind::WindConfig;
 
+use bevy::prelude::*;
 use nalgebra::Vector3;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Resource)]
 pub struct EnvironmentConfig {
     pub wind_model_config: WindConfig,
     pub atmosphere_config: AtmosphereConfig,

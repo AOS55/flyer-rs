@@ -1,5 +1,3 @@
-use pyo3::prelude::*;
-use pyo3::types::PyDict;
 use serde::{Deserialize, Serialize};
 
 use crate::{components::TerminalConditions, server::config::errors::ConfigError};
@@ -14,15 +12,9 @@ impl Default for TerminalConditionsBuilder {
 }
 
 impl TerminalConditionsBuilder {
-    pub fn new() -> Self {
-        Self::default()
-    }
-
-    pub fn from_pydict(_dict: &Bound<'_, PyDict>) -> PyResult<Self> {
-        let builder = Self::new();
-
-        Ok(builder)
-    }
+    // pub fn new() -> Self {
+    //     Self::default()
+    // }
 
     pub fn build(self) -> Result<TerminalConditions, ConfigError> {
         let conditions = TerminalConditions::default();

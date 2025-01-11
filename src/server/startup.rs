@@ -1,7 +1,7 @@
 use crate::{
     plugins::{
-        add_aircraft_plugin, AgentPlugin, CameraPlugin, HeadlessPlugin, StartupSequencePlugin,
-        TerrainPlugin, TransformationPlugin,
+        add_aircraft_plugin, AgentPlugin, CameraPlugin, EnvironmentPlugin, HeadlessPlugin,
+        PhysicsPlugin, StartupSequencePlugin, TerrainPlugin, TransformationPlugin,
     },
     resources::{RenderMode, UpdateControlPlugin},
     server::EnvConfig,
@@ -15,6 +15,8 @@ pub fn setup_app(mut app: App, config: EnvConfig, asset_path: String) -> App {
         TransformationPlugin::new(1.0),
         AgentPlugin::new(config.agent_config),
         UpdateControlPlugin,
+        EnvironmentPlugin::with_config(config.environment_config),
+        PhysicsPlugin::with_config(config.physics_config),
     ));
 
     for aircraft_config in config.aircraft_configs.iter() {

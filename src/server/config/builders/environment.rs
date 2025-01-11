@@ -1,11 +1,13 @@
-use flyer::resources::{AtmosphereConfig, AtmosphereType, EnvironmentConfig, WindConfig};
 use nalgebra::Vector3;
-use pyo3::prelude::*;
-use pyo3::types::PyDict;
+use serde::{Deserialize, Serialize};
+use serde_json::Value;
 
-use crate::gym::config::errors::ConfigError;
+use crate::{
+    resources::{AtmosphereConfig, AtmosphereType, EnvironmentConfig, WindConfig},
+    server::config::errors::ConfigError,
+};
 
-#[derive(Default)]
+#[derive(Default, Debug, Clone, Serialize, Deserialize)]
 pub struct EnvironmentConfigBuilder {
     wind_builder: Option<WindConfigBuilder>,
     atmosphere_builder: Option<AtmosphereConfigBuilder>,
@@ -17,14 +19,14 @@ impl EnvironmentConfigBuilder {
         Self::default()
     }
 
-    pub fn with_seed(mut self, master_seed: u64) -> Self {
-        use std::hash::{Hash, Hasher};
-        let mut hasher = std::collections::hash_map::DefaultHasher::new();
-        master_seed.hash(&mut hasher);
-        "environment".hash(&mut hasher);
-        self.seed = Some(hasher.finish());
-        self
-    }
+    // pub fn with_seed(mut self, master_seed: u64) -> Self {
+    //     use std::hash::{Hash, Hasher};
+    //     let mut hasher = std::collections::hash_map::DefaultHasher::new();
+    //     master_seed.hash(&mut hasher);
+    //     "environment".hash(&mut hasher);
+    //     self.seed = Some(hasher.finish());
+    //     self
+    // }
 
     pub fn wind_config(mut self, builder: WindConfigBuilder) -> Self {
         self.wind_builder = Some(builder);
@@ -36,19 +38,16 @@ impl EnvironmentConfigBuilder {
         self
     }
 
-    pub fn from_pydict(dict: &Bound<'_, PyDict>) -> PyResult<Self> {
+    pub fn from_json(value: &Value) -> Result<Self, ConfigError> {
         let mut builder = Self::new();
 
-        if let Some(wind_dict) = dict.get_item("wind_model_config")? {
-            if let Ok(dict) = wind_dict.downcast::<PyDict>() {
-                builder = builder.wind_config(WindConfigBuilder::from_pydict(&dict)?);
-            }
+        if let Some(wind_config) = value.get("wind_model_config") {
+            builder = builder.wind_config(WindConfigBuilder::from_json(wind_config)?);
         }
 
-        if let Some(atmosphere_dict) = dict.get_item("atmosphere_config")? {
-            if let Ok(dict) = atmosphere_dict.downcast::<PyDict>() {
-                builder = builder.atmosphere_config(AtmosphereConfigBuilder::from_pydict(&dict)?);
-            }
+        if let Some(atmosphere_config) = value.get("atmosphere_config") {
+            builder =
+                builder.atmosphere_config(AtmosphereConfigBuilder::from_json(atmosphere_config)?);
         }
 
         Ok(builder)
@@ -70,7 +69,7 @@ impl EnvironmentConfigBuilder {
     }
 }
 
-#[derive(Default)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WindConfigBuilder {
     wind_type: Option<String>,
     velocity: Option<Vector3<f64>>,
@@ -88,6 +87,23 @@ pub struct WindConfigBuilder {
     seed: Option<u64>,
 }
 
+impl Default for WindConfigBuilder {
+    fn default() -> Self {
+        Self {
+            wind_type: Some("Constant".to_string()),
+            velocity: Some(Vector3::new(0.0, 0.0, 0.0)),
+            d: None,
+            z0: None,
+            u_star: None,
+            bearing: None,
+            u_r: None,
+            z_r: None,
+            alpha: None,
+            seed: None,
+        }
+    }
+}
+
 impl WindConfigBuilder {
     pub fn new() -> Self {
         Self::default()
@@ -102,67 +118,61 @@ impl WindConfigBuilder {
         self
     }
 
-    pub fn wind_type(mut self, type_str: &str) -> Self {
-        self.wind_type = Some(type_str.to_string());
-        self
-    }
-
-    pub fn velocity(mut self, velocity: Vector3<f64>) -> Self {
-        self.velocity = Some(velocity);
-        self
-    }
-
-    pub fn from_pydict(dict: &Bound<'_, PyDict>) -> PyResult<Self> {
+    pub fn from_json(value: &Value) -> Result<Self, ConfigError> {
         let mut builder = Self::new();
 
-        let wind_type = dict
-            .get_item("type")?
-            .ok_or_else(|| ConfigError::MissingRequired("wind_type".into()))?
-            .extract::<String>()?;
+        let Some(wind_type) = value.get("type").and_then(|v| v.as_str()) else {
+            return Ok(builder);
+        };
 
-        builder = builder.wind_type(&wind_type);
+        let wind_type = wind_type.to_string();
+        builder.wind_type = Some(wind_type.clone());
 
         match wind_type.as_str() {
             "Constant" => {
-                if let Some(velocity) = dict.get_item("velocity")? {
-                    let (x, y, z): (f64, f64, f64) = velocity.extract()?;
-                    builder = builder.velocity(Vector3::new(x, y, z));
+                if let Some(velocity) = value.get("velocity") {
+                    if let (Some(x), Some(y), Some(z)) = (
+                        velocity.get(0).and_then(|v| v.as_f64()),
+                        velocity.get(1).and_then(|v| v.as_f64()),
+                        velocity.get(2).and_then(|v| v.as_f64()),
+                    ) {
+                        builder.velocity = Some(Vector3::new(x, y, z));
+                    }
                 }
             }
             "Logarithmic" => {
-                if let Some(d) = dict.get_item("d")? {
-                    builder.d = Some(d.extract()?);
+                if let Some(d) = value.get("d").and_then(|v| v.as_f64()) {
+                    builder.d = Some(d);
                 }
-                if let Some(z0) = dict.get_item("z0")? {
-                    builder.z0 = Some(z0.extract()?);
+                if let Some(z0) = value.get("z0").and_then(|v| v.as_f64()) {
+                    builder.z0 = Some(z0);
                 }
-                if let Some(u_star) = dict.get_item("u_star")? {
-                    builder.u_star = Some(u_star.extract()?);
+                if let Some(u_star) = value.get("u_star").and_then(|v| v.as_f64()) {
+                    builder.u_star = Some(u_star);
                 }
-                if let Some(bearing) = dict.get_item("bearing")? {
-                    builder.bearing = Some(bearing.extract()?);
+                if let Some(bearing) = value.get("bearing").and_then(|v| v.as_f64()) {
+                    builder.bearing = Some(bearing);
                 }
             }
             "PowerLaw" => {
-                if let Some(u_r) = dict.get_item("u_r")? {
-                    builder.u_r = Some(u_r.extract()?);
+                if let Some(u_r) = value.get("u_r").and_then(|v| v.as_f64()) {
+                    builder.u_r = Some(u_r);
                 }
-                if let Some(z_r) = dict.get_item("z_r")? {
-                    builder.z_r = Some(z_r.extract()?);
+                if let Some(z_r) = value.get("z_r").and_then(|v| v.as_f64()) {
+                    builder.z_r = Some(z_r);
                 }
-                if let Some(alpha) = dict.get_item("alpha")? {
-                    builder.alpha = Some(alpha.extract()?);
+                if let Some(alpha) = value.get("alpha").and_then(|v| v.as_f64()) {
+                    builder.alpha = Some(alpha);
                 }
-                if let Some(bearing) = dict.get_item("bearing")? {
-                    builder.bearing = Some(bearing.extract()?);
+                if let Some(bearing) = value.get("bearing").and_then(|v| v.as_f64()) {
+                    builder.bearing = Some(bearing);
                 }
             }
             _ => {
                 return Err(ConfigError::InvalidParameter {
                     name: "wind_type".into(),
                     value: wind_type,
-                }
-                .into())
+                })
             }
         }
 
@@ -197,7 +207,7 @@ impl WindConfigBuilder {
     }
 }
 
-#[derive(Default)]
+#[derive(Default, Debug, Clone, Serialize, Deserialize)]
 pub struct AtmosphereConfigBuilder {
     model_type: Option<AtmosphereType>,
     sea_level_density: Option<f64>,
@@ -218,38 +228,22 @@ impl AtmosphereConfigBuilder {
         self.seed = Some(hasher.finish());
         self
     }
-
-    pub fn model_type(mut self, model_type: AtmosphereType) -> Self {
-        self.model_type = Some(model_type);
-        self
-    }
-
-    pub fn sea_level_density(mut self, density: f64) -> Self {
-        self.sea_level_density = Some(density);
-        self
-    }
-
-    pub fn sea_level_temperature(mut self, temperature: f64) -> Self {
-        self.sea_level_temperature = Some(temperature);
-        self
-    }
-
-    pub fn from_pydict(dict: &Bound<'_, PyDict>) -> PyResult<Self> {
+    pub fn from_json(value: &Value) -> Result<Self, ConfigError> {
         let mut builder = Self::new();
 
-        if let Some(model_type) = dict.get_item("model_type")? {
-            builder = builder.model_type(match model_type.extract::<String>()?.as_str() {
+        if let Some(model_type) = value.get("model_type").and_then(|v| v.as_str()) {
+            builder.model_type = Some(match model_type {
                 "Constant" => AtmosphereType::Constant,
                 _ => AtmosphereType::Standard,
             });
         }
 
-        if let Some(density) = dict.get_item("sea_level_density")? {
-            builder = builder.sea_level_density(density.extract()?);
+        if let Some(density) = value.get("sea_level_density").and_then(|v| v.as_f64()) {
+            builder.sea_level_density = Some(density);
         }
 
-        if let Some(temperature) = dict.get_item("sea_level_temperature")? {
-            builder = builder.sea_level_temperature(temperature.extract()?);
+        if let Some(temperature) = value.get("sea_level_temperature").and_then(|v| v.as_f64()) {
+            builder.sea_level_temperature = Some(temperature);
         }
 
         Ok(builder)

@@ -3,9 +3,9 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::HashMap;
 
-mod aircraft;
-// mod environment;
 mod act;
+mod aircraft;
+mod environment;
 mod obs;
 mod physics;
 mod reward;
@@ -26,8 +26,8 @@ pub use aircraft::{
     FullAircraftConfigBuilder,
 };
 
-// use environment::EnvironmentConfigBuilder;
 pub use act::ActionSpaceBuilder;
+use environment::EnvironmentConfigBuilder;
 pub use obs::ObservationSpaceBuilder;
 pub use physics::PhysicsConfigBuilder;
 use reward::RewardWeightsBuilder;
@@ -53,7 +53,7 @@ pub struct EnvConfigBuilder {
     pub observation_builders: HashMap<String, ObservationSpaceBuilder>,
     #[serde(skip)]
     pub physics_builder: PhysicsConfigBuilder,
-    // environment_builder: EnvironmentConfigBuilder,
+    environment_builder: EnvironmentConfigBuilder,
     #[serde(skip)]
     pub terrain_builder: TerrainConfigBuilder,
     #[serde(skip)]
@@ -73,7 +73,7 @@ impl Default for EnvConfigBuilder {
             action_builders: HashMap::new(),
             observation_builders: HashMap::new(),
             physics_builder: PhysicsConfigBuilder::default(),
-            // environment_builder: EnvironmentConfigBuilder::default(),
+            environment_builder: EnvironmentConfigBuilder::default(),
             terrain_builder: TerrainConfigBuilder::default(),
             reward_builder: RewardWeightsBuilder::default(),
             terminal_builder: TerminalConditionsBuilder::default(),
@@ -171,6 +171,10 @@ impl EnvConfigBuilder {
             builder.physics_builder = PhysicsConfigBuilder::from_json(physics_config)?;
         }
 
+        if let Some(environment_config) = json_value.get("environment_config") {
+            builder.environment_builder = EnvironmentConfigBuilder::from_json(environment_config)?;
+        }
+
         Ok(builder)
     }
 
@@ -207,7 +211,7 @@ impl EnvConfigBuilder {
             action_spaces,
             observation_spaces,
             physics_config: self.physics_builder.build()?,
-            // environment_config: self.environment_builder.build()?,
+            environment_config: self.environment_builder.build()?,
             terrain_config: self.terrain_builder.build()?,
             agent_config: AgentConfig::default(),
             reward_weights: Some(self.reward_builder.build()?),

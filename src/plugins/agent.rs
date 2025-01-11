@@ -1,6 +1,6 @@
 use crate::{
     resources::{AgentConfig, AgentState},
-    systems::{apply_action, collect_state},
+    systems::collect_state,
 };
 
 use bevy::prelude::*;
@@ -61,7 +61,7 @@ impl Plugin for AgentPlugin {
     fn build(&self, app: &mut App) {
         // Add agent state resource
         app.insert_resource(AgentState::new(&self.config))
-            .add_systems(FixedUpdate, (apply_action, collect_state).chain());
+            .add_systems(FixedUpdate, (collect_state).chain());
 
         // Add render capture system only in render mode
         // if self.config.mode == SimulationMode::RGBArray {

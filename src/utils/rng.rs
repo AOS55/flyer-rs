@@ -105,7 +105,7 @@ mod tests {
         let component_name = "aircraft_0";
 
         // First reset
-        let mut state1 = {
+        let state1 = {
             let mut rng = rng_manager.get_rng(component_name);
             let u1: f64 = rng.gen();
             let u2: f64 = rng.gen();
@@ -113,7 +113,7 @@ mod tests {
         };
 
         // Second reset with same seed
-        let mut state2 = {
+        let state2 = {
             let mut rng = rng_manager.get_rng(component_name);
             let u1: f64 = rng.gen();
             let u2: f64 = rng.gen();

@@ -8,13 +8,13 @@ use std::{
 
 use flyer::{
     plugins::{
-        handle_reset_response, running_physics, sending_response, waiting_for_action,
         ResetCompleteEvent, ResetRequestEvent, SimState, StepCompleteEvent, StepRequestEvent,
     },
     server::{setup_app, Command, EnvConfig, ServerState},
     systems::{
-        aero_force_system, air_data_system, aircraft_render_system, dubins_aircraft_system,
-        force_calculator_system, physics_integrator_system, reset_env,
+        aero_force_system, air_data_system, dubins_aircraft_system, force_calculator_system,
+        handle_reset_response, physics_integrator_system, reset_env, running_physics,
+        sending_response, waiting_for_action,
     },
 };
 
@@ -140,7 +140,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .add_systems(FixedUpdate, reset_env);
 
     // Add event for handling reset requests
-    app.add_systems(FixedPostUpdate, handle_reset_response);
+    app.add_systems(
+        FixedPostUpdate,
+        handle_reset_response.run_if(resetting_state),
+    );
 
     // Run app
     println!("Starting Bevy app...");
