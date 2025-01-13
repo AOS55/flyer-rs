@@ -143,7 +143,7 @@ impl AersoAdapter {
             controls.aileron,
             controls.elevator,
             controls.rudder,
-            controls.flaps,
+            controls.power_lever,
         ]
     }
 }
@@ -171,7 +171,7 @@ impl AeroEffect<Vec<f64>> for AersoAdapter {
             aileron: input[0],
             elevator: input[1],
             rudder: input[2],
-            flaps: input[3],
+            power_lever: input[3],
         };
 
         let (forces, moments) = self.compute_forces(&airstate, &controls, rates);
@@ -409,7 +409,7 @@ mod tests {
             aileron: 0.1,
             elevator: -0.2,
             rudder: 0.3,
-            flaps: 0.4,
+            power_lever: 0.4,
         };
 
         let input = adapter.create_input_vector(&controls);

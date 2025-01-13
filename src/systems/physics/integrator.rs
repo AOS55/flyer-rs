@@ -1,4 +1,4 @@
-use crate::components::{PhysicsComponent, SpatialComponent};
+use crate::components::{FullAircraftState, PhysicsComponent, SpatialComponent};
 use crate::resources::PhysicsConfig;
 use bevy::prelude::*;
 use nalgebra::UnitQuaternion;
@@ -9,19 +9,15 @@ use nalgebra::UnitQuaternion;
 ///
 /// # Arguments
 /// - `query`: A query for entities with `PhysicsComponent` and `SpatialComponent`.
-/// - `time`: A fixed timestep resource (`Time<Fixed>`).
 /// - `config`: Physics configuration resource for velocity limits.
-pub fn physics_integrator_system(
-    mut query: Query<(&PhysicsComponent, &mut SpatialComponent)>,
-    time: Res<Time<Fixed>>,
-    config: Res<PhysicsConfig>,
-) {
+pub fn physics_integrator_system(mut query: Query<&FullAircraftState>, config: Res<PhysicsConfig>) {
+    println!("Running Physics Integrator System");
     // Get the timestep duration in seconds
-    let dt = time.delta_secs_f64();
+    let dt = config.timestep;
 
     // Iterate over all entities with physics and spatial components
-    for (physics, mut spatial) in query.iter_mut() {
-        integrate_state(physics, &mut spatial, dt, &config);
+    for state in query.iter_mut() {
+        integrate_state(&state.physics, state.spatial, dt, &config);
     }
 }
 
@@ -34,7 +30,7 @@ pub fn physics_integrator_system(
 /// - `config`: The physics configuration resource for constraints and limits.
 fn integrate_state(
     physics: &PhysicsComponent,
-    spatial: &mut SpatialComponent,
+    mut spatial: SpatialComponent,
     dt: f64,
     config: &PhysicsConfig,
 ) {
@@ -56,7 +52,7 @@ fn integrate_state(
     if spatial.angular_velocity.norm() > 0.0 {
         let rotation = UnitQuaternion::from_scaled_axis(spatial.angular_velocity * dt);
         spatial.attitude = rotation * spatial.attitude;
-    }
+    };
 }
 
 /// Applies velocity and angular velocity limits to prevent excessive motion.
@@ -64,7 +60,7 @@ fn integrate_state(
 /// # Arguments
 /// - `spatial`: The `SpatialComponent` containing velocity and angular velocity.
 /// - `config`: The physics configuration resource containing max limits.
-fn apply_velocity_limits(spatial: &mut SpatialComponent, config: &PhysicsConfig) {
+fn apply_velocity_limits(mut spatial: SpatialComponent, config: &PhysicsConfig) {
     // Limit linear velocity magnitude
     let velocity_norm = spatial.velocity.norm();
     if velocity_norm > config.max_velocity {

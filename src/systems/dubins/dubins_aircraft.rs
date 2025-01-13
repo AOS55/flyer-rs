@@ -1,7 +1,10 @@
 use bevy::prelude::*;
 use nalgebra::{UnitQuaternion, Vector3};
 
-use crate::components::aircraft::{DubinsAircraftConfig, DubinsAircraftState};
+use crate::{
+    components::aircraft::{DubinsAircraftConfig, DubinsAircraftState},
+    resources::PhysicsConfig,
+};
 
 /// System for simulating the dynamics of a Dubins aircraft.
 ///
@@ -10,9 +13,9 @@ use crate::components::aircraft::{DubinsAircraftConfig, DubinsAircraftState};
 /// and attitudes for each aircraft in the simulation.
 pub fn dubins_aircraft_system(
     mut query: Query<(&mut DubinsAircraftState, &DubinsAircraftConfig)>,
-    _time: Res<Time<Fixed>>,
+    physics: Res<PhysicsConfig>,
 ) {
-    let dt = 1.0 / 120.0;
+    let dt = physics.timestep;
 
     for (mut aircraft, config) in query.iter_mut() {
         update_aircraft(&mut aircraft, config, dt);
@@ -27,6 +30,21 @@ pub fn dubins_aircraft_system(
 /// * `dt` - The time step (in seconds) over which to apply the update.
 fn update_aircraft(state: &mut DubinsAircraftState, config: &DubinsAircraftConfig, dt: f64) {
     info!("Updating Aircraft State");
+
+    state.controls.bank_angle = state
+        .controls
+        .bank_angle
+        .clamp(-config.max_bank_angle, config.max_bank_angle);
+
+    state.controls.vertical_speed = state
+        .controls
+        .vertical_speed
+        .clamp(-config.max_descent_rate, config.max_climb_rate);
+
+    state.controls.acceleration = state.controls.acceleration.clamp(
+        -config.acceleration, // Maximum deceleration
+        config.acceleration,  // Maximum acceleration
+    );
 
     let controls = &state.controls;
     let spatial = &mut state.spatial;

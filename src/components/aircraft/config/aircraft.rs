@@ -4,7 +4,10 @@ use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 
 use crate::components::aircraft::config::{ConfigError, RawAircraftConfig};
-use crate::components::{AircraftAeroCoefficients, AircraftGeometry, MassModel};
+use crate::components::{
+    AircraftAeroCoefficients, AircraftGeometry, MassModel, PowerplantConfig, PropulsionConfig,
+    StartConfig,
+};
 
 /// The full aircraft configuration, including mass, geometry, and aerodynamic coefficients
 #[derive(Component, Debug, Clone, Serialize, Deserialize)]
@@ -17,8 +20,12 @@ pub struct FullAircraftConfig {
     pub mass: MassModel,
     /// The geometric properties of the aircraft, such as wing span and fuselage dimensions.
     pub geometry: AircraftGeometry,
-    /// Aerodynamic coefficients for calculating forces and moments on the aircraft.
+    /// Aerodynamic coefficients for calculating aerodynamic forces and moments on the aircraft.
     pub aero_coef: AircraftAeroCoefficients,
+    /// Prolusion configuration for calculating propulsive forces and moments on the aircraft.
+    pub propulsion: PropulsionConfig,
+    /// Configuration for the starting state of the aircraft
+    pub start_config: StartConfig,
 }
 
 impl Default for FullAircraftConfig {
@@ -30,6 +37,8 @@ impl Default for FullAircraftConfig {
             mass: MassModel::twin_otter(),
             geometry: AircraftGeometry::twin_otter(),
             aero_coef: AircraftAeroCoefficients::twin_otter(),
+            propulsion: PropulsionConfig::twin_otter(),
+            start_config: StartConfig::default(),
         }
     }
 }
@@ -65,6 +74,8 @@ impl FullAircraftConfig {
                 mass: MassModel::twin_otter(),
                 geometry: AircraftGeometry::twin_otter(),
                 aero_coef: AircraftAeroCoefficients::twin_otter(),
+                propulsion: PropulsionConfig::twin_otter(),
+                start_config: StartConfig::default(),
             },
             AircraftType::F4Phantom => Self {
                 name: "F4Phantom".to_string(),
@@ -72,6 +83,8 @@ impl FullAircraftConfig {
                 mass: MassModel::f4_phantom(),
                 geometry: AircraftGeometry::f4_phantom(),
                 aero_coef: AircraftAeroCoefficients::f4_phantom(),
+                propulsion: PropulsionConfig::f4_phantom(),
+                start_config: StartConfig::default(),
             },
             AircraftType::GenericTransport => Self {
                 name: "GenericTransport".to_string(),
@@ -79,6 +92,8 @@ impl FullAircraftConfig {
                 mass: MassModel::generic_transport(),
                 geometry: AircraftGeometry::generic_transport(),
                 aero_coef: AircraftAeroCoefficients::generic_transport(),
+                propulsion: PropulsionConfig::single_engine(PowerplantConfig::default()),
+                start_config: StartConfig::default(),
             },
             AircraftType::Custom(string) => Self {
                 name: string.clone(),
@@ -86,6 +101,8 @@ impl FullAircraftConfig {
                 mass: MassModel::twin_otter(),
                 geometry: AircraftGeometry::twin_otter(),
                 aero_coef: AircraftAeroCoefficients::twin_otter(),
+                propulsion: PropulsionConfig::twin_otter(),
+                start_config: StartConfig::default(),
             },
         }
     }
@@ -119,6 +136,8 @@ impl FullAircraftConfig {
             mass: MassModel::new(raw.mass, raw.ixx, raw.iyy, raw.izz, raw.ixz),
             geometry: AircraftGeometry::new(raw.wing_area, raw.wing_span, raw.mac),
             aero_coef: AircraftAeroCoefficients::from_raw(&raw)?,
+            propulsion: PropulsionConfig::twin_otter(), // TODO: Add engine config to raw config
+            start_config: StartConfig::default(),       // TODO: Add start config to raw config
         })
     }
 

@@ -1,27 +1,10 @@
-use pyo3::prelude::*;
 use serde::{Deserialize, Serialize};
-use std::str::FromStr;
 
 /// Modes the simulation can run in
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub enum RenderMode {
     RGBArray,
     Human,
-}
-
-// Utiltiy to extract render mode from Python string
-impl FromStr for RenderMode {
-    type Err = PyErr;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s {
-            "human" => Ok(Self::Human),
-            "rgb_array" => Ok(Self::RGBArray),
-            _ => Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
-                "Invalid render mode",
-            )),
-        }
-    }
 }
 
 /// Configuration for the agent plugin

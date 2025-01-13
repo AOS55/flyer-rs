@@ -1,4 +1,4 @@
-use crate::components::RandomStartConfig;
+use crate::components::StartConfig;
 use bevy::prelude::*;
 use serde::{Deserialize, Serialize};
 
@@ -24,9 +24,8 @@ pub struct DubinsAircraftConfig {
     pub max_climb_rate: f64,
     /// The maximum descent rate of the aircraft (m/s).
     pub max_descent_rate: f64,
-    /// Optional configuration for randomized starting positions.
-    /// If set, the aircraft will start at a random position defined by this configuration.
-    pub random_start_config: Option<RandomStartConfig>,
+    /// Configuration for the starting state of the aircraft.
+    pub start_config: StartConfig,
 }
 
 impl Default for DubinsAircraftConfig {
@@ -41,7 +40,7 @@ impl Default for DubinsAircraftConfig {
             max_turn_rate: 0.5,
             max_climb_rate: 5.0,
             max_descent_rate: 15.0,
-            random_start_config: Some(RandomStartConfig::default()),
+            start_config: StartConfig::default(),
         }
     }
 }
@@ -58,7 +57,7 @@ impl DubinsAircraftConfig {
     /// * `max_turn_rate` - The maximum turn rate (radians per second).
     /// * `max_climb_rate` - The maximum climb rate (m/s).
     /// * `max_descent_rate` - The maximum descent rate (m/s).
-    /// * `random_start_config` - Optional configuration for randomized starting positions.
+    /// * `start_config` - Optional configuration for starting positions.
     ///
     /// # Returns
     /// A fully initialized `DubinsAircraftConfig` with the provided values.
@@ -71,7 +70,7 @@ impl DubinsAircraftConfig {
         max_turn_rate: f64,
         max_climb_rate: f64,
         max_descent_rate: f64,
-        random_start_config: Option<RandomStartConfig>,
+        start_config: StartConfig,
     ) -> Self {
         Self {
             name,
@@ -82,7 +81,7 @@ impl DubinsAircraftConfig {
             max_turn_rate,
             max_climb_rate,
             max_descent_rate,
-            random_start_config,
+            start_config,
         }
     }
 }

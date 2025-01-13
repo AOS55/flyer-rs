@@ -1,14 +1,21 @@
 use bevy::prelude::*;
 use flyer::{
-    components::{AircraftConfig, DubinsAircraftConfig, FullAircraftConfig},
+    components::{
+        AircraftConfig, DubinsAircraftConfig, FullAircraftConfig, TrimBounds, TrimSolverConfig,
+    },
     plugins::*,
-    resources::{PhysicsConfig, TerrainConfig, UpdateMode},
+    resources::{EnvironmentConfig, PhysicsConfig, TerrainConfig, UpdateMode},
+    systems::{
+        aero_force_system, air_data_system, dubins_aircraft_system, force_calculator_system,
+        handle_trim_requests, physics_integrator_system, propulsion_system, trim_aircraft_system,
+    },
 };
 
 // Builder for creating a test application with customizable configuration
 pub struct TestAppBuilder {
     aircraft_configs: Vec<AircraftConfig>,
     physics_config: Option<PhysicsConfig>,
+    environment_config: Option<EnvironmentConfig>,
     terrain_config: Option<TerrainConfig>,
     update_mode: UpdateMode,
     steps_per_action: usize,
@@ -20,6 +27,7 @@ impl Default for TestAppBuilder {
         Self {
             aircraft_configs: Vec::new(),
             physics_config: None,
+            environment_config: None,
             terrain_config: None,
             update_mode: UpdateMode::Gym,
             steps_per_action: 10,
@@ -48,6 +56,11 @@ impl TestAppBuilder {
         self
     }
 
+    pub fn with_environment(mut self, config: EnvironmentConfig) -> Self {
+        self.environment_config = Some(config);
+        self
+    }
+
     pub fn with_terrain(mut self, config: TerrainConfig) -> Self {
         self.terrain_config = Some(config);
         self
@@ -63,11 +76,6 @@ impl TestAppBuilder {
         self
     }
 
-    pub fn with_time_step(mut self, dt: f64) -> Self {
-        self.time_step = dt;
-        self
-    }
-
     pub fn build(self) -> TestApp {
         let mut app = App::new();
 
@@ -76,6 +84,9 @@ impl TestAppBuilder {
             .add_plugins(TransformationPlugin::new(1.0))
             .add_plugins(PhysicsPlugin::with_config(
                 self.physics_config.unwrap_or_default(),
+            ))
+            .add_plugins(EnvironmentPlugin::with_config(
+                self.environment_config.unwrap_or_default(),
             ))
             .add_plugins(StartupSequencePlugin);
 
@@ -89,8 +100,45 @@ impl TestAppBuilder {
             app.add_plugins(TerrainPlugin::with_config(terrain_config));
         }
 
-        // Configure time step
-        app.insert_resource(Time::<Fixed>::from_seconds(self.time_step));
+        // app.add_systems(Update, || println!("Running Update"));
+
+        // Add Dubins systems
+        app.add_systems(Update, dubins_aircraft_system);
+
+        // app.add_systems(Update, || println!("Update schedule is running"));
+
+        // Add Full systems
+        app.add_systems(
+            Update,
+            (
+                (|| println!("Before air_data_system")),
+                air_data_system,
+                (|| println!("After air_data_system")),
+                aero_force_system,
+                (|| println!("After aero_force_system")),
+                propulsion_system,
+                (|| println!("After propulsion_system")),
+                force_calculator_system,
+                (|| println!("After force_calculator_system")),
+                physics_integrator_system,
+                (|| println!("After physics_integrator_system")),
+            )
+                .chain(),
+        );
+
+        // Add Trim systems (should be plugin)
+        // app.add_systems(Update, (handle_trim_requests, trim_aircraft_system).chain());
+
+        // app.insert_resource(TrimSolverConfig {
+        //     max_iterations: 1000,
+        //     cost_tolerance: 1e-6,
+        //     state_tolerance: 1e-8,
+        //     use_gradient_refinement: true,
+        //     bounds: TrimBounds::default(),
+        // });
+
+        // Run an initial update to initialize everything
+        app.update();
 
         TestApp {
             app,
@@ -107,6 +155,7 @@ pub struct TestApp {
 
 impl TestApp {
     pub fn run_steps(&mut self, steps: usize) {
+        println!("Running {} steps", steps);
         for _ in 0..steps {
             self.app.update();
         }

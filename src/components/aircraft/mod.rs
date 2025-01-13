@@ -1,14 +1,30 @@
-pub mod config;
-pub mod render;
-pub mod state;
+mod air_data;
+mod config;
+mod dubins;
+mod full;
+mod propulsion;
+mod render;
 
+pub use air_data::AirData;
 pub use config::{
     AircraftAeroCoefficients, AircraftConfig, AircraftGeometry, AircraftSource, AircraftType,
-    DubinsAircraftConfig, FullAircraftConfig, MassModel, RandomHeadingConfig, RandomPosConfig,
-    RandomSpeedConfig, RandomStartConfig, RawAircraftConfig,
+    DubinsAircraftConfig, FixedStartConfig, FullAircraftConfig, MassModel, PowerplantConfig,
+    PropulsionConfig, RandomHeadingConfig, RandomPosConfig, RandomSpeedConfig, RandomStartConfig,
+    RawAircraftConfig, StartConfig,
 };
+pub use dubins::{DubinsAircraftControls, DubinsAircraftState};
+pub use full::{AircraftControlSurfaces, FullAircraftState};
+pub use propulsion::{PowerplantState, PropulsionState};
 pub use render::{AircraftRenderState, Attitude};
-pub use state::{
-    AirData, AircraftControlSurfaces, AircraftControls, AircraftState, DubinsAircraftControls,
-    DubinsAircraftState, FullAircraftState,
-};
+
+#[derive(Debug, Clone, Copy)]
+pub enum AircraftControls {
+    Dubins(DubinsAircraftControls),
+    Full(AircraftControlSurfaces),
+}
+
+#[derive(Debug, Clone)]
+pub enum AircraftState {
+    Dubins(DubinsAircraftState),
+    Full(FullAircraftState),
+}

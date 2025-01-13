@@ -3,7 +3,7 @@ use serde_json::Value;
 use std::collections::HashMap;
 
 use crate::{
-    components::{AircraftConfig, TerminalConditions},
+    components::{AircraftConfig, StartConfig, TerminalConditions},
     resources::{
         AgentConfig, EnvironmentConfig, PhysicsConfig, RewardWeights, TerrainConfig, UpdateMode,
     },
@@ -16,7 +16,7 @@ use crate::{
         },
         ActionSpace, ObservationSpace,
     },
-    utils::{RngManager, WithRng},
+    utils::RngManager,
 };
 
 mod builders;
@@ -102,49 +102,56 @@ impl EnvConfig {
                     aircraft_builder.max_descent_rate = Some(dubins.max_descent_rate);
                     aircraft_builder.seed = Some(new_seed);
 
-                    // Copy random start config if it exists
-                    if dubins.random_start_config.is_some() {
-                        info!("Dubins IS SOME!!!");
+                    // Handle start configuration
+                    match &dubins.start_config {
+                        StartConfig::Fixed(fixed) => {
+                            let fixed_builder = FixedStartConfigBuilder {
+                                position: Some(fixed.position),
+                                speed: Some(fixed.speed),
+                                heading: Some(fixed.heading),
+                            };
+                            aircraft_builder.start_config =
+                                Some(StartConfigBuilder::Fixed(fixed_builder));
+                        }
+                        StartConfig::Random(random) => {
+                            // Create position builder
+                            let position_builder = RandomPosConfigBuilder {
+                                origin: Some(random.position.origin),
+                                variance: Some(random.position.variance),
+                                min_altitude: Some(random.position.min_altitude),
+                                max_altitude: Some(random.position.max_altitude),
+                            };
 
-                        let original_config = dubins.random_start_config.as_ref().unwrap();
+                            // Create speed builder
+                            let speed_builder = RandomSpeedConfigBuilder {
+                                min_speed: Some(random.speed.min_speed),
+                                max_speed: Some(random.speed.max_speed),
+                            };
 
-                        // Create position builder
-                        let position_builder = RandomPosConfigBuilder {
-                            origin: Some(original_config.position.origin),
-                            variance: Some(original_config.position.variance),
-                            min_altitude: Some(original_config.position.min_altitude),
-                            max_altitude: Some(original_config.position.max_altitude),
-                        };
+                            // Create heading builder
+                            let heading_builder = RandomHeadingConfigBuilder {
+                                min_heading: Some(random.heading.min_heading),
+                                max_heading: Some(random.heading.max_heading),
+                            };
 
-                        // Create speed builder
-                        let speed_builder = RandomSpeedConfigBuilder {
-                            min_speed: Some(original_config.speed.min_speed),
-                            max_speed: Some(original_config.speed.max_speed),
-                        };
+                            // Create the complete random start builder
+                            let random_start_builder = RandomStartConfigBuilder {
+                                position: position_builder,
+                                speed: speed_builder,
+                                heading: heading_builder,
+                                seed: Some(new_seed),
+                            };
 
-                        // Create heading builder
-                        let heading_builder = RandomHeadingConfigBuilder {
-                            min_heading: Some(original_config.heading.min_heading),
-                            max_heading: Some(original_config.heading.max_heading),
-                        };
-
-                        // Create the complete random start builder
-                        let random_start_builder = RandomStartConfigBuilder {
-                            position: position_builder,
-                            speed: speed_builder,
-                            heading: heading_builder,
-                            seed: Some(new_seed),
-                        };
-
-                        aircraft_builder.random_start_config = Some(random_start_builder);
-                    } else {
-                        info!("Dubins IS NONE!!!");
+                            aircraft_builder.start_config =
+                                Some(StartConfigBuilder::Random(random_start_builder));
+                        }
                     }
 
                     builder
                         .aircraft_builders
                         .insert(id.clone(), AircraftBuilderEnum::Dubins(aircraft_builder));
                 }
+
                 AircraftConfig::Full(full) => {
                     let mut aircraft_builder = FullAircraftConfigBuilder::new();
                     aircraft_builder.name = Some(full.name.clone());
@@ -153,11 +160,54 @@ impl EnvConfig {
                     aircraft_builder.geometry = Some(full.geometry.clone());
                     aircraft_builder.aero_coef = Some(full.aero_coef.clone());
 
-                    let builder_with_rng =
-                        WithRng::with_rng(aircraft_builder, rng_manager.get_rng(id));
+                    // Handle start configuration
+                    match &full.start_config {
+                        StartConfig::Fixed(fixed) => {
+                            let fixed_builder = FixedStartConfigBuilder {
+                                position: Some(fixed.position),
+                                speed: Some(fixed.speed),
+                                heading: Some(fixed.heading),
+                            };
+                            aircraft_builder.start_config =
+                                Some(StartConfigBuilder::Fixed(fixed_builder));
+                        }
+                        StartConfig::Random(random) => {
+                            // Create position builder
+                            let position_builder = RandomPosConfigBuilder {
+                                origin: Some(random.position.origin),
+                                variance: Some(random.position.variance),
+                                min_altitude: Some(random.position.min_altitude),
+                                max_altitude: Some(random.position.max_altitude),
+                            };
+
+                            // Create speed builder
+                            let speed_builder = RandomSpeedConfigBuilder {
+                                min_speed: Some(random.speed.min_speed),
+                                max_speed: Some(random.speed.max_speed),
+                            };
+
+                            // Create heading builder
+                            let heading_builder = RandomHeadingConfigBuilder {
+                                min_heading: Some(random.heading.min_heading),
+                                max_heading: Some(random.heading.max_heading),
+                            };
+
+                            // Create the complete random start builder
+                            let random_start_builder = RandomStartConfigBuilder {
+                                position: position_builder,
+                                speed: speed_builder,
+                                heading: heading_builder,
+                                seed: Some(new_seed),
+                            };
+
+                            aircraft_builder.start_config =
+                                Some(StartConfigBuilder::Random(random_start_builder));
+                        }
+                    }
+
                     builder
                         .aircraft_builders
-                        .insert(id.clone(), AircraftBuilderEnum::Full(builder_with_rng));
+                        .insert(id.clone(), AircraftBuilderEnum::Full(aircraft_builder));
                 }
             }
 

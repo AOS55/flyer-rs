@@ -1,22 +1,24 @@
 use bevy::prelude::*;
-use rand_chacha::ChaCha8Rng;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 use crate::{
     components::{
         AircraftAeroCoefficients, AircraftConfig, AircraftGeometry, AircraftType,
-        DubinsAircraftConfig, FullAircraftConfig, MassModel,
+        DubinsAircraftConfig, FullAircraftConfig, MassModel, PowerplantConfig, PropulsionConfig,
+        StartConfig,
     },
     server::{
         config::{
-            builders::{ActionSpaceBuilder, ObservationSpaceBuilder, RandomStartConfigBuilder},
+            builders::{
+                ActionSpaceBuilder, FixedStartConfigBuilder, ObservationSpaceBuilder,
+                RandomStartConfigBuilder, StartConfigBuilder,
+            },
             errors::ConfigError,
         },
         obs::ContinuousObservationSpace,
         ActionSpace, ObservationSpace,
     },
-    utils::WithRng,
 };
 
 pub struct AircraftAgentBuilder {
@@ -55,7 +57,7 @@ pub struct DubinsAircraftConfigBuilder {
     pub max_turn_rate: Option<f64>,
     pub max_climb_rate: Option<f64>,
     pub max_descent_rate: Option<f64>,
-    pub random_start_config: Option<RandomStartConfigBuilder>,
+    pub start_config: Option<StartConfigBuilder>,
     pub seed: Option<u64>,
 }
 
@@ -66,8 +68,9 @@ pub struct FullAircraftConfigBuilder {
     pub mass: Option<MassModel>,
     pub geometry: Option<AircraftGeometry>,
     pub aero_coef: Option<AircraftAeroCoefficients>,
-    #[serde(skip)]
-    pub rng: Option<ChaCha8Rng>,
+    pub propulsion_config: Option<PropulsionConfig>,
+    pub start_config: Option<StartConfigBuilder>,
+    pub seed: Option<u64>,
 }
 
 impl DubinsAircraftConfigBuilder {
@@ -79,6 +82,7 @@ impl DubinsAircraftConfigBuilder {
         let mut builder = Self::new();
 
         builder.name = value.get("name").and_then(|v| v.as_str()).map(String::from);
+        builder.seed = Some(seed);
 
         if let Some(config) = value.get("config") {
             builder.max_speed = config.get("max_speed").and_then(|v| v.as_f64());
@@ -91,16 +95,34 @@ impl DubinsAircraftConfigBuilder {
         }
 
         // Create RandomStartConfigBuilder with either provided config or defaults
-        let random_start_builder = if let Some(random_start) = value.get("random_start") {
-            RandomStartConfigBuilder::from_json(random_start, seed)?
-        } else {
-            // Create default builder but with the provided seed
-            let mut default_builder = RandomStartConfigBuilder::new();
-            default_builder.seed = Some(seed);
-            default_builder
-        };
+        if let Some(start_config) = value.get("start_config") {
+            let config_type = start_config
+                .get("type")
+                .and_then(|v| v.as_str())
+                .ok_or_else(|| ConfigError::MissingRequired("start_config.type".into()))?;
 
-        builder.random_start_config = Some(random_start_builder);
+            builder.start_config = Some(match config_type {
+                "fixed" => {
+                    if let Some(config) = start_config.get("config") {
+                        StartConfigBuilder::Fixed(FixedStartConfigBuilder::from_json(config)?)
+                    } else {
+                        return Err(ConfigError::MissingRequired("start_config.config".into()));
+                    }
+                }
+                "random" => {
+                    if let Some(config) = start_config.get("config") {
+                        StartConfigBuilder::Random(RandomStartConfigBuilder::from_json(
+                            config, seed,
+                        )?)
+                    } else {
+                        let mut default_builder = RandomStartConfigBuilder::new();
+                        default_builder.seed = Some(seed);
+                        StartConfigBuilder::Random(default_builder)
+                    }
+                }
+                _ => return Err(ConfigError::JsonError(config_type.to_string())),
+            });
+        }
         Ok(builder)
     }
 }
@@ -110,19 +132,21 @@ impl AircraftBuilder for DubinsAircraftConfigBuilder {
         info!("Building DubinsAircraftConfig");
         let default_config = DubinsAircraftConfig::default();
 
-        let random_start_config = match (&self.random_start_config, self.seed) {
-            (Some(config), Some(seed)) => {
-                info!("Using master seed {} for random_start_config", seed);
-                Some(config.clone().build_with_seed(seed))
+        let start_config = match &self.start_config {
+            Some(StartConfigBuilder::Fixed(fixed_config)) => {
+                Some(StartConfig::Fixed(fixed_config.build()))
             }
-            (Some(config), None) => {
-                info!("No seed provided, using default");
-                Some(config.clone().build())
+            Some(StartConfigBuilder::Random(random_config)) => {
+                let config = if let Some(seed) = self.seed {
+                    info!("Using master seed {} for random_start_config", seed);
+                    random_config.clone().build_with_seed(seed)
+                } else {
+                    info!("No seed provided, using default");
+                    random_config.clone().build()
+                };
+                Some(StartConfig::Random(config))
             }
-            (None, _) => {
-                info!("No random start config provided");
-                None
-            }
+            None => None,
         };
 
         Ok(AircraftConfig::Dubins(DubinsAircraftConfig {
@@ -139,7 +163,7 @@ impl AircraftBuilder for DubinsAircraftConfigBuilder {
             max_descent_rate: self
                 .max_descent_rate
                 .unwrap_or(default_config.max_descent_rate),
-            random_start_config,
+            start_config: start_config.unwrap_or(default_config.start_config),
         }))
     }
 }
@@ -149,7 +173,7 @@ impl FullAircraftConfigBuilder {
         Self::default()
     }
 
-    pub fn from_json(value: &Value) -> Result<Self, ConfigError> {
+    pub fn from_json(value: &Value, seed: u64) -> Result<Self, ConfigError> {
         let mut builder = Self::new();
 
         builder.name = value.get("name").and_then(|v| v.as_str()).map(String::from);
@@ -186,6 +210,49 @@ impl FullAircraftConfigBuilder {
                     _ => AircraftAeroCoefficients::generic_transport(),
                 },
             );
+
+            // Handle propulsion config based on aircraft_type
+            builder.propulsion_config = Some(
+                match builder
+                    .ac_type
+                    .as_ref()
+                    .unwrap_or(&AircraftType::GenericTransport)
+                {
+                    AircraftType::TwinOtter => PropulsionConfig::twin_otter(),
+                    AircraftType::F4Phantom => PropulsionConfig::f4_phantom(),
+                    _ => PropulsionConfig::single_engine(PowerplantConfig::default()),
+                },
+            );
+
+            // Create RandomStartConfigBuilder with either provided config or defaults
+            if let Some(start_config) = value.get("start_config") {
+                let config_type = start_config
+                    .get("type")
+                    .and_then(|v| v.as_str())
+                    .ok_or_else(|| ConfigError::MissingRequired("start_config.type".into()))?;
+
+                builder.start_config = Some(match config_type {
+                    "fixed" => {
+                        if let Some(config) = start_config.get("config") {
+                            StartConfigBuilder::Fixed(FixedStartConfigBuilder::from_json(config)?)
+                        } else {
+                            return Err(ConfigError::MissingRequired("start_config.config".into()));
+                        }
+                    }
+                    "random" => {
+                        if let Some(config) = start_config.get("config") {
+                            StartConfigBuilder::Random(RandomStartConfigBuilder::from_json(
+                                config, seed,
+                            )?)
+                        } else {
+                            let mut default_builder = RandomStartConfigBuilder::new();
+                            default_builder.seed = Some(seed);
+                            StartConfigBuilder::Random(default_builder)
+                        }
+                    }
+                    _ => return Err(ConfigError::JsonError(config_type.to_string())),
+                });
+            }
         }
 
         Ok(builder)
@@ -209,6 +276,23 @@ impl AircraftBuilder for FullAircraftConfigBuilder {
             )
         });
 
+        let start_config = match &self.start_config {
+            Some(StartConfigBuilder::Fixed(fixed_config)) => {
+                Some(StartConfig::Fixed(fixed_config.build()))
+            }
+            Some(StartConfigBuilder::Random(random_config)) => {
+                let config = if let Some(seed) = self.seed {
+                    info!("Using master seed {} for random_start_config", seed);
+                    random_config.clone().build_with_seed(seed)
+                } else {
+                    info!("No seed provided, using default");
+                    random_config.clone().build()
+                };
+                Some(StartConfig::Random(config))
+            }
+            None => None,
+        };
+
         Ok(AircraftConfig::Full(FullAircraftConfig {
             name,
             ac_type: ac_type.clone(),
@@ -227,6 +311,15 @@ impl AircraftBuilder for FullAircraftConfigBuilder {
                 AircraftType::F4Phantom => AircraftAeroCoefficients::f4_phantom(),
                 _ => AircraftAeroCoefficients::generic_transport(),
             }),
+            propulsion: self
+                .propulsion_config
+                .clone()
+                .unwrap_or_else(|| match ac_type {
+                    AircraftType::TwinOtter => PropulsionConfig::twin_otter(),
+                    AircraftType::F4Phantom => PropulsionConfig::f4_phantom(),
+                    _ => PropulsionConfig::single_engine(PowerplantConfig::default()),
+                }),
+            start_config: start_config.unwrap_or_default(),
         }))
     }
 }
@@ -260,33 +353,6 @@ fn parse_geometry_json(value: &Value) -> Result<Option<AircraftGeometry>, Config
     }
 }
 
-impl WithRng for DubinsAircraftConfigBuilder {
-    fn with_rng(mut self, rng: ChaCha8Rng) -> Self {
-        info!("Setting seed for Dubins aircraft config from RNG");
-        let new_seed = rng.get_seed()[0] as u64;
-        self.seed = Some(new_seed);
-        self
-    }
-}
-
-impl WithRng for FullAircraftConfigBuilder {
-    fn with_rng(mut self, rng: ChaCha8Rng) -> Self {
-        self.rng = Some(rng);
-        self
-    }
-}
-
-impl WithRng for AircraftBuilderEnum {
-    fn with_rng(self, rng: ChaCha8Rng) -> Self {
-        match self {
-            AircraftBuilderEnum::Dubins(builder) => {
-                AircraftBuilderEnum::Dubins(builder.with_rng(rng))
-            }
-            AircraftBuilderEnum::Full(builder) => AircraftBuilderEnum::Full(builder.with_rng(rng)),
-        }
-    }
-}
-
 pub fn create_aircraft_builder(
     value: &Value,
     seed: u64,
@@ -312,7 +378,7 @@ pub fn create_aircraft_builder(
             AircraftBuilderEnum::Dubins(builder)
         }
         "full" => {
-            let builder = FullAircraftConfigBuilder::from_json(value)?;
+            let builder = FullAircraftConfigBuilder::from_json(value, seed)?;
             AircraftBuilderEnum::Full(builder)
         }
         _ => return Err(ConfigError::InvalidAircraftType(aircraft_type.to_string())),

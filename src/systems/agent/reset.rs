@@ -80,7 +80,7 @@ pub fn reset_env(
         agent_state.reset();
         // Reset Dubins aircraft
         for (identifier, config, mut state) in dubins_query.iter_mut() {
-            *state = DubinsAircraftState::random_start(config.random_start_config.clone());
+            *state = DubinsAircraftState::from_config(&config.start_config);
 
             // Update state buffer
             if let Ok(mut state_buffer) = agent_state.state_buffer.lock() {

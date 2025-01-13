@@ -4,6 +4,7 @@ mod dubins;
 mod geometry;
 mod loader;
 mod mass;
+mod propulsion;
 mod start;
 
 pub use aero_coef::AircraftAeroCoefficients;
@@ -12,7 +13,11 @@ pub use dubins::DubinsAircraftConfig;
 pub use geometry::AircraftGeometry;
 pub use loader::{ConfigError, RawAircraftConfig};
 pub use mass::MassModel;
-pub use start::{RandomHeadingConfig, RandomPosConfig, RandomSpeedConfig, RandomStartConfig};
+pub use propulsion::{PowerplantConfig, PropulsionConfig};
+pub use start::{
+    FixedStartConfig, RandomHeadingConfig, RandomPosConfig, RandomSpeedConfig, RandomStartConfig,
+    StartConfig,
+};
 
 use serde::{Deserialize, Serialize};
 

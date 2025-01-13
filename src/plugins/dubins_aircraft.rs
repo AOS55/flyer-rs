@@ -34,7 +34,7 @@ impl DubinsAircraftPlugin {
     fn setup_aircraft(mut commands: Commands, config: DubinsAircraftConfig) {
         commands.spawn((
             config.clone(),
-            DubinsAircraftState::random_start(config.random_start_config),
+            DubinsAircraftState::from_config(&config.start_config),
             PlayerController::new(),
             Name::new(config.name.to_string()), // Name of Bevy component
             info!("Spawning Dubins aircraft: {}", config.name),

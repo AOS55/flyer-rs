@@ -1,7 +1,7 @@
 use bevy::prelude::*;
 
 use crate::{
-    components::{FullAircraftConfig, FullAircraftState, PlayerController, SpatialComponent},
+    components::{FullAircraftConfig, FullAircraftState, PlayerController},
     plugins::{AircraftPluginBase, Id, Identifier, StartupStage},
 };
 
@@ -35,8 +35,7 @@ impl FullAircraftPlugin {
         commands.spawn((
             config.clone(),
             PlayerController::new(),
-            FullAircraftState::default(),
-            SpatialComponent::default(),
+            FullAircraftState::from_config(&config),
             Name::new(config.name.to_string()),
             Identifier {
                 id: Id::Named(config.name.to_string()), // Id name

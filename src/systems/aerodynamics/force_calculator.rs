@@ -4,7 +4,8 @@ use bevy::prelude::*;
 use super::aerso_adapter::AersoAdapter;
 use crate::components::{
     AirData, AircraftAeroCoefficients, AircraftControlSurfaces, AircraftGeometry, Force,
-    ForceCategory, Moment, PhysicsComponent, ReferenceFrame, SpatialComponent,
+    ForceCategory, FullAircraftConfig, FullAircraftState, Moment, PhysicsComponent, ReferenceFrame,
+    SpatialComponent,
 };
 use crate::resources::AerodynamicsConfig;
 
@@ -14,47 +15,56 @@ use crate::resources::AerodynamicsConfig;
 /// aerodynamic coefficients, control surface inputs, air data, and spatial properties. The
 /// results are added to the aircraft's physics component.
 pub fn aero_force_system(
-    mut query: Query<(
-        &AircraftControlSurfaces,
-        &AircraftAeroCoefficients,
-        &AirData,
-        &SpatialComponent,
-        &AircraftGeometry,
-        &mut PhysicsComponent,
-    )>,
-    config: Res<AerodynamicsConfig>,
+    mut aircraft: Query<(&mut FullAircraftState, &FullAircraftConfig)>,
+    aero_config: Res<AerodynamicsConfig>,
 ) {
-    for (control_surfaces, coefficients, air_data, spatial, geometry, mut physics) in
-        query.iter_mut()
-    {
-        // Skip calculations if the airspeed is below the minimum threshold
-        if air_data.true_airspeed < config.min_airspeed_threshold {
+    println!("Running Aero Force System!");
+    for (mut state, config) in aircraft.iter_mut() {
+        // Early return if airspeed is below threshold
+        if state.air_data.true_airspeed < aero_config.min_airspeed_threshold {
             continue;
         }
 
-        // Create an aerodynamic adapter for the current aircraft configuration
-        let adapter = AersoAdapter::new(geometry.clone(), coefficients.clone());
-        // Perform aerodynamic force and moment calculations
-        calculate_aero_forces(&adapter, control_surfaces, air_data, spatial, &mut physics);
+        // Create adapter outside of the calculation
+        let adapter = AersoAdapter::new(config.geometry.clone(), config.aero_coef.clone());
+
+        // Collect all necessary data before calculation
+        let aero_forces = prepare_aero_forces(
+            &adapter,
+            &state.control_surfaces,
+            &state.air_data,
+            &state.spatial,
+        );
+        println!("State: {:?}, Config: {:?}", state, config);
+
+        // Clear existing aerodynamic forces and moments before adding new ones
+        state
+            .physics
+            .forces
+            .retain(|force| force.category != ForceCategory::Aerodynamic);
+        state
+            .physics
+            .moments
+            .retain(|moment| moment.category != ForceCategory::Aerodynamic);
+
+        // Apply the calculated forces and moments
+        apply_aero_forces(&mut state.physics, aero_forces);
     }
 }
 
-/// Helper function to calculate aerodynamic forces and moments for a single entity.
-///
-/// # Arguments
-/// * `adapter` - The aerodynamic adapter configured for the aircraft.
-/// * `control_surfaces` - The state of the aircraft's control surfaces.
-/// * `air_data` - The current air data for the aircraft (e.g., airspeed, alpha, beta).
-/// * `spatial` - The spatial component describing the aircraft's velocity and attitude.
-/// * `physics` - The physics component where forces and moments will be applied.
-fn calculate_aero_forces(
+/// Represents the calculated aerodynamic forces and moments
+struct AeroForces {
+    force: Force,
+    moment: Moment,
+}
+
+/// Prepares aerodynamic forces and moments without mutating any state
+fn prepare_aero_forces(
     adapter: &AersoAdapter,
     control_surfaces: &AircraftControlSurfaces,
     air_data: &AirData,
     spatial: &SpatialComponent,
-    physics: &mut PhysicsComponent,
-) {
-    // Create the air state required for aerodynamic calculations
+) -> AeroForces {
     let air_state = AirState {
         alpha: air_data.alpha,
         beta: air_data.beta,
@@ -62,37 +72,39 @@ fn calculate_aero_forces(
         q: air_data.dynamic_pressure,
     };
 
-    // Prepare the input vector from control surface deflections
     let input = vec![
         control_surfaces.aileron,
         control_surfaces.elevator,
         control_surfaces.rudder,
-        control_surfaces.flaps,
+        control_surfaces.power_lever,
     ];
 
-    // Compute aerodynamic force and torque
     let (aero_force, aero_torque) = adapter.get_effect(air_state, spatial.angular_velocity, &input);
 
-    // Transform aerodynamic force into the body frame if necessary
     let force_vector = match aero_force.frame {
         aerso::types::Frame::Body => aero_force.force,
         aerso::types::Frame::World => spatial.attitude.inverse() * aero_force.force,
     };
 
-    // Add aerodynamic force to the physics component
-    physics.add_force(Force {
-        vector: force_vector,
-        point: None,
-        frame: ReferenceFrame::Body,
-        category: ForceCategory::Aerodynamic,
-    });
+    AeroForces {
+        force: Force {
+            vector: force_vector,
+            point: None,
+            frame: ReferenceFrame::Body,
+            category: ForceCategory::Aerodynamic,
+        },
+        moment: Moment {
+            vector: aero_torque.torque,
+            frame: ReferenceFrame::Body,
+            category: ForceCategory::Aerodynamic,
+        },
+    }
+}
 
-    // Add aerodynamic moment to the physics component
-    physics.add_moment(Moment {
-        vector: aero_torque.torque,
-        frame: ReferenceFrame::Body,
-        category: ForceCategory::Aerodynamic,
-    });
+/// Applies the calculated forces and moments to the physics component
+fn apply_aero_forces(physics: &mut PhysicsComponent, aero_forces: AeroForces) {
+    physics.add_force(aero_forces.force);
+    physics.add_moment(aero_forces.moment);
 }
 
 #[cfg(test)]

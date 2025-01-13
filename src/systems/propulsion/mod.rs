@@ -1,3 +1,3 @@
-mod engine;
+mod powerplant;
 
-pub use engine::{PropulsionSystem, PropulsionSystemConfig};
+pub use powerplant::propulsion_system;

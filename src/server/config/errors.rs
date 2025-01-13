@@ -1,5 +1,3 @@
-use pyo3::exceptions::PyValueError;
-use pyo3::PyErr;
 use std::fmt;
 
 #[derive(Debug)]
@@ -42,15 +40,3 @@ impl fmt::Display for ConfigError {
 }
 
 impl std::error::Error for ConfigError {}
-
-impl From<ConfigError> for PyErr {
-    fn from(err: ConfigError) -> PyErr {
-        PyValueError::new_err(err.to_string())
-    }
-}
-
-impl From<PyErr> for ConfigError {
-    fn from(err: PyErr) -> ConfigError {
-        ConfigError::PythonError(err.to_string())
-    }
-}

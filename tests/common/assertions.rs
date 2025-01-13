@@ -144,7 +144,7 @@ pub fn assert_full_state_valid(state: &FullAircraftState) {
         "Negative dynamic pressure"
     );
 
-    // Verify control surfaces are within limits
+    // Verify control surfaces are within limits (should be based on radian config)
     assert!(
         state.control_surfaces.elevator.abs() <= 1.0,
         "Invalid elevator deflection"
@@ -158,7 +158,7 @@ pub fn assert_full_state_valid(state: &FullAircraftState) {
         "Invalid rudder deflection"
     );
     assert!(
-        state.control_surfaces.flaps >= 0.0 && state.control_surfaces.flaps <= 1.0,
+        state.control_surfaces.power_lever >= 0.0 && state.control_surfaces.power_lever <= 1.0,
         "Invalid flap setting"
     );
 }

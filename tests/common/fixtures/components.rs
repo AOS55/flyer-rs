@@ -1,15 +1,15 @@
 use flyer::components::{
-    AircraftConfig, AircraftControlSurfaces, DubinsAircraftConfig, FullAircraftConfig,
-    RandomStartConfig, SpatialComponent,
+    AircraftConfig, AircraftControlSurfaces, DubinsAircraftConfig, FixedStartConfig,
+    FullAircraftConfig, RandomStartConfig, SpatialComponent, StartConfig,
 };
 use nalgebra::{UnitQuaternion, Vector3};
-use std::f64::consts::PI;
+use std::{f64::consts::PI, sync::LazyLock};
 
 pub mod fixtures {
     use super::*;
 
     /// Standard test aircraft configuration
-    pub static TEST_AIRCRAFT_CONFIG: AircraftConfig =
+    pub static TEST_AIRCRAFT_CONFIG: LazyLock<AircraftConfig> = LazyLock::new(|| {
         AircraftConfig::Dubins(DubinsAircraftConfig {
             name: String::new(), // Will be set during tests
             max_speed: 100.0,
@@ -19,8 +19,9 @@ pub mod fixtures {
             max_turn_rate: 0.5,
             max_climb_rate: 10.0,
             max_descent_rate: 10.0,
-            random_start_config: None,
-        });
+            start_config: StartConfig::default(),
+        })
+    });
 }
 
 /// Creates a spatial component in straight and level flight
@@ -59,7 +60,7 @@ pub fn neutral_controls() -> AircraftControlSurfaces {
         elevator: 0.0,
         aileron: 0.0,
         rudder: 0.0,
-        flaps: 0.0,
+        power_lever: 0.0,
     }
 }
 
@@ -77,7 +78,7 @@ pub mod aircraft_configs {
             max_turn_rate: 0.5,
             max_climb_rate: 10.0,
             max_descent_rate: 10.0,
-            random_start_config: Some(RandomStartConfig::default()),
+            start_config: StartConfig::Fixed(FixedStartConfig::default()),
         }
     }
 
@@ -91,7 +92,7 @@ pub mod aircraft_configs {
             max_turn_rate: 1.0,
             max_climb_rate: 20.0,
             max_descent_rate: 15.0,
-            random_start_config: Some(RandomStartConfig::default()),
+            start_config: StartConfig::Random(RandomStartConfig::default()),
         }
     }
 

@@ -49,7 +49,7 @@ impl ToControls for ContinuousActionSpace {
                     elevator: action.get("elevator").copied().unwrap_or(0.0),
                     aileron: action.get("aileron").copied().unwrap_or(0.0),
                     rudder: action.get("rudder").copied().unwrap_or(0.0),
-                    flaps: 0.0,
+                    power_lever: action.get("power_lever").copied().unwrap_or(0.0),
                 })
             }
         }
@@ -70,7 +70,7 @@ impl ToControls for DiscreteActionSpace {
                 elevator: action.get("elevator").copied().unwrap_or(0.0),
                 aileron: action.get("aileron").copied().unwrap_or(0.0),
                 rudder: action.get("rudder").copied().unwrap_or(0.0),
-                flaps: 0.0,
+                power_lever: action.get("power_lever").copied().unwrap_or(0.0),
             }),
         }
     }

@@ -2,8 +2,9 @@ use crate::common::TestApp;
 use bevy::prelude::*;
 use flyer::{
     components::{
-        AircraftConfig, DubinsAircraftConfig, FullAircraftConfig, RandomStartConfig,
-        SpatialComponent,
+        AircraftAeroCoefficients, AircraftConfig, AircraftGeometry, AircraftType,
+        DubinsAircraftConfig, FixedStartConfig, FullAircraftConfig, MassModel, PropulsionConfig,
+        RandomStartConfig, SpatialComponent, StartConfig,
     },
     resources::{PhysicsConfig, TerrainConfig},
 };
@@ -41,13 +42,25 @@ pub fn create_test_dubins_config() -> DubinsAircraftConfig {
         max_turn_rate: 0.5,
         max_climb_rate: 10.0,
         max_descent_rate: 10.0,
-        random_start_config: Some(create_test_random_start()),
+        start_config: StartConfig::Fixed(FixedStartConfig::default()),
     }
 }
 
 /// Creates a basic full aircraft configuration for testing
 pub fn create_test_full_config() -> FullAircraftConfig {
-    FullAircraftConfig::default()
+    FullAircraftConfig {
+        name: "test_full".to_string(),
+        ac_type: AircraftType::TwinOtter,
+        mass: MassModel::twin_otter(),
+        geometry: AircraftGeometry::twin_otter(),
+        aero_coef: AircraftAeroCoefficients::twin_otter(),
+        propulsion: PropulsionConfig::twin_otter(),
+        start_config: StartConfig::Fixed(FixedStartConfig {
+            position: Vector3::new(0.0, 0.0, -600.0),
+            speed: 200.0,
+            heading: 0.0,
+        }),
+    }
 }
 
 /// Creates a test random start configuration
@@ -63,10 +76,10 @@ pub fn create_test_terrain_config() -> TerrainConfig {
 /// Waits for a specific condition to be met within a maximum number of steps
 pub fn wait_for_condition<F>(test_app: &mut TestApp, condition: F, max_steps: usize) -> bool
 where
-    F: Fn(&App) -> bool,
+    F: Fn(&mut App) -> bool,
 {
     for _ in 0..max_steps {
-        if condition(&test_app.app) {
+        if condition(&mut test_app.app) {
             return true;
         }
         test_app.run_frame();

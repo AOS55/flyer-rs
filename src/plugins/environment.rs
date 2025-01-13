@@ -45,13 +45,10 @@ impl EnvironmentPlugin {
 impl Plugin for EnvironmentPlugin {
     fn build(&self, app: &mut App) {
         let config = self.config.clone();
-
         // Setup configuration
         app.add_systems(
             Startup,
             (Self::setup_config_with_initial(config), Self::setup_model).chain(),
-        )
-        // Setup environment model
-        .add_systems(Startup, Self::setup_model);
+        );
     }
 }

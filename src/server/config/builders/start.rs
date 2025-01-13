@@ -1,12 +1,29 @@
 use bevy::prelude::*;
-use nalgebra::Vector2;
+use nalgebra::{Vector2, Vector3};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 use crate::{
-    components::{RandomHeadingConfig, RandomPosConfig, RandomSpeedConfig, RandomStartConfig},
+    components::{
+        FixedStartConfig, RandomHeadingConfig, RandomPosConfig, RandomSpeedConfig,
+        RandomStartConfig,
+    },
     server::config::ConfigError,
 };
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(tag = "type", content = "config")]
+pub enum StartConfigBuilder {
+    Fixed(FixedStartConfigBuilder),
+    Random(RandomStartConfigBuilder),
+}
+
+#[derive(Default, Debug, Clone, Serialize, Deserialize)]
+pub struct FixedStartConfigBuilder {
+    pub position: Option<Vector3<f64>>,
+    pub speed: Option<f64>,
+    pub heading: Option<f64>,
+}
 
 #[derive(Default, Debug, Clone, Serialize, Deserialize)]
 pub struct RandomStartConfigBuilder {
@@ -38,6 +55,39 @@ pub struct RandomSpeedConfigBuilder {
 pub struct RandomHeadingConfigBuilder {
     pub min_heading: Option<f64>,
     pub max_heading: Option<f64>,
+}
+
+impl FixedStartConfigBuilder {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn from_json(value: &Value) -> Result<Self, ConfigError> {
+        let mut builder = Self::new();
+
+        if let Some(pos) = value.get("position") {
+            builder.position = Some(Vector3::new(
+                pos.get("x").and_then(|v| v.as_f64()).unwrap_or(0.0),
+                pos.get("y").and_then(|v| v.as_f64()).unwrap_or(0.0),
+                pos.get("z").and_then(|v| v.as_f64()).unwrap_or(-500.0),
+            ));
+        }
+
+        builder.speed = value.get("speed").and_then(|v| v.as_f64());
+        builder.heading = value.get("heading").and_then(|v| v.as_f64());
+
+        Ok(builder)
+    }
+
+    pub fn build(&self) -> FixedStartConfig {
+        FixedStartConfig {
+            position: self
+                .position
+                .unwrap_or_else(|| Vector3::new(0.0, 0.0, -500.0)),
+            speed: self.speed.unwrap_or(100.0),
+            heading: self.heading.unwrap_or(0.0),
+        }
+    }
 }
 
 impl RandomStartConfigBuilder {

@@ -5,8 +5,33 @@ use rand_chacha::ChaCha8Rng;
 use serde::{Deserialize, Serialize};
 use std::f64::consts::PI;
 
+/// Enum for StartConfigurations
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+pub enum StartConfig {
+    /// Random start configuration
+    Random(RandomStartConfig),
+    /// Fixed start configuration
+    Fixed(FixedStartConfig),
+}
+
+impl Default for StartConfig {
+    fn default() -> Self {
+        Self::Random(RandomStartConfig::default())
+    }
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+pub struct FixedStartConfig {
+    // Position configuration
+    pub position: Vector3<f64>,
+    // Speed configuration
+    pub speed: f64,
+    // Heading configuration
+    pub heading: f64,
+}
+
 /// Configuration for generating random starting conditions.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub struct RandomStartConfig {
     // Position configuration
     pub position: RandomPosConfig,
@@ -18,7 +43,7 @@ pub struct RandomStartConfig {
     pub seed: Option<u64>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub struct RandomSpeedConfig {
     // Minimum speed in meters per second
     pub min_speed: f64,
@@ -26,7 +51,7 @@ pub struct RandomSpeedConfig {
     pub max_speed: f64,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub struct RandomHeadingConfig {
     // Minimum heading in radians (0 is North)
     pub min_heading: f64,
@@ -35,7 +60,7 @@ pub struct RandomHeadingConfig {
 }
 
 /// Configuration for generating a random starting position.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub struct RandomPosConfig {
     // The origin of the random position in NED frame (m).
     pub origin: Vector2<f64>,
@@ -45,6 +70,16 @@ pub struct RandomPosConfig {
     pub min_altitude: f64,
     // The maximum altitude of the random position (m).
     pub max_altitude: f64,
+}
+
+impl Default for FixedStartConfig {
+    fn default() -> Self {
+        Self {
+            position: Vector3::new(0.0, 0.0, -500.0),
+            speed: 80.0,
+            heading: 0.0,
+        }
+    }
 }
 
 impl Default for RandomSpeedConfig {

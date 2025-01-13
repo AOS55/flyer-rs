@@ -18,7 +18,7 @@ use crate::{
     resources::{AgentConfig, UpdateMode},
     server::config::errors::ConfigError,
     server::{ActionSpace, EnvConfig, ObservationSpace},
-    utils::{RngManager, WithRng},
+    utils::RngManager,
 };
 
 pub use aircraft::{
@@ -32,8 +32,8 @@ pub use obs::ObservationSpaceBuilder;
 pub use physics::PhysicsConfigBuilder;
 use reward::RewardWeightsBuilder;
 pub use start::{
-    RandomHeadingConfigBuilder, RandomPosConfigBuilder, RandomSpeedConfigBuilder,
-    RandomStartConfigBuilder,
+    FixedStartConfigBuilder, RandomHeadingConfigBuilder, RandomPosConfigBuilder,
+    RandomSpeedConfigBuilder, RandomStartConfigBuilder, StartConfigBuilder,
 };
 use termination::TerminalConditionsBuilder;
 pub use terrain::{HeightNoiseConfigBuilder, NoiseConfigBuilder, TerrainConfigBuilder};
@@ -143,12 +143,9 @@ impl EnvConfigBuilder {
                 }
 
                 // Initialize each aircraft with its own RNG stream
-                builder.aircraft_builders.insert(
-                    id.clone(),
-                    aircraft_agent
-                        .aircraft_builder
-                        .with_rng(rng_manager.get_rng(&id)),
-                );
+                builder
+                    .aircraft_builders
+                    .insert(id.clone(), aircraft_agent.aircraft_builder);
 
                 builder
                     .action_builders
