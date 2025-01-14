@@ -7,7 +7,10 @@ mod mass;
 mod propulsion;
 mod start;
 
-pub use aero_coef::AircraftAeroCoefficients;
+pub use aero_coef::{
+    AircraftAeroCoefficients, DragCoefficients, LiftCoefficients, PitchCoefficients,
+    RollCoefficients, SideForceCoefficients, YawCoefficients,
+};
 pub use aircraft::{AircraftSource, AircraftType, FullAircraftConfig};
 pub use dubins::DubinsAircraftConfig;
 pub use geometry::AircraftGeometry;

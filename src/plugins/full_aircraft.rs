@@ -1,7 +1,11 @@
 use bevy::prelude::*;
+use nalgebra::Vector3;
 
 use crate::{
-    components::{FullAircraftConfig, FullAircraftState, PlayerController},
+    components::{
+        AirData, AircraftControlSurfaces, FullAircraftConfig, PhysicsComponent, PlayerController,
+        PropulsionState, SpatialComponent, StartConfig,
+    },
     plugins::{AircraftPluginBase, Id, Identifier, StartupStage},
 };
 
@@ -32,10 +36,20 @@ impl FullAircraftPlugin {
     /// * `config` - The full aircraft configuration, cloned for the new entity.
     fn setup_aircraft(mut commands: Commands, config: FullAircraftConfig) {
         info!("Spawning full aircraft entity...");
+        let start_state = StartState::from_config(&config);
+
         commands.spawn((
-            config.clone(),
+            config.clone(), // add the config as a resource into the entity
             PlayerController::new(),
-            FullAircraftState::from_config(&config),
+            AirData::default(),
+            AircraftControlSurfaces::default(),
+            SpatialComponent::at_position_and_airspeed(
+                start_state.position,
+                start_state.speed,
+                start_state.heading,
+            ),
+            PhysicsComponent::new(config.mass.mass, config.mass.inertia),
+            PropulsionState::new(2), // Hardcoded to 2 engines for now
             Name::new(config.name.to_string()),
             Identifier {
                 id: Id::Named(config.name.to_string()), // Id name
@@ -86,5 +100,31 @@ impl Plugin for FullAircraftPlugin {
         // 5. Set the fixed timestep resource for physics calculations
         // app.init_resource::<Time<Fixed>>()
         //     .insert_resource(Time::<Fixed>::from_seconds(1.0 / 120.0));
+    }
+}
+
+struct StartState {
+    position: Vector3<f64>,
+    speed: f64,
+    heading: f64,
+}
+
+impl StartState {
+    fn from_config(config: &FullAircraftConfig) -> Self {
+        match &config.start_config {
+            StartConfig::Fixed(fixed_config) => Self {
+                position: fixed_config.position,
+                speed: fixed_config.speed,
+                heading: fixed_config.heading,
+            },
+            StartConfig::Random(random_config) => {
+                let (position, speed, heading) = random_config.generate();
+                Self {
+                    position,
+                    speed,
+                    heading,
+                }
+            }
+        }
     }
 }

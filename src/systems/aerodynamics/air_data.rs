@@ -1,4 +1,4 @@
-use crate::components::{FullAircraftState, SpatialComponent};
+use crate::components::{AirData, SpatialComponent};
 use crate::resources::{AerodynamicsConfig, EnvironmentModel};
 use bevy::prelude::*;
 use nalgebra::Vector3;
@@ -8,31 +8,28 @@ use nalgebra::Vector3;
 /// This system computes the airspeed, angle of attack (alpha), sideslip angle (beta),
 /// and other parameters for each entity based on its spatial data and environmental conditions.
 pub fn air_data_system(
-    mut query: Query<&mut FullAircraftState>,
+    mut query: Query<(&mut AirData, &SpatialComponent)>,
     environment: Res<EnvironmentModel>,
     config: Res<AerodynamicsConfig>,
 ) {
     println!("Running air_data_system!");
-    for mut state in query.iter_mut() {
+    for (mut air_data, spatial) in query.iter_mut() {
         let calculation = AirDataCalculation::calculate(
-            &state.spatial,
-            environment.get_wind(&state.spatial.position),
-            environment.get_density(&state.spatial.position),
+            spatial,
+            environment.get_wind(&spatial.position),
+            environment.get_density(&spatial.position),
             config.min_airspeed_threshold,
         );
-        println!(
-            "Spatial: {:?}, AirData: {:?}",
-            &state.spatial, &state.air_data
-        );
+        println!("Spatial: {:?}, AirData: {:?}", &spatial, &air_data);
 
         // Update air data
-        state.air_data.true_airspeed = calculation.true_airspeed;
-        state.air_data.alpha = calculation.alpha;
-        state.air_data.beta = calculation.beta;
-        state.air_data.density = calculation.density;
-        state.air_data.dynamic_pressure = calculation.dynamic_pressure;
-        state.air_data.relative_velocity = calculation.relative_velocity;
-        state.air_data.wind_velocity = calculation.wind_velocity;
+        air_data.true_airspeed = calculation.true_airspeed;
+        air_data.alpha = calculation.alpha;
+        air_data.beta = calculation.beta;
+        air_data.density = calculation.density;
+        air_data.dynamic_pressure = calculation.dynamic_pressure;
+        air_data.relative_velocity = calculation.relative_velocity;
+        air_data.wind_velocity = calculation.wind_velocity;
     }
 }
 

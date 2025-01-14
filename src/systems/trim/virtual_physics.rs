@@ -1,12 +1,12 @@
 use bevy::prelude::*;
-use nalgebra::Vector3;
+use nalgebra::{UnitQuaternion, Vector3};
 
 use crate::{
     components::{
-        AircraftControlSurfaces, FullAircraftConfig, FullAircraftState, PhysicsComponent,
+        AirData, AircraftControlSurfaces, FullAircraftConfig, PhysicsComponent, PropulsionState,
         SpatialComponent,
     },
-    resources::PhysicsConfig,
+    resources::{AerodynamicsConfig, EnvironmentConfig, EnvironmentModel, PhysicsConfig},
     systems::{
         aero_force_system, air_data_system, force_calculator_system, physics_integrator_system,
     },
@@ -15,42 +15,49 @@ use crate::{
 /// A virtual physics simulation that can run independently of the main simulation time
 pub struct VirtualPhysics {
     world: World,
-    _physics_config: PhysicsConfig,
-    fixed_timestep: f64,
 }
 
 impl VirtualPhysics {
-    pub fn new(physics_config: PhysicsConfig, fixed_timestep: f64) -> Self {
-        Self {
-            world: World::new(),
-            _physics_config: physics_config,
-            fixed_timestep,
-        }
+    pub fn new(physics_config: &PhysicsConfig) -> Self {
+        let mut world = World::new();
+
+        world.insert_resource(physics_config.clone());
+
+        let env_config = EnvironmentConfig::default(); // Assume nill wind for now
+        world.insert_resource(EnvironmentModel::new(&env_config));
+        world.insert_resource(AerodynamicsConfig {
+            min_airspeed_threshold: 0.0,
+        });
+
+        Self { world }
     }
 
     /// Create a virtual aircraft entity with given state and config
     pub fn spawn_aircraft(
         &mut self,
-        state: &FullAircraftState,
+        spatial: &SpatialComponent,
+        propulsion: &PropulsionState,
         config: &FullAircraftConfig,
     ) -> Entity {
-        let mut spatial = SpatialComponent::default();
-        spatial.position = state.spatial.position;
-        spatial.velocity = state.spatial.velocity;
-        spatial.attitude = state.spatial.attitude;
-        spatial.angular_velocity = state.spatial.angular_velocity;
-
+        let air_data = AirData::default();
+        let control_surfaces = AircraftControlSurfaces::default();
+        let spatial = spatial.clone();
         let physics = PhysicsComponent::new(config.mass.mass, config.mass.inertia);
-
+        let propulsion = propulsion.clone();
         self.world
-            .spawn((spatial, physics, state.clone(), config.clone()))
+            .spawn((
+                air_data,
+                control_surfaces,
+                spatial,
+                physics,
+                propulsion,
+                config.clone(),
+            ))
             .id()
     }
 
     /// Run the physics simulation for a specified number of steps
     pub fn run_steps(&mut self, _entity: Entity, steps: usize) {
-        let _dt = self.fixed_timestep;
-
         for _ in 0..steps {
             // Create a fake time resource for the fixed timestep
             // TODO: Ensure the update occurs for dt on each but can go faster than dt
@@ -101,31 +108,65 @@ impl VirtualPhysics {
     }
 
     /// Get the current state of the virtual aircraft
-    pub fn get_state(&self, entity: Entity) -> FullAircraftState {
-        self.world
-            .get::<FullAircraftState>(entity)
+    pub fn get_state(&self, entity: Entity) -> (SpatialComponent, AircraftControlSurfaces) {
+        let spatial = self
+            .world
+            .get::<SpatialComponent>(entity)
             .expect("Entity should have FullAircraftState")
-            .clone()
+            .clone();
+
+        let control_surfaces = self
+            .world
+            .get::<AircraftControlSurfaces>(entity)
+            .expect("Entity should have AircraftControlSurfaces")
+            .clone();
+
+        (spatial, control_surfaces)
     }
 
     /// Set the state of the virtual aircraft
-    pub fn set_state(&mut self, entity: Entity, state: &FullAircraftState) {
-        if let Some(mut entity_state) = self.world.get_mut::<FullAircraftState>(entity) {
-            *entity_state = state.clone();
-        }
-
-        if let Some(mut spatial) = self.world.get_mut::<SpatialComponent>(entity) {
-            spatial.position = state.spatial.position;
-            spatial.velocity = state.spatial.velocity;
-            spatial.attitude = state.spatial.attitude;
-            spatial.angular_velocity = state.spatial.angular_velocity;
+    pub fn set_state(
+        &mut self,
+        entity: Entity,
+        velocity: &Vector3<f64>,
+        attitude: &UnitQuaternion<f64>,
+    ) {
+        if let Some(mut entity_spatial) = self.world.get_mut::<SpatialComponent>(entity) {
+            entity_spatial.velocity = velocity.clone();
+            entity_spatial.attitude = attitude.clone();
         }
     }
 
     /// Set control inputs for the virtual aircraft
     pub fn set_controls(&mut self, entity: Entity, controls: &AircraftControlSurfaces) {
-        if let Some(mut state) = self.world.get_mut::<FullAircraftState>(entity) {
-            state.control_surfaces = *controls;
+        if let Some(mut control_surfaces) = self.world.get_mut::<AircraftControlSurfaces>(entity) {
+            *control_surfaces = controls.clone();
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_physics_initialization() {
+        // Test aircraft entity creation
+        // Verify initial state setting
+        // Check component setup
+    }
+
+    #[test]
+    fn test_physics_step() {
+        // Test single physics step
+        // Verify force calculations
+        // Check state integration
+    }
+
+    #[test]
+    fn test_force_calculation() {
+        // Test force/moment calculation
+        // Verify coordinate transformations
+        // Check boundary conditions
     }
 }

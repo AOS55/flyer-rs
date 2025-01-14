@@ -1,13 +1,11 @@
 use bevy::prelude::*;
 use flyer::{
-    components::{
-        AircraftConfig, DubinsAircraftConfig, FullAircraftConfig, TrimBounds, TrimSolverConfig,
-    },
+    components::{AircraftConfig, DubinsAircraftConfig, FullAircraftConfig},
     plugins::*,
     resources::{EnvironmentConfig, PhysicsConfig, TerrainConfig, UpdateMode},
     systems::{
         aero_force_system, air_data_system, dubins_aircraft_system, force_calculator_system,
-        handle_trim_requests, physics_integrator_system, propulsion_system, trim_aircraft_system,
+        physics_integrator_system, propulsion_system,
     },
 };
 
@@ -182,6 +180,19 @@ impl TestApp {
     pub fn query_single_mut<T: Component>(&mut self) -> Option<Mut<T>> {
         let world = self.app.world_mut();
         let mut query = world.query::<&mut T>();
+        query.get_single_mut(world).ok()
+    }
+
+    pub fn query_tuple3_single_mut<A, B, C>(
+        &mut self,
+    ) -> Option<(Mut<'_, A>, Mut<'_, B>, Mut<'_, C>)>
+    where
+        A: Component,
+        B: Component,
+        C: Component,
+    {
+        let world = self.app.world_mut();
+        let mut query = world.query::<(&mut A, &mut B, &mut C)>();
         query.get_single_mut(world).ok()
     }
 

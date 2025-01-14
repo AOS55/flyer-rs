@@ -1,13 +1,12 @@
 use bevy::prelude::*;
-use nalgebra::{Matrix3, Vector3};
 use serde::{Deserialize, Serialize};
 
 use crate::components::{
-    AirData, FullAircraftConfig, PhysicsComponent, PropulsionState, SpatialComponent, StartConfig,
+    AirData, FullAircraftConfig, PhysicsComponent, PowerplantState, SpatialComponent, StartConfig,
 };
 
-/// Represents the overall state of an aircraft.
-#[derive(Component, Debug, Clone, Serialize, Deserialize)]
+/// Represents the overall state of an aircraft (just a convenience method NOT a component)
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FullAircraftState {
     /// Aerodynamic data of the aircraft (e.g., airspeed, angle of attack).
     pub air_data: AirData,
@@ -18,29 +17,29 @@ pub struct FullAircraftState {
     /// Physical properties like mass and inertia.
     pub physics: PhysicsComponent,
     /// State of the propulsion system
-    pub propulsion: PropulsionState,
+    pub propulsion: PowerplantState,
 }
 
-impl Default for FullAircraftState {
-    /// Provides a default state for the aircraft.
-    /// Default values are based on the Twin Otter aircraft configuration.
-    fn default() -> Self {
-        Self {
-            air_data: AirData::default(),
-            control_surfaces: AircraftControlSurfaces::default(),
-            spatial: SpatialComponent::default(),
-            physics: PhysicsComponent::new(
-                4874.8,
-                Matrix3::from_columns(&[
-                    Vector3::new(28366.4, 0.0, -1384.3),
-                    Vector3::new(0.0, 32852.8, 0.0),
-                    Vector3::new(-1384.3, 0.0, 52097.3),
-                ]),
-            ),
-            propulsion: PropulsionState::default(),
-        }
-    }
-}
+// impl Default for FullAircraftState {
+//     /// Provides a default state for the aircraft.
+//     /// Default values are based on the Twin Otter aircraft configuration.
+//     fn default() -> Self {
+//         Self {
+//             air_data: AirData::default(),
+//             control_surfaces: AircraftControlSurfaces::default(),
+//             spatial: SpatialComponent::default(),
+//             physics: PhysicsComponent::new(
+//                 4874.8,
+//                 Matrix3::from_columns(&[
+//                     Vector3::new(28366.4, 0.0, -1384.3),
+//                     Vector3::new(0.0, 32852.8, 0.0),
+//                     Vector3::new(-1384.3, 0.0, 52097.3),
+//                 ]),
+//             ),
+//             propulsion: PowerplantState::default(),
+//         }
+//     }
+// }
 
 impl FullAircraftState {
     /// Creates a new `FullAircraftState` from a given configuration.
@@ -61,7 +60,7 @@ impl FullAircraftState {
             control_surfaces: AircraftControlSurfaces::default(),
             spatial: SpatialComponent::at_position_and_airspeed(position, speed, heading),
             physics: PhysicsComponent::new(config.mass.mass, config.mass.inertia),
-            propulsion: PropulsionState::default(),
+            propulsion: PowerplantState::default(),
         }
     }
 }

@@ -42,14 +42,14 @@ c_L_alpha4: 90.41
 c_l_beta: -0.112
 c_l_p: -0.413
 c_l_r: 0.191
-c_l_deltaa: -0.206
+c_l_deltaa: 0.206
 c_l_deltar: 0.116
 
 # Pitch coefficients
 c_m_0: 0.057
 c_m_alpha: -1.419
 c_m_q: -27.95
-c_m_deltae: -1.626
+c_m_deltae: 1.626
 c_m_alpha_q: 100.7
 c_m_alpha2_q: -759.2
 c_m_alpha2_deltae: 7.664
@@ -62,6 +62,6 @@ c_n_beta: 0.088
 c_n_p: -0.043
 c_n_r: -0.426
 c_n_deltaa: 0.023
-c_n_deltar: -0.087
+c_n_deltar: 0.087
 c_n_beta2: 0.337
 c_n_beta3: -0.766

@@ -1,4 +1,6 @@
-use crate::components::{Force, ForceCategory, FullAircraftState, Moment, ReferenceFrame};
+use crate::components::{
+    Force, ForceCategory, Moment, PhysicsComponent, ReferenceFrame, SpatialComponent,
+};
 use crate::resources::PhysicsConfig;
 use bevy::prelude::*;
 
@@ -12,32 +14,41 @@ use bevy::prelude::*;
 /// - `query`: Query to access entities with FullAircraftState.
 /// - `config`: A resource containing global physics configuration parameters, like gravity.
 pub fn force_calculator_system(
-    mut query: Query<&mut FullAircraftState>,
+    mut query: Query<(&mut PhysicsComponent, &SpatialComponent)>,
     config: Res<PhysicsConfig>,
 ) {
     println!("Running Force Calculator System!");
-    for mut state in query.iter_mut() {
-        println!("physics: {:?}, spatial, {:?}", state, config);
+    for (mut physics, spatial) in query.iter_mut() {
+        println!("physics: {:?}, spatial, {:?}", physics, config);
+
+        physics
+            .forces
+            .retain(|force| force.category != ForceCategory::Gravitational);
+
+        physics
+            .moments
+            .retain(|moment| moment.category != ForceCategory::Gravitational);
 
         // Store forces before clearing
-        let original_forces = state.physics.forces.clone();
+        let original_forces = physics.forces.clone();
+        let original_moments = physics.moments.clone();
 
-        state.physics.clear_forces();
+        physics.clear_forces();
 
         // Process forces
         for force in original_forces {
             // Transform force to inertial frame
             let force_inertial = match force.frame {
-                ReferenceFrame::Body => state.spatial.attitude * force.vector,
+                ReferenceFrame::Body => spatial.attitude * force.vector,
                 ReferenceFrame::Inertial => force.vector,
-                ReferenceFrame::Wind => state.spatial.attitude * force.vector,
+                ReferenceFrame::Wind => spatial.attitude * force.vector,
             };
 
             // Add to net force
-            state.physics.net_force += force_inertial;
+            physics.net_force += force_inertial;
 
             // Store transformed force
-            state.physics.add_force(Force {
+            physics.add_force(Force {
                 vector: force_inertial,
                 point: force.point,
                 frame: ReferenceFrame::Inertial,
@@ -46,11 +57,11 @@ pub fn force_calculator_system(
 
             // Calculate moment if force has application point
             if let Some(point) = force.point {
-                let point_inertial = state.spatial.attitude * point;
+                let point_inertial = spatial.attitude * point;
                 let moment = point_inertial.cross(&force_inertial);
-                state.physics.net_moment += moment;
+                physics.net_moment += moment;
 
-                state.physics.add_moment(Moment {
+                physics.add_moment(Moment {
                     vector: moment,
                     frame: ReferenceFrame::Inertial,
                     category: force.category.clone(),
@@ -58,17 +69,36 @@ pub fn force_calculator_system(
             }
         }
 
+        // Process pure moments (transform from body to inertial frame)
+        for moment in original_moments {
+            let moment_inertial = match moment.frame {
+                ReferenceFrame::Body => spatial.attitude * moment.vector,
+                ReferenceFrame::Inertial => moment.vector,
+                ReferenceFrame::Wind => spatial.attitude * moment.vector,
+            };
+
+            // Add to net moment
+            physics.net_moment += moment_inertial;
+
+            // Store transformed moment
+            physics.add_moment(Moment {
+                vector: moment_inertial,
+                frame: ReferenceFrame::Inertial,
+                category: moment.category,
+            });
+        }
+
         // Add gravitational force (already in inertial frame)
         let gravity_force = Force {
-            vector: config.gravity * state.physics.mass,
+            vector: config.gravity * physics.mass,
             point: None,
             frame: ReferenceFrame::Inertial,
             category: ForceCategory::Gravitational,
         };
-        state.physics.add_force(gravity_force.clone());
-        state.physics.net_force += gravity_force.vector;
+        physics.add_force(gravity_force.clone());
+        physics.net_force += gravity_force.vector;
 
-        println!("Final net force: {:?}", state.physics.net_force);
-        println!("Final net moment: {:?}", state.physics.net_moment);
+        println!("Final net force: {:?}", physics.net_force);
+        println!("Final net moment: {:?}", physics.net_moment);
     }
 }

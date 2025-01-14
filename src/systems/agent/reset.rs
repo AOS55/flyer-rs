@@ -3,8 +3,9 @@ use std::{collections::HashMap, io::Write};
 
 use crate::{
     components::{
-        AircraftState, DubinsAircraftConfig, DubinsAircraftState, FullAircraftConfig,
-        FullAircraftState, PlayerController,
+        AirData, AircraftControlSurfaces, AircraftState, DubinsAircraftConfig, DubinsAircraftState,
+        FullAircraftConfig, FullAircraftState, PhysicsComponent, PlayerController, PowerplantState,
+        SpatialComponent,
     },
     plugins::{Id, Identifier, ResetCompleteEvent, ResetRequestEvent, SimState},
     resources::AgentState,
@@ -70,7 +71,15 @@ pub fn reset_env(
         With<PlayerController>,
     >,
     mut full_query: Query<
-        (&Identifier, &FullAircraftConfig, &mut FullAircraftState),
+        (
+            &Identifier,
+            &FullAircraftConfig,
+            &AirData,
+            &AircraftControlSurfaces,
+            &SpatialComponent,
+            &PhysicsComponent,
+            &PowerplantState,
+        ),
         With<PlayerController>,
     >,
     mut agent_state: ResMut<AgentState>,
@@ -89,11 +98,11 @@ pub fn reset_env(
         }
 
         // Reset Full aircraft
-        for (identifier, _, mut state) in full_query.iter_mut() {
+        for (identifier, config, _, _, _, _, _) in full_query.iter_mut() {
             // TODO: Implement position for full aircraft
-            *state = FullAircraftState::default();
+            let state = FullAircraftState::from_config(&config);
             if let Ok(mut state_buffer) = agent_state.state_buffer.lock() {
-                state_buffer.insert(identifier.id.clone(), AircraftState::Full(state.clone()));
+                state_buffer.insert(identifier.id.clone(), AircraftState::Full(state));
             }
         }
 

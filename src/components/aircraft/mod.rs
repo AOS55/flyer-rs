@@ -8,9 +8,10 @@ mod render;
 pub use air_data::AirData;
 pub use config::{
     AircraftAeroCoefficients, AircraftConfig, AircraftGeometry, AircraftSource, AircraftType,
-    DubinsAircraftConfig, FixedStartConfig, FullAircraftConfig, MassModel, PowerplantConfig,
-    PropulsionConfig, RandomHeadingConfig, RandomPosConfig, RandomSpeedConfig, RandomStartConfig,
-    RawAircraftConfig, StartConfig,
+    DragCoefficients, DubinsAircraftConfig, FixedStartConfig, FullAircraftConfig, LiftCoefficients,
+    MassModel, PitchCoefficients, PowerplantConfig, PropulsionConfig, RandomHeadingConfig,
+    RandomPosConfig, RandomSpeedConfig, RandomStartConfig, RawAircraftConfig, RollCoefficients,
+    SideForceCoefficients, StartConfig, YawCoefficients,
 };
 pub use dubins::{DubinsAircraftControls, DubinsAircraftState};
 pub use full::{AircraftControlSurfaces, FullAircraftState};

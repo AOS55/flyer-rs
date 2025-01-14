@@ -1,6 +1,6 @@
 use nalgebra::{UnitQuaternion, Vector3};
 
-use crate::components::FullAircraftState;
+use crate::components::{AirData, AircraftControlSurfaces, SpatialComponent};
 
 /// Represents different types of trim conditions
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -72,6 +72,44 @@ impl TrimState {
             theta: vec[7],
         }
     }
+
+    pub fn to_trim_state(
+        spatial: &SpatialComponent,
+        control_surfaces: &AircraftControlSurfaces,
+        air_data: &AirData,
+    ) -> Self {
+        let (phi, theta, _) = spatial.attitude.euler_angles();
+
+        Self {
+            elevator: control_surfaces.elevator,
+            aileron: control_surfaces.aileron,
+            rudder: control_surfaces.rudder,
+            power_lever: control_surfaces.power_lever,
+            alpha: air_data.alpha,
+            beta: air_data.beta,
+            phi,
+            theta,
+        }
+    }
+
+    pub fn apply_trim_state(
+        self,
+        control_surfaces: &mut AircraftControlSurfaces,
+        air_data: &mut AirData,
+        spatial: &mut SpatialComponent,
+    ) {
+        control_surfaces.aileron = self.aileron;
+        control_surfaces.elevator = self.elevator;
+        control_surfaces.rudder = self.rudder;
+        control_surfaces.power_lever = self.power_lever;
+
+        air_data.alpha = self.alpha;
+        air_data.beta = self.beta;
+
+        spatial.attitude = UnitQuaternion::from_euler_angles(
+            self.phi, self.theta, 0.0, // Yaw not considered in trim
+        );
+    }
 }
 
 /// Results from the trim calculation
@@ -100,43 +138,4 @@ pub struct TrimResiduals {
     pub gamma_error: f64,
     /// Bank angle error (rad)
     pub mu_error: f64,
-}
-
-// Extension trait to convert between TrimState and FullAircraftState
-pub trait TrimStateConversion {
-    fn to_trim_state(&self) -> TrimState;
-    fn apply_trim_state(&mut self, trim_state: &TrimState);
-}
-
-impl TrimStateConversion for FullAircraftState {
-    fn to_trim_state(&self) -> TrimState {
-        let (phi, theta, _) = self.spatial.attitude.euler_angles();
-
-        TrimState {
-            elevator: self.control_surfaces.elevator,
-            aileron: self.control_surfaces.aileron,
-            rudder: self.control_surfaces.rudder,
-            power_lever: self.control_surfaces.power_lever,
-            alpha: self.air_data.alpha,
-            beta: self.air_data.beta,
-            phi,
-            theta,
-        }
-    }
-
-    fn apply_trim_state(&mut self, trim_state: &TrimState) {
-        self.control_surfaces.elevator = trim_state.elevator;
-        self.control_surfaces.aileron = trim_state.aileron;
-        self.control_surfaces.rudder = trim_state.rudder;
-        self.control_surfaces.power_lever = trim_state.power_lever;
-
-        self.air_data.alpha = trim_state.alpha;
-        self.air_data.beta = trim_state.beta;
-
-        self.spatial.attitude = UnitQuaternion::from_euler_angles(
-            trim_state.phi,
-            trim_state.theta,
-            0.0, // yaw not considered in trim
-        );
-    }
 }

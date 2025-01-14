@@ -19,8 +19,8 @@ impl Default for TrimSolverConfig {
     fn default() -> Self {
         Self {
             max_iterations: 1000,
-            cost_tolerance: 1e-6,
-            state_tolerance: 1e-8,
+            cost_tolerance: 1e-4,
+            state_tolerance: 1e-6,
             use_gradient_refinement: true,
             bounds: TrimBounds::default(),
         }

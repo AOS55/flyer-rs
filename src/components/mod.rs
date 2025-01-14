@@ -9,11 +9,12 @@ mod trim;
 
 pub use aircraft::{
     AirData, AircraftAeroCoefficients, AircraftConfig, AircraftControlSurfaces, AircraftControls,
-    AircraftGeometry, AircraftRenderState, AircraftState, AircraftType, Attitude,
+    AircraftGeometry, AircraftRenderState, AircraftState, AircraftType, Attitude, DragCoefficients,
     DubinsAircraftConfig, DubinsAircraftControls, DubinsAircraftState, FixedStartConfig,
-    FullAircraftConfig, FullAircraftState, MassModel, PowerplantConfig, PowerplantState,
-    PropulsionConfig, PropulsionState, RandomHeadingConfig, RandomPosConfig, RandomSpeedConfig,
-    RandomStartConfig, StartConfig,
+    FullAircraftConfig, FullAircraftState, LiftCoefficients, MassModel, PitchCoefficients,
+    PowerplantConfig, PowerplantState, PropulsionConfig, PropulsionState, RandomHeadingConfig,
+    RandomPosConfig, RandomSpeedConfig, RandomStartConfig, RollCoefficients, SideForceCoefficients,
+    StartConfig, YawCoefficients,
 };
 pub use camera::CameraComponent;
 pub use controller::PlayerController;
@@ -22,5 +23,5 @@ pub use spatial::SpatialComponent;
 pub use termination::TerminalConditions;
 pub use trim::{
     NeedsTrim, TrimBounds, TrimCondition, TrimRequest, TrimResiduals, TrimResult, TrimSolver,
-    TrimSolverConfig, TrimState, TrimStateConversion,
+    TrimSolverConfig, TrimState,
 };

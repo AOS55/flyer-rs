@@ -1,6 +1,9 @@
 use bevy::prelude::*;
 
-use crate::components::{AircraftState, DubinsAircraftState, FullAircraftState, PlayerController};
+use crate::components::{
+    AirData, AircraftControlSurfaces, AircraftState, DubinsAircraftState, FullAircraftState,
+    PhysicsComponent, PlayerController, PowerplantState, SpatialComponent,
+};
 use crate::plugins::Identifier;
 use crate::resources::AgentState;
 
@@ -11,7 +14,18 @@ use crate::resources::AgentState;
 /// can be used by agents (e.g., AI or player control logic) for decision-making.
 pub fn collect_state(
     dubins_query: Query<(Entity, &Identifier, &mut DubinsAircraftState), With<PlayerController>>,
-    full_query: Query<(Entity, &Identifier, &mut FullAircraftState), With<PlayerController>>,
+    full_query: Query<
+        (
+            Entity,
+            &Identifier,
+            &AirData,
+            &AircraftControlSurfaces,
+            &SpatialComponent,
+            &PhysicsComponent,
+            &PowerplantState,
+        ),
+        With<PlayerController>,
+    >,
     agent_state: ResMut<AgentState>,
 ) {
     // Access the shared state buffer in the `AgentState` resource
@@ -28,11 +42,18 @@ pub fn collect_state(
         }
 
         // Collect state from Full aircraft
-        for (_entity, identifier, full_state) in full_query.iter() {
-            state_buffer.insert(
-                identifier.id.clone(),
-                AircraftState::Full(full_state.clone()),
-            );
+        for (_entity, identifier, air_data, control_surfaces, spatial, physics, powerplant) in
+            full_query.iter()
+        {
+            let full_state = FullAircraftState {
+                air_data: air_data.clone(),
+                control_surfaces: control_surfaces.clone(),
+                spatial: spatial.clone(),
+                physics: physics.clone(),
+                propulsion: powerplant.clone(),
+            };
+
+            state_buffer.insert(identifier.id.clone(), AircraftState::Full(full_state));
         }
     }
 }

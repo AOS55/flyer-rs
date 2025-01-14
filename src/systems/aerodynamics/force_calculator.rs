@@ -3,9 +3,8 @@ use bevy::prelude::*;
 
 use super::aerso_adapter::AersoAdapter;
 use crate::components::{
-    AirData, AircraftAeroCoefficients, AircraftControlSurfaces, AircraftGeometry, Force,
-    ForceCategory, FullAircraftConfig, FullAircraftState, Moment, PhysicsComponent, ReferenceFrame,
-    SpatialComponent,
+    AirData, AircraftControlSurfaces, Force, ForceCategory, FullAircraftConfig, Moment,
+    PhysicsComponent, ReferenceFrame, SpatialComponent,
 };
 use crate::resources::AerodynamicsConfig;
 
@@ -15,13 +14,19 @@ use crate::resources::AerodynamicsConfig;
 /// aerodynamic coefficients, control surface inputs, air data, and spatial properties. The
 /// results are added to the aircraft's physics component.
 pub fn aero_force_system(
-    mut aircraft: Query<(&mut FullAircraftState, &FullAircraftConfig)>,
+    mut aircraft: Query<(
+        &AircraftControlSurfaces,
+        &AirData,
+        &SpatialComponent,
+        &mut PhysicsComponent,
+        &FullAircraftConfig,
+    )>,
     aero_config: Res<AerodynamicsConfig>,
 ) {
     println!("Running Aero Force System!");
-    for (mut state, config) in aircraft.iter_mut() {
+    for (controls, air_data, spatial, mut physics, config) in aircraft.iter_mut() {
         // Early return if airspeed is below threshold
-        if state.air_data.true_airspeed < aero_config.min_airspeed_threshold {
+        if air_data.true_airspeed < aero_config.min_airspeed_threshold {
             continue;
         }
 
@@ -29,26 +34,19 @@ pub fn aero_force_system(
         let adapter = AersoAdapter::new(config.geometry.clone(), config.aero_coef.clone());
 
         // Collect all necessary data before calculation
-        let aero_forces = prepare_aero_forces(
-            &adapter,
-            &state.control_surfaces,
-            &state.air_data,
-            &state.spatial,
-        );
-        println!("State: {:?}, Config: {:?}", state, config);
+        let aero_forces = prepare_aero_forces(&adapter, &controls, &air_data, &spatial);
+        println!("Forces Config: {:?}", config);
 
         // Clear existing aerodynamic forces and moments before adding new ones
-        state
-            .physics
+        physics
             .forces
             .retain(|force| force.category != ForceCategory::Aerodynamic);
-        state
-            .physics
+        physics
             .moments
             .retain(|moment| moment.category != ForceCategory::Aerodynamic);
 
         // Apply the calculated forces and moments
-        apply_aero_forces(&mut state.physics, aero_forces);
+        apply_aero_forces(&mut physics, aero_forces);
     }
 }
 

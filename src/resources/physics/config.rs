@@ -20,7 +20,7 @@ impl Default for PhysicsConfig {
             max_velocity: 200.0,        // m/s
             max_angular_velocity: 10.0, // rad/s
             timestep: 1.0 / 120.0,      // 120 Hz
-            gravity: Vector3::new(0.0, 0.0, -9.81),
+            gravity: Vector3::new(0.0, 0.0, 9.81),
         }
     }
 }

@@ -48,15 +48,22 @@ impl PropulsionState {
     }
 
     /// Sets the power_levers for all engines
-    pub fn set_throttle(&mut self, power_lever: f64) {
+    pub fn set_power_lever(&mut self, power_lever: f64) {
         let power_lever = power_lever.clamp(0.0, 1.0);
         for state in &mut self.engine_states {
             state.power_lever = power_lever;
         }
     }
 
+    /// Turns all engines on
+    pub fn turn_engines_on(&mut self) {
+        for state in &mut self.engine_states {
+            state.running = true;
+        }
+    }
+
     /// Sets the throttle for a specific engine
-    pub fn set_engine_throttle(&mut self, engine_index: usize, throttle: f64) {
+    pub fn set_engine_power_lever(&mut self, engine_index: usize, throttle: f64) {
         if let Some(state) = self.engine_states.get_mut(engine_index) {
             state.power_lever = throttle.clamp(0.0, 1.0);
         }

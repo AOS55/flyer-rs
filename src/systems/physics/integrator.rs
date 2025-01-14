@@ -1,4 +1,4 @@
-use crate::components::{FullAircraftState, PhysicsComponent, SpatialComponent};
+use crate::components::{PhysicsComponent, SpatialComponent};
 use crate::resources::PhysicsConfig;
 use bevy::prelude::*;
 use nalgebra::UnitQuaternion;
@@ -10,14 +10,18 @@ use nalgebra::UnitQuaternion;
 /// # Arguments
 /// - `query`: A query for entities with `PhysicsComponent` and `SpatialComponent`.
 /// - `config`: Physics configuration resource for velocity limits.
-pub fn physics_integrator_system(mut query: Query<&FullAircraftState>, config: Res<PhysicsConfig>) {
+pub fn physics_integrator_system(
+    mut query: Query<(&PhysicsComponent, &mut SpatialComponent)>,
+    config: Res<PhysicsConfig>,
+) {
     println!("Running Physics Integrator System");
     // Get the timestep duration in seconds
     let dt = config.timestep;
 
     // Iterate over all entities with physics and spatial components
-    for state in query.iter_mut() {
-        integrate_state(&state.physics, state.spatial, dt, &config);
+    for (physics, mut spatial) in query.iter_mut() {
+        println!("Integrator, physics: {:?}, spatial: {:?}", physics, spatial);
+        integrate_state(&physics, &mut spatial, dt, &config);
     }
 }
 
@@ -30,7 +34,7 @@ pub fn physics_integrator_system(mut query: Query<&FullAircraftState>, config: R
 /// - `config`: The physics configuration resource for constraints and limits.
 fn integrate_state(
     physics: &PhysicsComponent,
-    mut spatial: SpatialComponent,
+    spatial: &mut SpatialComponent,
     dt: f64,
     config: &PhysicsConfig,
 ) {
@@ -60,7 +64,7 @@ fn integrate_state(
 /// # Arguments
 /// - `spatial`: The `SpatialComponent` containing velocity and angular velocity.
 /// - `config`: The physics configuration resource containing max limits.
-fn apply_velocity_limits(mut spatial: SpatialComponent, config: &PhysicsConfig) {
+fn apply_velocity_limits(spatial: &mut SpatialComponent, config: &PhysicsConfig) {
     // Limit linear velocity magnitude
     let velocity_norm = spatial.velocity.norm();
     if velocity_norm > config.max_velocity {

@@ -3,35 +3,44 @@ use nalgebra::{UnitQuaternion, Vector3};
 
 use crate::{
     components::{
-        Force, ForceCategory, FullAircraftConfig, FullAircraftState, PowerplantConfig,
-        PowerplantState, ReferenceFrame,
+        AirData, AircraftControlSurfaces, Force, ForceCategory, FullAircraftConfig,
+        PhysicsComponent, PowerplantConfig, PowerplantState, PropulsionState, ReferenceFrame,
     },
     resources::PhysicsConfig,
 };
 
 /// System for calculating propulsion forces and moments
 pub fn propulsion_system(
-    mut query: Query<(&mut FullAircraftState, &mut FullAircraftConfig)>,
-    physics: Res<PhysicsConfig>,
+    mut query: Query<(
+        &AircraftControlSurfaces,
+        &mut PropulsionState,
+        &mut PhysicsComponent,
+        &AirData,
+        &FullAircraftConfig,
+    )>,
+    physics_config: Res<PhysicsConfig>,
 ) {
-    let dt = physics.timestep;
+    let dt = physics_config.timestep;
     println!("Running propulsion system!");
-    for (mut aircraft_state, aircraft_config) in query.iter_mut() {
-        let air_density = aircraft_state.air_data.density;
-        let airspeed = aircraft_state.air_data.true_airspeed;
-
+    for (controls, mut propulsion_state, mut physics, air_data, aircraft_config) in query.iter_mut()
+    {
         // Remove any existing propulsive forces before adding new ones
-        aircraft_state
-            .physics
+        physics
             .forces
             .retain(|force| force.category != ForceCategory::Propulsive);
+
+        physics
+            .moments
+            .retain(|moment| moment.category != ForceCategory::Propulsive);
+
+        propulsion_state.set_power_lever(controls.power_lever);
 
         // Calculate all engine updates and store them in a temporary vector
         let engine_updates: Vec<(PowerplantState, Force)> = aircraft_config
             .propulsion
             .engines
             .iter()
-            .zip(aircraft_state.propulsion.engine_states.iter())
+            .zip(propulsion_state.engine_states.iter())
             .map(|(engine_config, engine_state)| {
                 // Create a mutable copy of the engine state
                 let mut updated_state = engine_state.clone();
@@ -40,8 +49,12 @@ pub fn propulsion_system(
                 update_powerplant_state(&mut updated_state, engine_config, dt);
 
                 // Calculate thrust and fuel flow
-                let (thrust, fuel_flow) =
-                    calculate_thrust(engine_config, &updated_state, air_density, airspeed);
+                let (thrust, fuel_flow) = calculate_thrust(
+                    engine_config,
+                    &updated_state,
+                    air_data.density,
+                    air_data.true_airspeed,
+                );
 
                 // Update fuel flow in the state
                 updated_state.fuel_flow = fuel_flow;
@@ -74,8 +87,8 @@ pub fn propulsion_system(
 
         // Apply all updates at once
         for (idx, (updated_state, force)) in engine_updates.into_iter().enumerate() {
-            aircraft_state.propulsion.engine_states[idx] = updated_state;
-            aircraft_state.physics.add_force(force);
+            propulsion_state.engine_states[idx] = updated_state;
+            physics.add_force(force);
         }
     }
 }

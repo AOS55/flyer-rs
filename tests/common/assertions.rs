@@ -131,6 +131,7 @@ pub fn assert_dubins_state_valid(state: &DubinsAircraftState) {
 }
 
 /// Assert that full aircraft state is valid
+// TOO: break out in to component checks
 #[track_caller]
 pub fn assert_full_state_valid(state: &FullAircraftState) {
     assert_spatial_valid(&state.spatial);

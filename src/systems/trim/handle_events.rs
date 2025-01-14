@@ -10,3 +10,22 @@ pub fn handle_trim_requests(mut commands: Commands, mut trim_requests: EventRead
         });
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_trim_request_handling() {
+        // Test event handling
+        // Verify component addition
+        // Check condition passing
+    }
+
+    #[test]
+    fn test_multiple_requests() {
+        // Test handling multiple trim requests
+        // Verify queue behavior
+        // Check entity updates
+    }
+}

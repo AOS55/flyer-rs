@@ -1,7 +1,9 @@
 use bevy::prelude::*;
 
 use crate::{
-    components::{AircraftControls, DubinsAircraftState, FullAircraftState, PlayerController},
+    components::{
+        AircraftControlSurfaces, AircraftControls, DubinsAircraftState, PlayerController,
+    },
     plugins::{Identifier, SimState},
     resources::{AgentState, UpdateControl},
     server::ServerState,
@@ -15,7 +17,10 @@ pub fn running_physics(
         (Entity, &Identifier, &mut DubinsAircraftState),
         With<PlayerController>,
     >,
-    mut full_query: Query<(Entity, &Identifier, &mut FullAircraftState), With<PlayerController>>,
+    mut full_query: Query<
+        (Entity, &Identifier, &mut AircraftControlSurfaces),
+        With<PlayerController>,
+    >,
 ) {
     info!("Running physics");
     if update_control.remaining_steps > 0 {
@@ -35,7 +40,7 @@ pub fn running_physics(
                 }
             }
 
-            for (_entity, identifier, mut aircraft) in full_query.iter_mut() {
+            for (_entity, identifier, mut control_surfaces) in full_query.iter_mut() {
                 if let Some(controls) = action_queue.get(&identifier.id) {
                     match controls {
                         AircraftControls::Full(full_controls) => {
@@ -43,7 +48,10 @@ pub fn running_physics(
                                 "Applying controls to full aircraft {:?}: {:?}",
                                 identifier.id, full_controls
                             );
-                            aircraft.control_surfaces = *full_controls;
+                            control_surfaces.aileron = full_controls.aileron;
+                            control_surfaces.elevator = full_controls.elevator;
+                            control_surfaces.rudder = full_controls.rudder;
+                            control_surfaces.power_lever = full_controls.power_lever;
                         }
                         _ => warn!("Received non-Full controls for Full aircraft"),
                     }

@@ -1,7 +1,7 @@
 use bevy::prelude::*;
 use serde::{Deserialize, Serialize};
 
-#[derive(Component, Debug, Clone, Copy, Serialize, Deserialize)]
+#[derive(Component, Default, Debug, Clone, Copy, Serialize, Deserialize)]
 pub struct AircraftAeroCoefficients {
     pub drag: DragCoefficients,
     pub lift: LiftCoefficients,
@@ -12,7 +12,7 @@ pub struct AircraftAeroCoefficients {
 }
 
 /// Drag coefficients for full aerodynamic model
-#[derive(Component, Debug, Clone, Copy, Serialize, Deserialize)]
+#[derive(Component, Default, Debug, Clone, Copy, Serialize, Deserialize)]
 pub struct DragCoefficients {
     // Base drag coefficient (zero angle of attack).
     pub c_d_0: f64,
@@ -37,7 +37,7 @@ pub struct DragCoefficients {
 }
 
 /// Lift coefficients for full aerodynamic model
-#[derive(Component, Debug, Clone, Copy, Serialize, Deserialize)]
+#[derive(Component, Default, Debug, Clone, Copy, Serialize, Deserialize)]
 pub struct LiftCoefficients {
     /// Base lift coefficient (zero angle of attack).
     pub c_l_0: f64,
@@ -58,7 +58,7 @@ pub struct LiftCoefficients {
 }
 
 /// Side force coefficients for full aerodynamic model
-#[derive(Component, Debug, Clone, Copy, Serialize, Deserialize)]
+#[derive(Component, Default, Debug, Clone, Copy, Serialize, Deserialize)]
 pub struct SideForceCoefficients {
     /// Side-force coefficient due to sideslip angle (β).
     pub c_y_beta: f64,
@@ -73,7 +73,7 @@ pub struct SideForceCoefficients {
 }
 
 /// Roll coefficients for full aerodynamic model
-#[derive(Component, Debug, Clone, Copy, Serialize, Deserialize)]
+#[derive(Component, Default, Debug, Clone, Copy, Serialize, Deserialize)]
 pub struct RollCoefficients {
     /// Roll moment coefficient due to sideslip angle (β).
     pub c_l_beta: f64,
@@ -88,7 +88,7 @@ pub struct RollCoefficients {
 }
 
 /// Pitch coefficients for full aerodynamic model
-#[derive(Component, Debug, Clone, Copy, Serialize, Deserialize)]
+#[derive(Component, Default, Debug, Clone, Copy, Serialize, Deserialize)]
 pub struct PitchCoefficients {
     /// Base pitch moment coefficient (zero angle of attack).
     pub c_m_0: f64,
@@ -113,7 +113,7 @@ pub struct PitchCoefficients {
 }
 
 /// Yaw coefficients for full aerodynamic model
-#[derive(Component, Debug, Clone, Copy, Serialize, Deserialize)]
+#[derive(Component, Default, Debug, Clone, Copy, Serialize, Deserialize)]
 pub struct YawCoefficients {
     /// Yaw moment coefficient due to sideslip angle (β).
     pub c_n_beta: f64,
@@ -310,7 +310,7 @@ impl RollCoefficients {
             c_l_beta: -0.112,
             c_l_p: -0.413,
             c_l_r: 0.191,
-            c_l_deltaa: -0.206,
+            c_l_deltaa: 0.206,
             c_l_deltar: 0.116,
         }
     }
@@ -320,7 +320,7 @@ impl RollCoefficients {
             c_l_beta: -0.034,
             c_l_p: -0.236,
             c_l_r: 0.025,
-            c_l_deltaa: -0.035,
+            c_l_deltaa: 0.035,
             c_l_deltar: 0.013,
         }
     }
@@ -330,7 +330,7 @@ impl RollCoefficients {
             c_l_beta: -0.109,
             c_l_p: -0.366,
             c_l_r: 0.061,
-            c_l_deltaa: -0.079,
+            c_l_deltaa: 0.079,
             c_l_deltar: 0.021,
         }
     }
@@ -342,7 +342,7 @@ impl PitchCoefficients {
             c_m_0: 0.057,
             c_m_alpha: -1.419,
             c_m_q: -27.95,
-            c_m_deltae: -1.626,
+            c_m_deltae: 1.626,
             c_m_alpha_q: 100.7,
             c_m_alpha2_q: -759.2,
             c_m_alpha2_deltae: 7.664,
@@ -357,7 +357,7 @@ impl PitchCoefficients {
             c_m_0: -0.013,
             c_m_alpha: -0.254,
             c_m_q: -2.916,
-            c_m_deltae: -0.403,
+            c_m_deltae: 0.403,
             c_m_alpha_q: -3.955,
             c_m_alpha2_q: -24.0,
             c_m_alpha2_deltae: -0.270,
@@ -372,7 +372,7 @@ impl PitchCoefficients {
             c_m_0: 0.182,
             c_m_alpha: -1.782,
             c_m_q: -44.34,
-            c_m_deltae: -1.785,
+            c_m_deltae: 1.785,
             c_m_alpha_q: 374.0,
             c_m_alpha2_q: -1748.0,
             c_m_alpha2_deltae: 2.439,
@@ -390,7 +390,7 @@ impl YawCoefficients {
             c_n_p: -0.043,
             c_n_r: -0.426,
             c_n_deltaa: 0.023,
-            c_n_deltar: -0.087,
+            c_n_deltar: 0.087,
             c_n_beta2: 0.337,
             c_n_beta3: -0.766,
         }
@@ -402,7 +402,7 @@ impl YawCoefficients {
             c_n_p: -0.006,
             c_n_r: -0.358,
             c_n_deltaa: 0.001,
-            c_n_deltar: -0.053,
+            c_n_deltar: 0.053,
             c_n_beta2: 0.0,
             c_n_beta3: 0.377,
         }
@@ -414,7 +414,7 @@ impl YawCoefficients {
             c_n_p: -0.022,
             c_n_r: -0.405,
             c_n_deltaa: -0.009,
-            c_n_deltar: -0.129,
+            c_n_deltar: 0.129,
             c_n_beta2: 0.184,
             c_n_beta3: -0.377,
         }
