@@ -23,7 +23,7 @@ pub fn aero_force_system(
     )>,
     aero_config: Res<AerodynamicsConfig>,
 ) {
-    println!("Running Aero Force System!");
+    // println!("Running Aero Force System!");
     for (controls, air_data, spatial, mut physics, config) in aircraft.iter_mut() {
         // Early return if airspeed is below threshold
         if air_data.true_airspeed < aero_config.min_airspeed_threshold {
@@ -35,7 +35,7 @@ pub fn aero_force_system(
 
         // Collect all necessary data before calculation
         let aero_forces = prepare_aero_forces(&adapter, &controls, &air_data, &spatial);
-        println!("Forces Config: {:?}", config);
+        // println!("Forces Config: {:?}", config);
 
         // Clear existing aerodynamic forces and moments before adding new ones
         physics

@@ -17,9 +17,9 @@ pub fn force_calculator_system(
     mut query: Query<(&mut PhysicsComponent, &SpatialComponent)>,
     config: Res<PhysicsConfig>,
 ) {
-    println!("Running Force Calculator System!");
+    // println!("Running Force Calculator System!");
     for (mut physics, spatial) in query.iter_mut() {
-        println!("physics: {:?}, spatial, {:?}", physics, config);
+        // println!("physics: {:?}, spatial, {:?}", physics, config);
 
         physics
             .forces
@@ -98,7 +98,7 @@ pub fn force_calculator_system(
         physics.add_force(gravity_force.clone());
         physics.net_force += gravity_force.vector;
 
-        println!("Final net force: {:?}", physics.net_force);
-        println!("Final net moment: {:?}", physics.net_moment);
+        // println!("Final net force: {:?}", physics.net_force);
+        // println!("Final net moment: {:?}", physics.net_moment);
     }
 }

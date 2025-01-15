@@ -12,7 +12,7 @@ pub fn air_data_system(
     environment: Res<EnvironmentModel>,
     config: Res<AerodynamicsConfig>,
 ) {
-    println!("Running air_data_system!");
+    // println!("Running air_data_system!");
     for (mut air_data, spatial) in query.iter_mut() {
         let calculation = AirDataCalculation::calculate(
             spatial,
@@ -20,7 +20,7 @@ pub fn air_data_system(
             environment.get_density(&spatial.position),
             config.min_airspeed_threshold,
         );
-        println!("Spatial: {:?}, AirData: {:?}", &spatial, &air_data);
+        // println!("Spatial: {:?}, AirData: {:?}", &spatial, &air_data);
 
         // Update air data
         air_data.true_airspeed = calculation.true_airspeed;

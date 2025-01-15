@@ -13,6 +13,7 @@ use crate::{
 };
 
 /// A virtual physics simulation that can run independently of the main simulation time
+#[derive(Debug)]
 pub struct VirtualPhysics {
     world: World,
 }
@@ -147,7 +148,6 @@ impl VirtualPhysics {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
 
     #[test]
     fn test_physics_initialization() {

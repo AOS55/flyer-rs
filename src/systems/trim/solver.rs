@@ -52,10 +52,8 @@ pub fn trim_aircraft_system(
 
         // Run a few iterations each frame
         if let Some(ref mut solver) = &mut needs_trim.solver {
-            for _ in 0..100 {
-                if !solver.has_converged() && solver.iteration < settings.max_iterations {
-                    solver.iterate();
-                }
+            if !solver.has_converged() && solver.iteration < settings.max_iterations {
+                solver.iterate();
             }
 
             // Check if we're done

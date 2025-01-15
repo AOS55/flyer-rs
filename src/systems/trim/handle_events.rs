@@ -13,7 +13,6 @@ pub fn handle_trim_requests(mut commands: Commands, mut trim_requests: EventRead
 
 #[cfg(test)]
 mod tests {
-    use super::*;
 
     #[test]
     fn test_trim_request_handling() {

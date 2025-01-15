@@ -14,13 +14,11 @@ pub fn physics_integrator_system(
     mut query: Query<(&PhysicsComponent, &mut SpatialComponent)>,
     config: Res<PhysicsConfig>,
 ) {
-    println!("Running Physics Integrator System");
     // Get the timestep duration in seconds
     let dt = config.timestep;
 
     // Iterate over all entities with physics and spatial components
     for (physics, mut spatial) in query.iter_mut() {
-        println!("Integrator, physics: {:?}, spatial: {:?}", physics, spatial);
         integrate_state(&physics, &mut spatial, dt, &config);
     }
 }
