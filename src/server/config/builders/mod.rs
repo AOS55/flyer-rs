@@ -8,8 +8,8 @@ mod aircraft;
 mod environment;
 mod obs;
 mod physics;
-mod reward;
 mod start;
+mod task;
 mod termination;
 mod terrain;
 
@@ -21,20 +21,19 @@ use crate::{
     utils::RngManager,
 };
 
+pub use act::ActionSpaceBuilder;
 pub use aircraft::{
     create_aircraft_builder, AircraftBuilder, AircraftBuilderEnum, DubinsAircraftConfigBuilder,
     FullAircraftConfigBuilder,
 };
-
-pub use act::ActionSpaceBuilder;
 use environment::EnvironmentConfigBuilder;
 pub use obs::ObservationSpaceBuilder;
 pub use physics::PhysicsConfigBuilder;
-use reward::RewardWeightsBuilder;
 pub use start::{
     FixedStartConfigBuilder, RandomHeadingConfigBuilder, RandomPosConfigBuilder,
     RandomSpeedConfigBuilder, RandomStartConfigBuilder, StartConfigBuilder,
 };
+pub use task::TaskConfigBuilder;
 use termination::TerminalConditionsBuilder;
 pub use terrain::{HeightNoiseConfigBuilder, NoiseConfigBuilder, TerrainConfigBuilder};
 
@@ -57,8 +56,6 @@ pub struct EnvConfigBuilder {
     #[serde(skip)]
     pub terrain_builder: TerrainConfigBuilder,
     #[serde(skip)]
-    pub reward_builder: RewardWeightsBuilder,
-    #[serde(skip)]
     pub terminal_builder: TerminalConditionsBuilder,
 }
 
@@ -75,7 +72,6 @@ impl Default for EnvConfigBuilder {
             physics_builder: PhysicsConfigBuilder::default(),
             environment_builder: EnvironmentConfigBuilder::default(),
             terrain_builder: TerrainConfigBuilder::default(),
-            reward_builder: RewardWeightsBuilder::default(),
             terminal_builder: TerminalConditionsBuilder::default(),
         }
     }
@@ -211,7 +207,6 @@ impl EnvConfigBuilder {
             environment_config: self.environment_builder.build()?,
             terrain_config: self.terrain_builder.build()?,
             agent_config: AgentConfig::default(),
-            reward_weights: Some(self.reward_builder.build()?),
             terminal_conditions: self.terminal_builder.build()?,
         })
     }

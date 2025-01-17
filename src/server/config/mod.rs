@@ -4,9 +4,7 @@ use std::collections::HashMap;
 
 use crate::{
     components::{AircraftConfig, StartConfig, TerminalConditions},
-    resources::{
-        AgentConfig, EnvironmentConfig, PhysicsConfig, RewardWeights, TerrainConfig, UpdateMode,
-    },
+    resources::{AgentConfig, EnvironmentConfig, PhysicsConfig, TerrainConfig, UpdateMode},
     server::{
         config::builders::{
             DubinsAircraftConfigBuilder, FullAircraftConfigBuilder, HeightNoiseConfigBuilder,
@@ -55,9 +53,6 @@ pub struct EnvConfig {
 
     // Terminal conditions
     pub terminal_conditions: TerminalConditions,
-
-    // Reward configuration
-    pub reward_weights: Option<RewardWeights>,
 }
 
 impl EnvConfig {

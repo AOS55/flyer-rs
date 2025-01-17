@@ -6,7 +6,7 @@ use std::path::{Path, PathBuf};
 use crate::components::aircraft::config::{ConfigError, RawAircraftConfig};
 use crate::components::{
     AircraftAeroCoefficients, AircraftGeometry, MassModel, PowerplantConfig, PropulsionConfig,
-    StartConfig,
+    StartConfig, TaskType,
 };
 
 /// The full aircraft configuration, including mass, geometry, and aerodynamic coefficients
@@ -26,6 +26,8 @@ pub struct FullAircraftConfig {
     pub propulsion: PropulsionConfig,
     /// Configuration for the starting state of the aircraft
     pub start_config: StartConfig,
+    /// Configuration for the aircrafts reward scheme
+    pub task_config: TaskType,
 }
 
 impl Default for FullAircraftConfig {
@@ -39,6 +41,7 @@ impl Default for FullAircraftConfig {
             aero_coef: AircraftAeroCoefficients::twin_otter(),
             propulsion: PropulsionConfig::twin_otter(),
             start_config: StartConfig::default(),
+            task_config: TaskType::default(),
         }
     }
 }
@@ -76,6 +79,7 @@ impl FullAircraftConfig {
                 aero_coef: AircraftAeroCoefficients::twin_otter(),
                 propulsion: PropulsionConfig::twin_otter(),
                 start_config: StartConfig::default(),
+                task_config: TaskType::default(),
             },
             AircraftType::F4Phantom => Self {
                 name: "F4Phantom".to_string(),
@@ -85,6 +89,7 @@ impl FullAircraftConfig {
                 aero_coef: AircraftAeroCoefficients::f4_phantom(),
                 propulsion: PropulsionConfig::f4_phantom(),
                 start_config: StartConfig::default(),
+                task_config: TaskType::default(),
             },
             AircraftType::GenericTransport => Self {
                 name: "GenericTransport".to_string(),
@@ -94,6 +99,7 @@ impl FullAircraftConfig {
                 aero_coef: AircraftAeroCoefficients::generic_transport(),
                 propulsion: PropulsionConfig::single_engine(PowerplantConfig::default()),
                 start_config: StartConfig::default(),
+                task_config: TaskType::default(),
             },
             AircraftType::Custom(string) => Self {
                 name: string.clone(),
@@ -103,6 +109,7 @@ impl FullAircraftConfig {
                 aero_coef: AircraftAeroCoefficients::twin_otter(),
                 propulsion: PropulsionConfig::twin_otter(),
                 start_config: StartConfig::default(),
+                task_config: TaskType::default(),
             },
         }
     }
@@ -137,7 +144,8 @@ impl FullAircraftConfig {
             geometry: AircraftGeometry::new(raw.wing_area, raw.wing_span, raw.mac),
             aero_coef: AircraftAeroCoefficients::from_raw(&raw)?,
             propulsion: PropulsionConfig::twin_otter(), // TODO: Add engine config to raw config
-            start_config: StartConfig::default(),       // TODO: Add start config to raw config
+            start_config: StartConfig::default(),
+            task_config: TaskType::default(),
         })
     }
 

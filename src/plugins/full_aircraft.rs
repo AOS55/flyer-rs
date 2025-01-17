@@ -3,8 +3,8 @@ use nalgebra::Vector3;
 
 use crate::{
     components::{
-        AirData, AircraftControlSurfaces, FullAircraftConfig, PhysicsComponent, PlayerController,
-        PropulsionState, SpatialComponent, StartConfig,
+        AirData, AircraftControlSurfaces, CollisionComponent, FullAircraftConfig, PhysicsComponent,
+        PlayerController, PropulsionState, SpatialComponent, StartConfig,
     },
     plugins::{AircraftPluginBase, Id, Identifier, StartupStage},
 };
@@ -48,6 +48,7 @@ impl FullAircraftPlugin {
                 start_state.speed,
                 start_state.heading,
             ),
+            CollisionComponent::from_geometry(&config.geometry),
             PhysicsComponent::new(config.mass.mass, config.mass.inertia),
             PropulsionState::new(2), // Hardcoded to 2 engines for now
             Name::new(config.name.to_string()),

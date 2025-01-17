@@ -420,6 +420,7 @@ mod tests {
                 }],
             },
             start_config: Default::default(),
+            task_config: Default::default(),
         }
     }
 

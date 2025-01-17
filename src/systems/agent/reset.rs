@@ -21,8 +21,12 @@ pub fn handle_reset_response(
     let conn = server.conn.clone();
     info!("Handling Reset Response");
     for _ in reset_complete.read() {
-        if let Ok(state_buffer) = agent_state.state_buffer.lock() {
+        if let (Ok(state_buffer), Ok(reward_buffer)) = (
+            agent_state.state_buffer.lock(),
+            agent_state.reward_buffer.lock(),
+        ) {
             let mut all_observations = HashMap::new();
+            let mut all_rewards = HashMap::new();
 
             // Collect initial observations
             for (id, state) in state_buffer.iter() {
@@ -34,7 +38,12 @@ pub fn handle_reset_response(
 
                 if let Some(obs_space) = observation_spaces.get(&id_str) {
                     let obs = obs_space.to_observation(state);
-                    all_observations.insert(id_str, obs);
+                    all_observations.insert(id_str.clone(), obs);
+                }
+
+                // Should be reset to 0 after reset
+                if let Some(&reward) = reward_buffer.get(id) {
+                    all_rewards.insert(id_str, reward);
                 }
             }
 
@@ -43,7 +52,7 @@ pub fn handle_reset_response(
                 if let Ok(mut stream) = guard.try_clone() {
                     let response = Response {
                         obs: all_observations,
-                        reward: 0.0,
+                        reward: all_rewards,
                         terminated: false,
                         truncated: false,
                         info: serde_json::json!({}),

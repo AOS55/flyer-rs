@@ -6,13 +6,13 @@ use crate::{
     components::{
         AircraftAeroCoefficients, AircraftConfig, AircraftGeometry, AircraftType,
         DubinsAircraftConfig, FullAircraftConfig, MassModel, PowerplantConfig, PropulsionConfig,
-        StartConfig,
+        StartConfig, TaskType,
     },
     server::{
         config::{
             builders::{
                 ActionSpaceBuilder, FixedStartConfigBuilder, ObservationSpaceBuilder,
-                RandomStartConfigBuilder, StartConfigBuilder,
+                RandomStartConfigBuilder, StartConfigBuilder, TaskConfigBuilder,
             },
             errors::ConfigError,
         },
@@ -58,6 +58,7 @@ pub struct DubinsAircraftConfigBuilder {
     pub max_climb_rate: Option<f64>,
     pub max_descent_rate: Option<f64>,
     pub start_config: Option<StartConfigBuilder>,
+    pub task_config: Option<TaskConfigBuilder>,
     pub seed: Option<u64>,
 }
 
@@ -70,6 +71,7 @@ pub struct FullAircraftConfigBuilder {
     pub aero_coef: Option<AircraftAeroCoefficients>,
     pub propulsion_config: Option<PropulsionConfig>,
     pub start_config: Option<StartConfigBuilder>,
+    pub task_config: Option<TaskConfigBuilder>,
     pub seed: Option<u64>,
 }
 
@@ -123,6 +125,11 @@ impl DubinsAircraftConfigBuilder {
                 _ => return Err(ConfigError::JsonError(config_type.to_string())),
             });
         }
+
+        if let Some(task_config) = value.get("task_config") {
+            builder.task_config = Some(TaskConfigBuilder::from_json(task_config)?);
+        }
+
         Ok(builder)
     }
 }
@@ -253,6 +260,10 @@ impl FullAircraftConfigBuilder {
                     _ => return Err(ConfigError::JsonError(config_type.to_string())),
                 });
             }
+
+            if let Some(reward_config) = value.get("reward_config") {
+                builder.task_config = Some(TaskConfigBuilder::from_json(reward_config)?);
+            }
         }
 
         Ok(builder)
@@ -293,6 +304,11 @@ impl AircraftBuilder for FullAircraftConfigBuilder {
             None => None,
         };
 
+        let task_config = match &self.task_config {
+            Some(task_config) => task_config.build()?,
+            None => TaskType::default(),
+        };
+
         Ok(AircraftConfig::Full(FullAircraftConfig {
             name,
             ac_type: ac_type.clone(),
@@ -320,6 +336,7 @@ impl AircraftBuilder for FullAircraftConfigBuilder {
                     _ => PropulsionConfig::single_engine(PowerplantConfig::default()),
                 }),
             start_config: start_config.unwrap_or_default(),
+            task_config: task_config,
         }))
     }
 }

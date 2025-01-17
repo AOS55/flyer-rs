@@ -4,7 +4,6 @@ mod environment;
 mod physics;
 // mod render;
 mod agent;
-mod rewards;
 pub mod terrain;
 mod transformations;
 
@@ -19,7 +18,6 @@ pub use agent::{
     consume_step, step_condition, AgentConfig, AgentState, RenderMode, StepCommand, UpdateControl,
     UpdateControlPlugin, UpdateMode,
 };
-pub use rewards::RewardWeights;
 pub use terrain::{
     BiomeConfig, BiomeThresholds, FeatureConfig, HeightNoiseConfig, MoistureNoiseConfig,
     NoiseConfig, RenderConfig, RiverNoiseConfig, TerrainAssets, TerrainConfig, TerrainState,

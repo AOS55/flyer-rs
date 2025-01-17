@@ -43,7 +43,7 @@ pub struct Response {
     /// Observation data from the environment (for each aircraft).
     pub obs: HashMap<String, HashMap<String, f64>>,
     /// Reward for the current step.
-    pub reward: f64,
+    pub reward: HashMap<String, f64>,
     /// Whether the episode is terminated.
     pub terminated: bool,
     /// Whether the episode is truncated.

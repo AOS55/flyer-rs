@@ -4,7 +4,7 @@ use flyer::{
     components::{
         AircraftAeroCoefficients, AircraftConfig, AircraftGeometry, AircraftType,
         DubinsAircraftConfig, FixedStartConfig, FullAircraftConfig, MassModel, PropulsionConfig,
-        RandomStartConfig, SpatialComponent, StartConfig,
+        RandomStartConfig, SpatialComponent, StartConfig, TaskType,
     },
     resources::{PhysicsConfig, TerrainConfig},
 };
@@ -60,6 +60,7 @@ pub fn create_test_full_config() -> FullAircraftConfig {
             speed: 200.0,
             heading: 0.0,
         }),
+        task_config: TaskType::default(),
     }
 }
 

@@ -2,8 +2,8 @@ use bevy::prelude::*;
 
 use crate::{
     components::{
-        AircraftRenderState, AircraftType, Attitude, DubinsAircraftConfig, DubinsAircraftState,
-        PlayerController,
+        AircraftRenderState, AircraftType, Attitude, CollisionComponent, DubinsAircraftConfig,
+        DubinsAircraftState, PlayerController,
     },
     plugins::{AircraftPluginBase, Id, Identifier, StartupStage},
     // resources::step_condition,
@@ -37,6 +37,7 @@ impl DubinsAircraftPlugin {
             DubinsAircraftState::from_config(&config.start_config),
             PlayerController::new(),
             Name::new(config.name.to_string()), // Name of Bevy component
+            CollisionComponent::default(),
             info!("Spawning Dubins aircraft: {}", config.name),
             Identifier {
                 id: Id::Named(config.name.to_string()), // Id name
