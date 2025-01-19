@@ -12,9 +12,10 @@ use flyer::{
     },
     server::{setup_app, Command, EnvConfig, ServerState},
     systems::{
-        aero_force_system, air_data_system, dubins_aircraft_system, force_calculator_system,
-        handle_reset_response, physics_integrator_system, reset_env, running_physics,
-        sending_response, waiting_for_action,
+        aero_force_system, air_data_system, calculate_reward, determine_terminated,
+        dubins_aircraft_system, force_calculator_system, handle_reset_response,
+        physics_integrator_system, reset_env, running_physics, sending_response,
+        waiting_for_action,
     },
 };
 
@@ -127,6 +128,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 )
                     .chain()
                     .run_if(running_state),
+                calculate_reward.run_if(running_state),
+                determine_terminated.run_if(running_state),
                 sending_response.run_if(sending_state),
             )
                 .chain(),
@@ -299,6 +302,7 @@ fn handle_commands(
                             Ok(new_config) => {
                                 server.config = new_config;
                                 info!("Successfully rebuilt EnvConfig with seed: {}", seed_value);
+                                info!("Server Config: {:?}", server.config);
                             }
                             Err(e) => {
                                 error!("Failed to rebuild EnvConfig: {}", e);

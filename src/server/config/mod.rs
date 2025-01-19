@@ -3,7 +3,7 @@ use serde_json::Value;
 use std::collections::HashMap;
 
 use crate::{
-    components::{AircraftConfig, StartConfig, TerminalConditions},
+    components::{AircraftConfig, StartConfig},
     resources::{AgentConfig, EnvironmentConfig, PhysicsConfig, TerrainConfig, UpdateMode},
     server::{
         config::builders::{
@@ -50,9 +50,6 @@ pub struct EnvConfig {
 
     // Agent Configuration
     pub agent_config: AgentConfig,
-
-    // Terminal conditions
-    pub terminal_conditions: TerminalConditions,
 }
 
 impl EnvConfig {

@@ -14,6 +14,7 @@ pub struct AgentState {
 
     pub state_buffer: Arc<Mutex<HashMap<Id, AircraftState>>>,
     pub reward_buffer: Arc<Mutex<HashMap<Id, f64>>>,
+    pub termination_buffer: Arc<Mutex<HashMap<Id, bool>>>,
     pub action_queue: Arc<Mutex<HashMap<Id, AircraftControls>>>,
     pub render_buffer: Arc<Mutex<Option<Vec<u8>>>>,
 
@@ -30,6 +31,7 @@ impl AgentState {
             current_step: 0,
             state_buffer: Arc::new(Mutex::new(HashMap::new())),
             reward_buffer: Arc::new(Mutex::new(HashMap::new())),
+            termination_buffer: Arc::new(Mutex::new(HashMap::new())),
             action_queue: Arc::new(Mutex::new(HashMap::new())),
             render_buffer: Arc::new(Mutex::new(None)),
             mode: config.mode,

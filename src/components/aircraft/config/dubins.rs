@@ -1,4 +1,4 @@
-use crate::components::StartConfig;
+use crate::components::{StartConfig, TaskType};
 use bevy::prelude::*;
 use serde::{Deserialize, Serialize};
 
@@ -26,6 +26,8 @@ pub struct DubinsAircraftConfig {
     pub max_descent_rate: f64,
     /// Configuration for the starting state of the aircraft.
     pub start_config: StartConfig,
+    /// Configuration for the aircrafts reward scheme
+    pub task_config: TaskType,
 }
 
 impl Default for DubinsAircraftConfig {
@@ -41,6 +43,7 @@ impl Default for DubinsAircraftConfig {
             max_climb_rate: 5.0,
             max_descent_rate: 15.0,
             start_config: StartConfig::default(),
+            task_config: TaskType::default(),
         }
     }
 }
@@ -71,6 +74,7 @@ impl DubinsAircraftConfig {
         max_climb_rate: f64,
         max_descent_rate: f64,
         start_config: StartConfig,
+        task_config: TaskType,
     ) -> Self {
         Self {
             name,
@@ -82,6 +86,7 @@ impl DubinsAircraftConfig {
             max_climb_rate,
             max_descent_rate,
             start_config,
+            task_config,
         }
     }
 }

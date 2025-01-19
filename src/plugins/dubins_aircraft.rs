@@ -3,7 +3,7 @@ use bevy::prelude::*;
 use crate::{
     components::{
         AircraftRenderState, AircraftType, Attitude, CollisionComponent, DubinsAircraftConfig,
-        DubinsAircraftState, PlayerController,
+        DubinsAircraftState, PlayerController, TaskComponent,
     },
     plugins::{AircraftPluginBase, Id, Identifier, StartupStage},
     // resources::step_condition,
@@ -46,6 +46,11 @@ impl DubinsAircraftPlugin {
                 attitude: Attitude::Level,
             },
             AircraftType::TwinOtter,
+            TaskComponent {
+                task_type: config.task_config,
+                terminated: false,
+                weight: 1.0,
+            },
         ));
     }
 }

@@ -21,9 +21,11 @@ pub fn calculate_reward(
     )>,
     agent_state: ResMut<AgentState>,
 ) {
+    info!("Calculating rewards for Dubins aircraft");
+
     if let Ok(mut reward_buffer) = agent_state.reward_buffer.lock() {
         reward_buffer.clear();
-
+        info!("Found reward_buffer");
         for (id, state, task, collision) in dubins_query.iter() {
             let reward_value = task.calculate_dubins_reward(state, collision) * task.weight;
             reward_buffer.insert(id.id.clone(), reward_value);

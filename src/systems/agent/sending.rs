@@ -8,11 +8,13 @@ use crate::{
 };
 
 pub fn sending_response(agent_state: Res<AgentState>, mut server: ResMut<ServerState>) {
-    if let (Ok(state_buffer), Ok(reward_buffer)) = (
+    if let (Ok(state_buffer), Ok(termination_buffer), Ok(reward_buffer)) = (
         agent_state.state_buffer.lock(),
+        agent_state.termination_buffer.lock(),
         agent_state.reward_buffer.lock(),
     ) {
         let mut all_observations = HashMap::new();
+        let mut all_terminations = HashMap::new();
         let mut all_rewards = HashMap::new();
 
         // Collect observations from all aircraft
@@ -28,6 +30,11 @@ pub fn sending_response(agent_state: Res<AgentState>, mut server: ResMut<ServerS
                 all_observations.insert(id_str.clone(), obs);
             }
 
+            // Get terminations
+            if let Some(&termination) = termination_buffer.get(id) {
+                all_terminations.insert(id_str.clone(), termination);
+            }
+
             // Get rewards
             if let Some(&reward) = reward_buffer.get(id) {
                 all_rewards.insert(id_str.clone(), reward);
@@ -41,7 +48,7 @@ pub fn sending_response(agent_state: Res<AgentState>, mut server: ResMut<ServerS
                     let response = Response {
                         obs: all_observations,
                         reward: all_rewards,
-                        terminated: false,
+                        terminated: all_terminations,
                         truncated: false,
                         info: serde_json::json!({}),
                     };

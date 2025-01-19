@@ -20,6 +20,7 @@ pub mod fixtures {
             max_climb_rate: 10.0,
             max_descent_rate: 10.0,
             start_config: StartConfig::default(),
+            task_config: Default::default(),
         })
     });
 }
@@ -79,6 +80,7 @@ pub mod aircraft_configs {
             max_climb_rate: 10.0,
             max_descent_rate: 10.0,
             start_config: StartConfig::Fixed(FixedStartConfig::default()),
+            task_config: Default::default(),
         }
     }
 
@@ -93,6 +95,7 @@ pub mod aircraft_configs {
             max_climb_rate: 20.0,
             max_descent_rate: 15.0,
             start_config: StartConfig::Random(RandomStartConfig::default()),
+            task_config: Default::default(),
         }
     }
 

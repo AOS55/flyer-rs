@@ -45,7 +45,7 @@ pub struct Response {
     /// Reward for the current step.
     pub reward: HashMap<String, f64>,
     /// Whether the episode is terminated.
-    pub terminated: bool,
+    pub terminated: HashMap<String, bool>,
     /// Whether the episode is truncated.
     pub truncated: bool,
     /// Additional info about the step or environment state.

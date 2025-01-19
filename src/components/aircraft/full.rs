@@ -51,7 +51,6 @@ impl FullAircraftState {
                 let heading = fixed_config.heading;
                 (position, speed, heading)
             }
-
             StartConfig::Random(random_config) => random_config.generate(),
         };
 

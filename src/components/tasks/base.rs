@@ -101,7 +101,11 @@ impl TaskComponent {
     }
 
     /// Determine if task is terminated
-    pub fn is_dubins_terminated(&self, state: &DubinsAircraftState) -> bool {
+    pub fn is_dubins_terminated(
+        &self,
+        state: &DubinsAircraftState,
+        collision: &CollisionComponent,
+    ) -> bool {
         match &self.task_type {
             TaskType::Control(_params) => TaskComponent::simple_termination(&state.spatial),
             TaskType::Goal(params) => TaskComponent::goal_termination(&state.spatial, &params),
@@ -109,7 +113,27 @@ impl TaskComponent {
                 TaskComponent::trajectory_termination(&state.spatial, &params)
             }
             TaskType::Runway(_params) => TaskComponent::simple_termination(&state.spatial), // TODO: Implement Runway termination based on params
-            TaskType::ForcedLanding(_params) => TaskComponent::simple_termination(&state.spatial), // TODO: Implement ForcedLanding termination based on params
+            TaskType::ForcedLanding(params) => {
+                TaskComponent::landing_termination(&state.spatial, &collision, &params)
+            } // TODO: Implement ForcedLanding termination based on params
+        }
+    }
+
+    pub fn is_full_terminated(
+        &self,
+        spatial: &SpatialComponent,
+        collision: &CollisionComponent,
+    ) -> bool {
+        match &self.task_type {
+            TaskType::Control(_params) => TaskComponent::simple_termination(&spatial),
+            TaskType::Goal(params) => TaskComponent::goal_termination(&spatial, &params),
+            TaskType::Trajectory(params) => {
+                TaskComponent::trajectory_termination(&spatial, &params)
+            }
+            TaskType::Runway(params) => TaskComponent::runway_termination(&spatial, &params),
+            TaskType::ForcedLanding(params) => {
+                TaskComponent::landing_termination(&spatial, &collision, &params)
+            }
         }
     }
 }

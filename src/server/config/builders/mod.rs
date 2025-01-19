@@ -10,7 +10,6 @@ mod obs;
 mod physics;
 mod start;
 mod task;
-mod termination;
 mod terrain;
 
 use crate::{
@@ -34,7 +33,6 @@ pub use start::{
     RandomSpeedConfigBuilder, RandomStartConfigBuilder, StartConfigBuilder,
 };
 pub use task::TaskConfigBuilder;
-use termination::TerminalConditionsBuilder;
 pub use terrain::{HeightNoiseConfigBuilder, NoiseConfigBuilder, TerrainConfigBuilder};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -55,8 +53,6 @@ pub struct EnvConfigBuilder {
     environment_builder: EnvironmentConfigBuilder,
     #[serde(skip)]
     pub terrain_builder: TerrainConfigBuilder,
-    #[serde(skip)]
-    pub terminal_builder: TerminalConditionsBuilder,
 }
 
 impl Default for EnvConfigBuilder {
@@ -72,7 +68,6 @@ impl Default for EnvConfigBuilder {
             physics_builder: PhysicsConfigBuilder::default(),
             environment_builder: EnvironmentConfigBuilder::default(),
             terrain_builder: TerrainConfigBuilder::default(),
-            terminal_builder: TerminalConditionsBuilder::default(),
         }
     }
 }
@@ -207,7 +202,6 @@ impl EnvConfigBuilder {
             environment_config: self.environment_builder.build()?,
             terrain_config: self.terrain_builder.build()?,
             agent_config: AgentConfig::default(),
-            terminal_conditions: self.terminal_builder.build()?,
         })
     }
 }

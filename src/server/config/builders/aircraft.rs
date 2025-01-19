@@ -156,6 +156,11 @@ impl AircraftBuilder for DubinsAircraftConfigBuilder {
             None => None,
         };
 
+        let task_config = match &self.task_config {
+            Some(task_config) => task_config.build()?,
+            None => TaskType::default(),
+        };
+
         Ok(AircraftConfig::Dubins(DubinsAircraftConfig {
             name: self
                 .name
@@ -171,6 +176,7 @@ impl AircraftBuilder for DubinsAircraftConfigBuilder {
                 .max_descent_rate
                 .unwrap_or(default_config.max_descent_rate),
             start_config: start_config.unwrap_or(default_config.start_config),
+            task_config,
         }))
     }
 }
@@ -261,8 +267,8 @@ impl FullAircraftConfigBuilder {
                 });
             }
 
-            if let Some(reward_config) = value.get("reward_config") {
-                builder.task_config = Some(TaskConfigBuilder::from_json(reward_config)?);
+            if let Some(task_config) = value.get("task_config") {
+                builder.task_config = Some(TaskConfigBuilder::from_json(task_config)?);
             }
         }
 
@@ -336,7 +342,7 @@ impl AircraftBuilder for FullAircraftConfigBuilder {
                     _ => PropulsionConfig::single_engine(PowerplantConfig::default()),
                 }),
             start_config: start_config.unwrap_or_default(),
-            task_config: task_config,
+            task_config,
         }))
     }
 }
@@ -389,13 +395,25 @@ pub fn create_aircraft_builder(
         .and_then(|v| v.as_str())
         .ok_or_else(|| ConfigError::MissingRequired("observation type".into()))?;
 
+    let task_config = if let Some(task_config) = value.get("task_config") {
+        Some(TaskConfigBuilder::from_json(task_config)?)
+    } else {
+        None
+    };
+
     let aircraft_builder = match aircraft_type {
         "dubins" => {
-            let builder = DubinsAircraftConfigBuilder::from_json(value, seed)?;
+            let mut builder = DubinsAircraftConfigBuilder::from_json(value, seed)?;
+            if let Some(task_config) = task_config {
+                builder.task_config = Some(task_config);
+            }
             AircraftBuilderEnum::Dubins(builder)
         }
         "full" => {
-            let builder = FullAircraftConfigBuilder::from_json(value, seed)?;
+            let mut builder = FullAircraftConfigBuilder::from_json(value, seed)?;
+            if let Some(task_config) = task_config {
+                builder.task_config = Some(task_config);
+            }
             AircraftBuilderEnum::Full(builder)
         }
         _ => return Err(ConfigError::InvalidAircraftType(aircraft_type.to_string())),

@@ -3,9 +3,9 @@ use std::{collections::HashMap, io::Write};
 
 use crate::{
     components::{
-        AirData, AircraftControlSurfaces, AircraftState, DubinsAircraftConfig, DubinsAircraftState,
-        FullAircraftConfig, FullAircraftState, PhysicsComponent, PlayerController, PowerplantState,
-        SpatialComponent,
+        AirData, AircraftConfig, AircraftControlSurfaces, AircraftState, DubinsAircraftConfig,
+        DubinsAircraftState, FullAircraftConfig, FullAircraftState, PhysicsComponent,
+        PlayerController, PowerplantState, SpatialComponent, StartConfig,
     },
     plugins::{Id, Identifier, ResetCompleteEvent, ResetRequestEvent, SimState},
     resources::AgentState,
@@ -21,11 +21,13 @@ pub fn handle_reset_response(
     let conn = server.conn.clone();
     info!("Handling Reset Response");
     for _ in reset_complete.read() {
-        if let (Ok(state_buffer), Ok(reward_buffer)) = (
+        if let (Ok(state_buffer), Ok(termination_buffer), Ok(reward_buffer)) = (
             agent_state.state_buffer.lock(),
+            agent_state.termination_buffer.lock(),
             agent_state.reward_buffer.lock(),
         ) {
             let mut all_observations = HashMap::new();
+            let mut all_terminations = HashMap::new();
             let mut all_rewards = HashMap::new();
 
             // Collect initial observations
@@ -41,9 +43,13 @@ pub fn handle_reset_response(
                     all_observations.insert(id_str.clone(), obs);
                 }
 
+                if let Some(&terminated) = termination_buffer.get(id) {
+                    all_terminations.insert(id_str.clone(), terminated);
+                }
+
                 // Should be reset to 0 after reset
                 if let Some(&reward) = reward_buffer.get(id) {
-                    all_rewards.insert(id_str, reward);
+                    all_rewards.insert(id_str.clone(), reward);
                 }
             }
 
@@ -53,7 +59,7 @@ pub fn handle_reset_response(
                     let response = Response {
                         obs: all_observations,
                         reward: all_rewards,
-                        terminated: false,
+                        terminated: all_terminations,
                         truncated: false,
                         info: serde_json::json!({}),
                     };
@@ -71,18 +77,22 @@ pub fn handle_reset_response(
     }
 }
 
-/// System to handle resetting both Dubins and Full Aircraft state resets
+/// System to handle resetting environment
 pub fn reset_env(
     mut reset_events: EventReader<ResetRequestEvent>,
     mut reset_complete: EventWriter<ResetCompleteEvent>,
     mut dubins_query: Query<
-        (&Identifier, &DubinsAircraftConfig, &mut DubinsAircraftState),
+        (
+            &Identifier,
+            &mut DubinsAircraftConfig,
+            &mut DubinsAircraftState,
+        ),
         With<PlayerController>,
     >,
     mut full_query: Query<
         (
             &Identifier,
-            &FullAircraftConfig,
+            &mut FullAircraftConfig,
             &AirData,
             &AircraftControlSurfaces,
             &SpatialComponent,
@@ -92,26 +102,57 @@ pub fn reset_env(
         With<PlayerController>,
     >,
     mut agent_state: ResMut<AgentState>,
+    mut server: ResMut<ServerState>,
 ) {
-    for _event in reset_events.read() {
+    for event in reset_events.read() {
         // Reset the agent state
         agent_state.reset();
-        // Reset Dubins aircraft
-        for (identifier, config, mut state) in dubins_query.iter_mut() {
-            *state = DubinsAircraftState::from_config(&config.start_config);
 
-            // Update state buffer
-            if let Ok(mut state_buffer) = agent_state.state_buffer.lock() {
-                state_buffer.insert(identifier.id.clone(), AircraftState::Dubins(state.clone()));
+        // If seed provided, rebuild entire configuration
+        if let Some(seed) = event.seed {
+            match server.config.rebuild_with_seed(seed) {
+                Ok(new_config) => {
+                    server.config = new_config;
+                }
+                Err(e) => {
+                    error!("Failed to rebuild config with seed {}: {}", seed, e);
+                    continue;
+                }
             }
         }
 
-        // Reset Full aircraft
-        for (identifier, config, _, _, _, _, _) in full_query.iter_mut() {
-            // TODO: Implement position for full aircraft
-            let state = FullAircraftState::from_config(&config);
-            if let Ok(mut state_buffer) = agent_state.state_buffer.lock() {
-                state_buffer.insert(identifier.id.clone(), AircraftState::Full(state));
+        // Reset Dubins aircraft using the potentially updated config
+        for (identifier, _, mut state) in dubins_query.iter_mut() {
+            if let Some(config) = server.config.aircraft_configs.get(&identifier.to_string()) {
+                match config {
+                    AircraftConfig::Dubins(config) => {
+                        *state = DubinsAircraftState::from_config(&config.start_config);
+
+                        // Update state buffer
+                        if let Ok(mut state_buffer) = agent_state.state_buffer.lock() {
+                            state_buffer.insert(
+                                identifier.id.clone(),
+                                AircraftState::Dubins(state.clone()),
+                            );
+                        }
+                    }
+                    _ => error!("Mismatched aircraft type for {}", identifier.to_string()),
+                }
+            }
+        }
+
+        // Reset Full aircraft using the potentially updated config
+        for (identifier, _, _, _, _, _, _) in full_query.iter_mut() {
+            if let Some(config) = server.config.aircraft_configs.get(&identifier.to_string()) {
+                match config {
+                    AircraftConfig::Full(config) => {
+                        let state = FullAircraftState::from_config(&config);
+                        if let Ok(mut state_buffer) = agent_state.state_buffer.lock() {
+                            state_buffer.insert(identifier.id.clone(), AircraftState::Full(state));
+                        }
+                    }
+                    _ => error!("Mismatched aircraft type for {}", identifier.to_string()),
+                }
             }
         }
 
@@ -119,3 +160,73 @@ pub fn reset_env(
         reset_complete.send(ResetCompleteEvent);
     }
 }
+
+// pub fn reset_env(
+//     mut reset_events: EventReader<ResetRequestEvent>,
+//     mut reset_complete: EventWriter<ResetCompleteEvent>,
+//     mut dubins_query: Query<
+//         (
+//             &Identifier,
+//             &mut DubinsAircraftConfig,
+//             &mut DubinsAircraftState,
+//         ),
+//         With<PlayerController>,
+//     >,
+//     mut full_query: Query<
+//         (
+//             &Identifier,
+//             &mut FullAircraftConfig,
+//             &AirData,
+//             &AircraftControlSurfaces,
+//             &SpatialComponent,
+//             &PhysicsComponent,
+//             &PowerplantState,
+//         ),
+//         With<PlayerController>,
+//     >,
+//     mut agent_state: ResMut<AgentState>,
+// ) {
+//     for event in reset_events.read() {
+//         // Reset the agent state
+//         agent_state.reset();
+
+//         // Reset Dubins aircraft
+//         for (identifier, mut config, mut state) in dubins_query.iter_mut() {
+//             if let Some(seed) = event.seed {
+//                 // Update the start config seed
+//                 match &mut config.start_config {
+//                     StartConfig::Random(random_config) => {
+//                         random_config.seed = Some(seed);
+//                     }
+//                     _ => {}
+//                 }
+//             }
+
+//             *state = DubinsAircraftState::from_config(&config.start_config);
+
+//             // Update state buffer
+//             if let Ok(mut state_buffer) = agent_state.state_buffer.lock() {
+//                 state_buffer.insert(identifier.id.clone(), AircraftState::Dubins(state.clone()));
+//             }
+//         }
+
+//         // Reset Full aircraft
+//         for (identifier, mut config, _, _, _, _, _) in full_query.iter_mut() {
+//             if let Some(seed) = event.seed {
+//                 match &mut config.start_config {
+//                     StartConfig::Random(random_config) => {
+//                         random_config.seed = Some(seed);
+//                     }
+//                     _ => {}
+//                 }
+//             }
+//             let state = FullAircraftState::from_config(&config);
+//             if let Ok(mut state_buffer) = agent_state.state_buffer.lock() {
+//                 state_buffer.insert(identifier.id.clone(), AircraftState::Full(state));
+//             }
+//         }
+
+//         // Send reset complete event
+//         reset_complete.send(ResetCompleteEvent);
+//     }
+// }

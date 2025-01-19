@@ -25,6 +25,7 @@ impl Default for DubinsAircraftState {
 impl DubinsAircraftState {
     /// Creates a new Dubins aircraft state from a given configuration.
     pub fn from_config(config: &StartConfig) -> Self {
+        info!("Dubins Aircraft Config: {:?}", config);
         match config {
             StartConfig::Fixed(fixed_config) => {
                 let spatial = SpatialComponent::at_position_and_airspeed(

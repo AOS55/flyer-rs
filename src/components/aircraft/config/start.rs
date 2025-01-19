@@ -124,6 +124,7 @@ impl Default for RandomStartConfig {
 
 impl RandomStartConfig {
     pub fn generate(&self) -> (Vector3<f64>, f64, f64) {
+        info!("Random seed: {:?}", self.seed);
         let mut rng = match self.seed {
             Some(seed) => ChaCha8Rng::seed_from_u64(seed),
             None => {

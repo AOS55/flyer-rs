@@ -4,7 +4,7 @@ use nalgebra::Vector3;
 use crate::{
     components::{
         AirData, AircraftControlSurfaces, CollisionComponent, FullAircraftConfig, PhysicsComponent,
-        PlayerController, PropulsionState, SpatialComponent, StartConfig,
+        PlayerController, PropulsionState, SpatialComponent, StartConfig, TaskComponent,
     },
     plugins::{AircraftPluginBase, Id, Identifier, StartupStage},
 };
@@ -54,6 +54,11 @@ impl FullAircraftPlugin {
             Name::new(config.name.to_string()),
             Identifier {
                 id: Id::Named(config.name.to_string()), // Id name
+            },
+            TaskComponent {
+                task_type: config.task_config,
+                terminated: false,
+                weight: 1.0,
             },
         ));
     }

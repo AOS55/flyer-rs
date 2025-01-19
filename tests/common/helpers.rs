@@ -43,6 +43,7 @@ pub fn create_test_dubins_config() -> DubinsAircraftConfig {
         max_climb_rate: 10.0,
         max_descent_rate: 10.0,
         start_config: StartConfig::Fixed(FixedStartConfig::default()),
+        task_config: Default::default(),
     }
 }
 
