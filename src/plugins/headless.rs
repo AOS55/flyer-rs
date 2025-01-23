@@ -198,7 +198,7 @@ fn setup_render_target(
         size,
         TextureDimension::D2,
         &[0; 4],
-        TextureFormat::bevy_default(),
+        TextureFormat::Rgba8UnormSrgb,
         RenderAssetUsages::default(),
     );
     render_target_image.texture_descriptor.usage |=
@@ -292,12 +292,14 @@ impl render_graph::Node for ImageCopyDriver {
         render_context: &mut RenderContext,
         world: &World,
     ) -> Result<(), NodeRunError> {
+        info!("ImageCopyDriver running");
         let image_copiers = world.get_resource::<ImageCopiers>().unwrap();
         let gpu_images = world
             .get_resource::<RenderAssets<bevy::render::texture::GpuImage>>()
             .unwrap();
 
         for image_copier in image_copiers.iter() {
+            info!("Processing copier");
             if !image_copier.enabled() {
                 continue;
             }
@@ -351,22 +353,30 @@ fn receive_image_from_buffer(
     render_device: Res<RenderDevice>,
     sender: Res<RenderWorldSender>,
 ) {
+    info!("Start buffer mapping");
     for image_copier in image_copiers.0.iter() {
         if !image_copier.enabled() {
             continue;
         }
-        let buffer_slice = image_copier.buffer.slice(..);
 
+        let buffer_slice = image_copier.buffer.slice(..);
+        info!("Got buffer slice size: {}", buffer_slice.size());
+
+        // Wait for buffer to be ready
         let (s, r) = crossbeam_channel::bounded(1);
-        buffer_slice.map_async(MapMode::Read, move |r| match r {
-            Ok(r) => s.send(r).expect("Failed to send map update"),
-            Err(err) => panic!("Failed to map buffer {err}"),
+        buffer_slice.map_async(MapMode::Read, move |result| {
+            if let Ok(_) = result {
+                s.send(()).expect("Failed to signal mapping complete");
+            }
         });
 
-        render_device.poll(Maintain::wait()).panic_on_timeout();
-        r.recv().expect("Failed to receive the map_async message");
-        let _ = sender.send(buffer_slice.get_mapped_range().to_vec());
-        image_copier.buffer.unmap();
+        // Wait for mapping to complete before reading
+        render_device.poll(Maintain::Wait).panic_on_timeout();
+        if r.recv().is_ok() {
+            let data = buffer_slice.get_mapped_range().to_vec();
+            image_copier.buffer.unmap(); // Unmap before sending
+            let _ = sender.send(data);
+        }
     }
 }
 
@@ -388,9 +398,11 @@ fn update(
             let mut image_data = Vec::new();
             while let Ok(data) = receiver.try_recv() {
                 // keep only the latest frame
+                info!("Received image data: {} bytes", data.len());
                 image_data = data;
             }
             if !image_data.is_empty() {
+                info!("Processing image data: {} bytes", image_data.len());
                 for image in images_to_save.iter() {
                     // Fill correct data from channel to image
                     let img_bytes = images.get_mut(image.id()).unwrap();
@@ -414,6 +426,7 @@ fn update(
 
                     // Update the latest frame resource
                     latest_frame.update(final_data);
+                    info!("Updated latest frame");
                 }
             }
         } else {

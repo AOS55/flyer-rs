@@ -13,8 +13,9 @@ mod trim;
 
 pub use aerodynamics::{aero_force_system, air_data_system};
 pub use agent::{
-    calculate_reward, capture_frame, collect_state, determine_terminated, handle_reset_response,
-    reset_env, running_physics, sending_response, waiting_for_action, ScreenshotState,
+    calculate_reward, collect_state, determine_terminated, handle_render_response,
+    handle_reset_response, render_frame, reset_env, running_physics, sending_response,
+    waiting_for_action,
 };
 pub use camera::camera_follow_system;
 pub use collisions::{collision_detection_system, get_terrain_at_position, TerrainInfo};

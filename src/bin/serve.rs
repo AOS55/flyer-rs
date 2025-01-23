@@ -8,14 +8,15 @@ use std::{
 
 use flyer::{
     plugins::{
-        ResetCompleteEvent, ResetRequestEvent, SimState, StepCompleteEvent, StepRequestEvent,
+        RenderCompleteEvent, RenderRequestEvent, ResetCompleteEvent, ResetRequestEvent, SimState,
+        StepCompleteEvent, StepRequestEvent,
     },
     server::{setup_app, Command, EnvConfig, ServerState},
     systems::{
         aero_force_system, air_data_system, calculate_reward, determine_terminated,
-        dubins_aircraft_system, force_calculator_system, handle_reset_response,
-        physics_integrator_system, reset_env, running_physics, sending_response,
-        waiting_for_action,
+        dubins_aircraft_system, force_calculator_system, handle_render_response,
+        handle_reset_response, physics_integrator_system, render_frame, reset_env, running_physics,
+        sending_response, waiting_for_action,
     },
 };
 
@@ -134,11 +135,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             )
                 .chain(),
         )
+        // Render systems
+        .add_systems(FixedUpdate, (render_frame, handle_render_response).chain())
         // Events
         .add_event::<StepRequestEvent>()
         .add_event::<StepCompleteEvent>()
         .add_event::<ResetRequestEvent>()
         .add_event::<ResetCompleteEvent>()
+        .add_event::<RenderRequestEvent>()
+        .add_event::<RenderCompleteEvent>()
         // Reset handling
         .add_systems(FixedUpdate, reset_env);
 
@@ -230,6 +235,7 @@ fn handle_commands(
     mut server: ResMut<ServerState>,
     mut step_events: EventWriter<StepRequestEvent>,
     mut reset_events: EventWriter<ResetRequestEvent>,
+    mut render_events: EventWriter<RenderRequestEvent>,
 ) {
     let cmd = {
         let guard = server.conn.lock().unwrap();
@@ -326,6 +332,11 @@ fn handle_commands(
                     info!("Transitioning to Resetting state");
                     reset_events.send(ResetRequestEvent { seed });
                     server.sim_state = SimState::Resetting;
+                }
+
+                Command::Render => {
+                    info!("Render command received");
+                    render_events.send(RenderRequestEvent);
                 }
 
                 Command::Close => {

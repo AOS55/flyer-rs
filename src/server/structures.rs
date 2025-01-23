@@ -20,6 +20,8 @@ pub enum Command {
     },
     /// Reset the environment with an optional random seed.
     Reset { seed: Option<u64> },
+    /// Pass out a render of the current state.
+    Render,
     /// Close the server connection.
     Close,
 }

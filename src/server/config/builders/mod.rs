@@ -14,7 +14,7 @@ mod terrain;
 
 use crate::{
     components::AircraftConfig,
-    resources::{AgentConfig, UpdateMode},
+    resources::{AgentConfig, RenderMode, UpdateMode},
     server::config::errors::ConfigError,
     server::{ActionSpace, EnvConfig, ObservationSpace},
     utils::RngManager,
@@ -53,6 +53,7 @@ pub struct EnvConfigBuilder {
     environment_builder: EnvironmentConfigBuilder,
     #[serde(skip)]
     pub terrain_builder: TerrainConfigBuilder,
+    pub agent_config: Option<AgentConfig>,
 }
 
 impl Default for EnvConfigBuilder {
@@ -68,6 +69,7 @@ impl Default for EnvConfigBuilder {
             physics_builder: PhysicsConfigBuilder::default(),
             environment_builder: EnvironmentConfigBuilder::default(),
             terrain_builder: TerrainConfigBuilder::default(),
+            agent_config: None,
         }
     }
 }
@@ -163,6 +165,31 @@ impl EnvConfigBuilder {
             builder.environment_builder = EnvironmentConfigBuilder::from_json(environment_config)?;
         }
 
+        // Parse agent config
+        if let Some(agent_config) = json_value.get("agent_config") {
+            let mode = match agent_config.get("mode").and_then(|v| v.as_str()) {
+                Some("human") => RenderMode::Human,
+                Some("RGBArray") => RenderMode::RGBArray,
+                _ => RenderMode::Human, // Default
+            };
+
+            let width = agent_config
+                .get("render_width")
+                .and_then(|v| v.as_f64())
+                .unwrap_or(800.0);
+            let height = agent_config
+                .get("render_height")
+                .and_then(|v| v.as_f64())
+                .unwrap_or(600.0);
+
+            builder.agent_config = Some(AgentConfig {
+                mode,
+                render_width: width as f32,
+                render_height: height as f32,
+                ..AgentConfig::default()
+            });
+        }
+
         Ok(builder)
     }
 
@@ -201,7 +228,7 @@ impl EnvConfigBuilder {
             physics_config: self.physics_builder.build()?,
             environment_config: self.environment_builder.build()?,
             terrain_config: self.terrain_builder.build()?,
-            agent_config: AgentConfig::default(),
+            agent_config: self.agent_config.unwrap_or_default(),
         })
     }
 }

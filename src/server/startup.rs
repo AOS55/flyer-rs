@@ -56,7 +56,8 @@ pub fn setup_app(mut app: App, config: EnvConfig, asset_path: String) -> App {
                 config.agent_config.render_height as u32,
                 asset_path,
             ))
-            .add_systems(FixedUpdate, camera_follow_system);
+            .add_plugins(CameraPlugin);
+            // .add_systems(FixedUpdate, camera_follow_system);
             // .insert_resource(Time::<Fixed>::from_seconds(1.0 / 60.0));
         }
     }

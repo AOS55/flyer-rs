@@ -2155,6 +2155,7 @@ dependencies = [
  "argmin-math",
  "argmin-observer-slog",
  "argmin_testfunctions",
+ "base64 0.22.1",
  "bevy",
  "crossbeam-channel",
  "futures-lite",

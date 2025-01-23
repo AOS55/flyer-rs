@@ -7,7 +7,7 @@ mod state;
 mod termination;
 mod waiting;
 
-pub use render::{capture_frame, ScreenshotState};
+pub use render::{handle_render_response, render_frame};
 pub use reset::{handle_reset_response, reset_env};
 pub use reward::calculate_reward;
 pub use running::running_physics;

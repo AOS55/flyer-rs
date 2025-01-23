@@ -18,3 +18,11 @@ pub struct ResetRequestEvent {
 
 #[derive(Event)]
 pub struct ResetCompleteEvent;
+
+#[derive(Event)]
+pub struct RenderRequestEvent;
+
+#[derive(Event)]
+pub struct RenderCompleteEvent {
+    pub frame: Vec<u8>,
+}

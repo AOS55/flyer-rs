@@ -116,16 +116,16 @@ impl Default for LandingTaskConfigBuilder {
 
 impl TaskConfigBuilder {
     pub fn from_json(value: &Value) -> Result<Self, ConfigError> {
-        let reward_type = value
+        let task_type = value
             .get("type")
             .and_then(|v| v.as_str())
-            .ok_or_else(|| ConfigError::MissingRequired("reward type".into()))?;
+            .ok_or_else(|| ConfigError::MissingRequired("task type".into()))?;
 
         let config = value
             .get("config")
-            .ok_or_else(|| ConfigError::MissingRequired("reward config".into()))?;
+            .ok_or_else(|| ConfigError::MissingRequired("task config".into()))?;
 
-        match reward_type {
+        match task_type {
             "Control" => Ok(TaskConfigBuilder::Control(
                 ControlTaskConfigBuilder::from_json(config)?,
             )),
@@ -142,8 +142,8 @@ impl TaskConfigBuilder {
                 LandingTaskConfigBuilder::from_json(config)?,
             )),
             _ => Err(ConfigError::InvalidParameter {
-                name: "reward type".into(),
-                value: reward_type.into(),
+                name: "task type".into(),
+                value: task_type.into(),
             }),
         }
     }
