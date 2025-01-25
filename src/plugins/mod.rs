@@ -21,7 +21,7 @@ pub use events::{
     StepCompleteEvent, StepRequestEvent,
 };
 pub use full_aircraft::FullAircraftPlugin;
-pub use headless::HeadlessPlugin;
+pub use headless::{HeadlessPlugin, HeadlessRenderTarget};
 pub use physics::PhysicsPlugin;
 pub use staging::{SimState, StartupSequencePlugin, StartupStage};
 pub use terrain::TerrainPlugin;

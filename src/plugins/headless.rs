@@ -31,6 +31,9 @@ use crate::{
     resources::TransformationResource,
 };
 
+#[derive(Resource)]
+pub struct HeadlessRenderTarget(pub RenderTarget);
+
 pub struct HeadlessPlugin {
     width: u32,
     height: u32,
@@ -91,11 +94,9 @@ impl Plugin for HeadlessPlugin {
 
 fn setup(
     mut commands: Commands,
-    player_query: Query<Entity, With<PlayerController>>,
     mut images: ResMut<Assets<Image>>,
     mut scene_controller: ResMut<SceneController>,
     render_device: Res<RenderDevice>,
-    transform_res: Res<TransformationResource>,
 ) {
     let render_target = setup_render_target(
         &mut commands,
@@ -105,29 +106,8 @@ fn setup(
         40,
     );
 
+    commands.insert_resource(HeadlessRenderTarget(render_target));
     commands.insert_resource(ClearColor(Color::srgb(0.5, 0.5, 1.0)));
-
-    // TODO: Problem is here, no camera spawned
-    if let Ok(player_entity) = player_query.get_single() {
-        let initial_pos = Vector3::new(0.0, 0.0, 500.0);
-        let render_pos = transform_res.screen_from_ned(&initial_pos).unwrap();
-        commands.spawn((
-            Camera2d::default(),
-            Camera {
-                hdr: true,
-                target: render_target.clone(),
-                ..Default::default()
-            },
-            Transform::from_translation(render_pos), // Set the camera position in world space
-            GlobalTransform::default(),
-            CameraComponent {
-                target: Some(player_entity),
-                ..default()
-            },
-        ));
-    } else {
-        error!("No player entity found");
-    }
 }
 
 #[derive(Resource, Deref)]
@@ -231,7 +211,7 @@ pub struct CaptureFramePlugin;
 impl Plugin for CaptureFramePlugin {
     fn build(&self, app: &mut App) {
         info!("Adding CaptureFramePlugin");
-        app.add_systems(PostUpdate, update);
+        app.add_systems(FixedPostUpdate, update);
     }
 }
 
@@ -352,8 +332,10 @@ fn receive_image_from_buffer(
     image_copiers: Res<ImageCopiers>,
     render_device: Res<RenderDevice>,
     sender: Res<RenderWorldSender>,
+    camera_query: Query<(&Camera, &GlobalTransform)>,
 ) {
     info!("Start buffer mapping");
+    info!("Camera count: {}", camera_query.iter().count());
     for image_copier in image_copiers.0.iter() {
         if !image_copier.enabled() {
             continue;
@@ -383,7 +365,7 @@ fn receive_image_from_buffer(
 #[derive(Component, Deref, DerefMut)]
 struct ImageToSave(Handle<Image>);
 
-// Takes from channel image content sent from render world and saves it to disk
+// Takes from channel image content sent from render world and adds to frame buffer
 fn update(
     images_to_save: Query<&ImageToSave>,
     receiver: Res<MainWorldReceiver>,

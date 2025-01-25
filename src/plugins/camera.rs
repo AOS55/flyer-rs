@@ -3,7 +3,7 @@ use nalgebra::Vector3;
 
 use crate::{
     components::{CameraComponent, PlayerController},
-    plugins::StartupStage,
+    plugins::{HeadlessRenderTarget, StartupStage},
     resources::TransformationResource,
     systems::camera_follow_system,
 };
@@ -39,15 +39,19 @@ fn spawn_camera(
     mut commands: Commands,
     player_query: Query<Entity, With<PlayerController>>,
     transform_res: Res<TransformationResource>,
+    render_target: Option<Res<HeadlessRenderTarget>>,
 ) {
     // Attempt to get the single player entity from the query
     // TODO: Handle the case where there are multiple player entities
     if let Ok(player_entity) = player_query.get_single() {
+        info!("Spawning Camera");
         // 1. Set the initial camera position in the NED (North-East-Down) coordinate system
         let initial_pos = Vector3::new(0.0, 0.0, 500.0);
 
         // 2. Convert the position to screen/render space using the transformation resource
         let render_pos = transform_res.screen_from_ned(&initial_pos).unwrap();
+
+        let camera_target = render_target.map(|rt| rt.0.clone()); // Get the camera target from the render target
 
         // 3. Spawn the camera entity with core camera components and a custom `CameraComponent`
         commands.spawn((
@@ -55,6 +59,7 @@ fn spawn_camera(
             Camera2d::default(), // Basic 2D camera
             Camera {
                 hdr: true, // Enable HDR rendering for better visual quality
+                target: camera_target.unwrap_or_default(),
                 ..default()
             },
             Transform::from_translation(render_pos), // Set the camera position in world space
