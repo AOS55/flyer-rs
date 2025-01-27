@@ -10,26 +10,54 @@ use bevy::prelude::*;
 use std::io::Write;
 
 use crate::{
-    plugins::{LatestFrame, RenderCompleteEvent, RenderRequestEvent},
+    plugins::{FrameState, LatestFrame, RenderCompleteEvent, SimState},
     server::ServerState,
 };
 
+// Gets a Render of the environment, must await the update completing
 pub fn render_frame(
-    mut render_events: EventReader<RenderRequestEvent>,
     latest_frame: Res<LatestFrame>,
+    mut frame_state: ResMut<FrameState>,
     mut complete_events: EventWriter<RenderCompleteEvent>,
 ) {
-    for _event in render_events.read() {
-        complete_events.send(RenderCompleteEvent {
-            frame: latest_frame.data.clone(),
-        });
+    if !frame_state.new_frame_available {
+        warn!("Waiting for render frame...");
+        return;
     }
+    info!(
+        "Render frame available! Frame size = {}",
+        latest_frame.data.len()
+    );
+    complete_events.send(RenderCompleteEvent {
+        frame: latest_frame.data.clone(),
+    });
+    frame_state.new_frame_available = false;
+
+    // for _event in render_events.read() {
+    //     warn!("Render frame unavailable!");
+    //     if !frame_state.new_frame_available {
+    //         info!("Exiting and trying again next frame");
+    //         return; // Exit and try again next frame
+    //     }
+    //     info!(
+    //         "Render frame: latest_frame size = {}",
+    //         latest_frame.data.len()
+    //     );
+    //     complete_events.send(RenderCompleteEvent {
+    //         frame: latest_frame.data.clone(),
+    //     });
+
+    //     // Reset the flag after sending the frame
+    //     frame_state.new_frame_available = false;
+    // }
 }
 
+// Should only run once RenderCompleteEvent is received
 pub fn handle_render_response(
     mut server: ResMut<ServerState>,
     mut complete_events: EventReader<RenderCompleteEvent>,
 ) {
+    let conn = server.conn.clone();
     for event in complete_events.read() {
         info!(
             "Processing render event with frame size: {}",
@@ -41,39 +69,53 @@ pub fn handle_render_response(
             continue;
         }
 
-        // Limit base64 encoding to reasonable size
         if event.frame.len() > 10_000_000 {
-            // 10MB limit
             error!("Frame too large: {} bytes", event.frame.len());
             continue;
         }
 
-        let response = match (|| {
-            let guard = server
-                .conn
-                .lock()
-                .map_err(|e| format!("Lock error: {}", e))?;
-            let mut stream = guard
-                .try_clone()
-                .map_err(|e| format!("Clone error: {}", e))?;
+        if let Ok(guard) = conn.lock() {
+            if let Ok(mut stream) = guard.try_clone() {
+                // Enable TCP_NODELAY
+                if let Err(e) = stream.set_nodelay(true) {
+                    error!("Failed to set TCP_NODELAY: {}", e);
+                    continue;
+                }
 
-            let base64_frame = base64::encode(&event.frame);
-            info!("Base64 frame size: {}", base64_frame.len());
+                let base64_frame = base64::encode(&event.frame);
+                let response = serde_json::json!({
+                    "frame": base64_frame,
+                    "width": server.config.agent_config.render_width,
+                    "height": server.config.agent_config.render_height,
+                });
 
-            let response = serde_json::json!({
-                "frame": base64_frame,
-                "width": server.config.agent_config.render_width,
-                "height": server.config.agent_config.render_height,
-            });
+                match serde_json::to_string(&response) {
+                    Ok(response_str) => {
+                        let len_bytes = (response_str.len() as u32).to_be_bytes();
 
-            let response_str = serde_json::to_string(&response)? + "\n";
-            stream.write_all(response_str.as_bytes())?;
-            stream.flush()?;
-            Ok::<_, Box<dyn std::error::Error>>(())
-        })() {
-            Ok(_) => info!("Render response sent successfully"),
-            Err(e) => error!("Failed to send render response: {}", e),
-        };
+                        // Write length prefix and data with error handling
+                        if let Err(e) = stream.write_all(&len_bytes) {
+                            error!("Failed to write length prefix: {}", e);
+                            continue;
+                        }
+
+                        if let Err(e) = stream.write_all(response_str.as_bytes()) {
+                            error!("Failed to write response data: {}", e);
+                            continue;
+                        }
+
+                        if let Err(e) = stream.flush() {
+                            error!("Failed to flush stream: {}", e);
+                            continue;
+                        }
+
+                        info!("Successfully sent response of size: {}", response_str.len());
+                        server.sim_state = SimState::WaitingForAction;
+                    }
+                    Err(e) => error!("Failed to serialize response: {}", e),
+                }
+            }
+        }
     }
 }
 

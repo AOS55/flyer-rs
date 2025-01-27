@@ -33,4 +33,5 @@ pub enum SimState {
     RunningPhysics,
     SendingResponse,
     Resetting,
+    Rendering,
 }

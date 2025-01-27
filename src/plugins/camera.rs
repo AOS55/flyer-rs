@@ -53,6 +53,8 @@ fn spawn_camera(
 
         let camera_target = render_target.map(|rt| rt.0.clone()); // Get the camera target from the render target
 
+        info!("Camera Target: {:?}", camera_target);
+
         // 3. Spawn the camera entity with core camera components and a custom `CameraComponent`
         commands.spawn((
             // Core camera components for 2D

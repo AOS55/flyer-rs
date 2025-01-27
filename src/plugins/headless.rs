@@ -16,7 +16,6 @@ use bevy::{
     },
 };
 use crossbeam_channel::{Receiver, Sender};
-use nalgebra::Vector3;
 use std::{
     sync::{
         atomic::{AtomicBool, Ordering},
@@ -25,14 +24,23 @@ use std::{
     time::Duration,
 };
 
-use crate::{
-    components::{CameraComponent, PlayerController},
-    plugins::{LatestFrame, StartupStage},
-    resources::TransformationResource,
-};
+use crate::plugins::{LatestFrame, StartupStage};
 
 #[derive(Resource)]
 pub struct HeadlessRenderTarget(pub RenderTarget);
+
+#[derive(Resource)]
+pub struct FrameState {
+    pub new_frame_available: bool,
+}
+
+impl Default for FrameState {
+    fn default() -> Self {
+        Self {
+            new_frame_available: false,
+        }
+    }
+}
 
 pub struct HeadlessPlugin {
     width: u32,
@@ -87,8 +95,9 @@ impl Plugin for HeadlessPlugin {
             .add_plugins(ScheduleRunnerPlugin::run_loop(Duration::from_secs_f64(
                 1.0 / 60.0,
             )))
+            .init_resource::<FrameState>()
             .init_resource::<SceneController>()
-            .add_systems(Startup, setup.in_set(StartupStage::BuildCameras));
+            .add_systems(Startup, setup.in_set(StartupStage::BuildUtilities));
     }
 }
 
@@ -143,6 +152,8 @@ enum SceneState {
 pub struct ImageCopyPlugin;
 impl Plugin for ImageCopyPlugin {
     fn build(&self, app: &mut App) {
+        info!("Adding ImageCopyPlugin");
+
         let (s, r) = crossbeam_channel::unbounded();
 
         let render_app = app
@@ -156,7 +167,8 @@ impl Plugin for ImageCopyPlugin {
         render_app
             .insert_resource(RenderWorldSender(s))
             .add_systems(ExtractSchedule, image_copy_extract)
-            .add_systems(Render, receive_image_from_buffer.after(RenderSet::Render));
+            .add_systems(Render, receive_image_from_buffer.after(RenderSet::Render))
+            .add_systems(Render, debug_buffer.after(RenderSet::Render));
     }
 }
 
@@ -167,6 +179,8 @@ fn setup_render_target(
     scene_controller: &mut ResMut<SceneController>,
     pre_roll_frames: u32,
 ) -> RenderTarget {
+    info!("Setting up render target");
+
     let size = Extent3d {
         width: scene_controller.width,
         height: scene_controller.height,
@@ -204,14 +218,14 @@ fn setup_render_target(
     commands.spawn(ImageToSave(cpu_image_handle));
 
     scene_controller.state = SceneState::Render(pre_roll_frames);
-    RenderTarget::Image(render_target_image_handle)
+    RenderTarget::Image(render_target_image_handle.into())
 }
 
 pub struct CaptureFramePlugin;
 impl Plugin for CaptureFramePlugin {
     fn build(&self, app: &mut App) {
         info!("Adding CaptureFramePlugin");
-        app.add_systems(FixedPostUpdate, update);
+        app.add_systems(PostUpdate, update);
     }
 }
 
@@ -231,6 +245,8 @@ impl ImageCopier {
         size: Extent3d,
         render_device: &RenderDevice,
     ) -> ImageCopier {
+        info!("Creating ImageCopier");
+
         let padded_bytes_per_row =
             RenderDevice::align_copy_bytes_per_row((size.width) as usize) * 4;
 
@@ -254,6 +270,7 @@ impl ImageCopier {
 }
 
 fn image_copy_extract(mut commands: Commands, image_copiers: Extract<Query<&ImageCopier>>) {
+    info!("Running Image Copy Extract");
     commands.insert_resource(ImageCopiers(
         image_copiers.iter().cloned().collect::<Vec<ImageCopier>>(),
     ));
@@ -272,14 +289,13 @@ impl render_graph::Node for ImageCopyDriver {
         render_context: &mut RenderContext,
         world: &World,
     ) -> Result<(), NodeRunError> {
-        info!("ImageCopyDriver running");
+        info!("Running ImageCopyDriver");
         let image_copiers = world.get_resource::<ImageCopiers>().unwrap();
         let gpu_images = world
             .get_resource::<RenderAssets<bevy::render::texture::GpuImage>>()
             .unwrap();
 
         for image_copier in image_copiers.iter() {
-            info!("Processing copier");
             if !image_copier.enabled() {
                 continue;
             }
@@ -328,21 +344,32 @@ impl render_graph::Node for ImageCopyDriver {
     }
 }
 
+fn debug_buffer() {
+    info!("Debugging buffer");
+}
+
 fn receive_image_from_buffer(
     image_copiers: Res<ImageCopiers>,
     render_device: Res<RenderDevice>,
     sender: Res<RenderWorldSender>,
-    camera_query: Query<(&Camera, &GlobalTransform)>,
+    // mut latest_frame: ResMut<LatestFrame>,
+    // mut frame_state: ResMut<FrameState>,
+    // camera_query: Query<(&Camera, &GlobalTransform)>,
 ) {
     info!("Start buffer mapping");
-    info!("Camera count: {}", camera_query.iter().count());
+    // info!("Camera count: {}", camera_query.iter().count());
     for image_copier in image_copiers.0.iter() {
         if !image_copier.enabled() {
             continue;
         }
 
         let buffer_slice = image_copier.buffer.slice(..);
-        info!("Got buffer slice size: {}", buffer_slice.size());
+        // info!("Got buffer slice size: {}", buffer_slice.size());
+
+        // info!(
+        //     "Latest frame size before update: {}",
+        //     latest_frame.data.len()
+        // );
 
         // Wait for buffer to be ready
         let (s, r) = crossbeam_channel::bounded(1);
@@ -352,13 +379,27 @@ fn receive_image_from_buffer(
             }
         });
 
+        render_device.poll(Maintain::wait()).panic_on_timeout();
+
+        r.recv().expect("Failed to receive the map_async message");
+        let _ = sender.send(buffer_slice.get_mapped_range().to_vec());
+        image_copier.buffer.unmap();
+
         // Wait for mapping to complete before reading
-        render_device.poll(Maintain::Wait).panic_on_timeout();
-        if r.recv().is_ok() {
-            let data = buffer_slice.get_mapped_range().to_vec();
-            image_copier.buffer.unmap(); // Unmap before sending
-            let _ = sender.send(data);
-        }
+        // render_device.poll(Maintain::Wait).panic_on_timeout();
+        // if r.recv().is_ok() {
+        //     let data = buffer_slice.get_mapped_range().to_vec();
+        //     let _ = sender.send(buffer_slice.get_mapped_range().to_vec());
+
+        //     info!("Buffer data size: {}", data.len());
+        //     image_copier.buffer.unmap(); // Unmap before sending
+        // latest_frame.update(data);
+        // frame_state.new_frame_available = true;
+        // info!(
+        // "Latest frame size after update: {}",
+        // latest_frame.data.len()
+        // )
+        // }
     }
 }
 
@@ -372,7 +413,12 @@ fn update(
     mut images: ResMut<Assets<Image>>,
     mut scene_controller: ResMut<SceneController>,
     mut latest_frame: ResMut<LatestFrame>,
+    mut frame_state: ResMut<FrameState>,
+    camera_query: Query<(&Camera, &GlobalTransform)>,
 ) {
+    info!("Updating, SceneState: {:?}", scene_controller.state);
+    info!("Camera count: {}", camera_query.iter().count());
+
     if let SceneState::Render(n) = scene_controller.state {
         if n < 1 {
             // We don't want to block the main world on this,
@@ -408,6 +454,7 @@ fn update(
 
                     // Update the latest frame resource
                     latest_frame.update(final_data);
+                    frame_state.new_frame_available = true;
                     info!("Updated latest frame");
                 }
             }

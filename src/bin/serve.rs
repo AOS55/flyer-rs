@@ -136,7 +136,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 .chain(),
         )
         // Render systems
-        .add_systems(FixedUpdate, (render_frame, handle_render_response).chain())
+        .add_systems(
+            FixedUpdate,
+            (render_frame, handle_render_response)
+                .chain()
+                .run_if(rendering),
+        )
         // Events
         .add_event::<StepRequestEvent>()
         .add_event::<StepCompleteEvent>()
@@ -178,6 +183,10 @@ fn sending_state(state: Res<ServerState>) -> bool {
 
 fn resetting_state(state: Res<ServerState>) -> bool {
     state.sim_state == SimState::Resetting
+}
+
+fn rendering(state: Res<ServerState>) -> bool {
+    state.sim_state == SimState::Rendering
 }
 
 /// Function to receive the initial configuration from the client.
@@ -235,7 +244,6 @@ fn handle_commands(
     mut server: ResMut<ServerState>,
     mut step_events: EventWriter<StepRequestEvent>,
     mut reset_events: EventWriter<ResetRequestEvent>,
-    mut render_events: EventWriter<RenderRequestEvent>,
 ) {
     let cmd = {
         let guard = server.conn.lock().unwrap();
@@ -336,7 +344,8 @@ fn handle_commands(
 
                 Command::Render => {
                     info!("Render command received");
-                    render_events.send(RenderRequestEvent);
+                    // render_events.send(RenderRequestEvent);
+                    server.sim_state = SimState::Rendering;
                 }
 
                 Command::Close => {
