@@ -5,7 +5,6 @@ use crate::{
     },
     resources::{RenderMode, UpdateControlPlugin},
     server::EnvConfig,
-    systems::camera_follow_system,
 };
 use bevy::prelude::*;
 
@@ -48,6 +47,7 @@ pub fn setup_app(mut app: App, config: EnvConfig, asset_path: String) -> App {
                     }),
             );
             app.add_plugins(CameraPlugin);
+            app.insert_resource(Time::<Fixed>::from_seconds(1.0 / 60.0));
         }
         RenderMode::RGBArray => {
             println!("Running RGBArray Mode");
@@ -57,6 +57,7 @@ pub fn setup_app(mut app: App, config: EnvConfig, asset_path: String) -> App {
                 asset_path,
             ))
             .add_plugins(CameraPlugin);
+            app.insert_resource(Time::<Fixed>::from_seconds(1.0 / 10000.0));
             // .add_systems(FixedUpdate, camera_follow_system);
             // .insert_resource(Time::<Fixed>::from_seconds(1.0 / 60.0));
         }
@@ -64,7 +65,6 @@ pub fn setup_app(mut app: App, config: EnvConfig, asset_path: String) -> App {
 
     // app.add_plugins(CameraPlugin);
     app.add_plugins(TerrainPlugin::new());
-    app.insert_resource(Time::<Fixed>::from_seconds(1.0 / 60.0));
 
     app
 }

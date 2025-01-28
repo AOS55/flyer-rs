@@ -53,6 +53,14 @@ fn update_aircraft(state: &mut DubinsAircraftState, config: &DubinsAircraftConfi
     let acceleration = controls.acceleration;
     let speed = spatial.velocity.norm();
     let new_speed = (speed + acceleration * dt).clamp(config.min_speed, config.max_speed);
+    info!(
+        "Current speed: {}, acceleration: {}, new_speed: {}",
+        speed, acceleration, new_speed
+    );
+    info!(
+        "min_speed: {}, max_speed: {}",
+        config.min_speed, config.max_speed
+    );
 
     // Extract the current heading (yaw) from the aircraft's attitude
     let (_roll, _pitch, yaw) = spatial.attitude.euler_angles();

@@ -6,7 +6,7 @@ use flyer::{
     systems::dubins_aircraft_system,
 };
 use nalgebra::Vector3;
-use std::time::Instant;
+use std::{fs::OpenOptions, io::Write, path::PathBuf, time::Instant};
 
 // Resource to track elapsed times and compute metrics
 #[derive(Resource)]
@@ -15,15 +15,34 @@ struct Metrics {
     last_update: Instant,
     start_time: Instant,
     total_updates: u64,
+    log_file: PathBuf,
 }
 
 impl Default for Metrics {
     fn default() -> Self {
+        let log_file = std::env::temp_dir().join("dubins_aircraft_metrics.csv");
+        // Create/overwrite the file with headers
+        if let Ok(mut file) = OpenOptions::new()
+            .write(true)
+            .create(true)
+            .truncate(true)
+            .open(&log_file)
+        {
+            writeln!(
+                file,
+                "timestamp,instant_rate,overall_rate,variance,total_updates"
+            )
+            .unwrap();
+        }
+
+        println!("Log file created at: {:?}", log_file);
+
         Self {
             elapsed_times: Vec::with_capacity(1000), // Pre-allocate for performance
             last_update: Instant::now(),
             start_time: Instant::now(),
             total_updates: 0,
+            log_file,
         }
     }
 }
@@ -55,6 +74,18 @@ impl Metrics {
         let overall_rate = self.total_updates as f64 / total_time;
 
         (1.0 / mean, variance, overall_rate)
+    }
+
+    fn log_to_file(&self, instant_rate: f64, variance: f64, overall_rate: f64) {
+        if let Ok(mut file) = OpenOptions::new().append(true).open(&self.log_file) {
+            let timestamp = self.start_time.elapsed().as_secs_f64();
+            writeln!(
+                file,
+                "{},{},{},{},{}",
+                timestamp, instant_rate, overall_rate, variance, self.total_updates
+            )
+            .unwrap_or_else(|e| eprintln!("Failed to write to log file: {}", e));
+        }
     }
 }
 
@@ -126,8 +157,13 @@ fn update_metrics(mut metrics: ResMut<Metrics>) {
 
 fn log_metrics(metrics: Res<Metrics>) {
     let (instant_rate, variance, overall_rate) = metrics.compute_stats();
+
+    // Log to console
     println!(
         "Instant Rate: {} Hz, Overall Rate: {} Hz, Variance: {:.6e}, Total Updates: {}",
         instant_rate, overall_rate, variance, metrics.total_updates
     );
+
+    // Log to file
+    metrics.log_to_file(instant_rate, variance, overall_rate);
 }
