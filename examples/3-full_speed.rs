@@ -5,7 +5,7 @@ use flyer::{
         EnvironmentPlugin, FullAircraftPlugin, PhysicsPlugin, StartupSequencePlugin,
         TransformationPlugin,
     },
-    resources::{EnvironmentConfig, PhysicsConfig},
+    resources::PhysicsConfig,
     systems::{
         aero_force_system, air_data_system, force_calculator_system, physics_integrator_system,
     },
@@ -114,7 +114,7 @@ fn main() {
 
     app.add_plugins((TransformationPlugin::new(1.0), EnvironmentPlugin::new()));
     // Add aircraft plugin with config
-    app.add_plugins(FullAircraftPlugin::new(aircraft_config));
+    app.add_plugins(FullAircraftPlugin::new_single(aircraft_config));
 
     // Add physics update system
     app.add_systems(

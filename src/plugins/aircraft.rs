@@ -12,6 +12,9 @@ pub struct AircraftPluginBase {
     pub config: AircraftConfig,
 }
 
+#[derive(Resource)]
+pub struct AircraftBaseInitialized;
+
 // System sets for the FullAircraft (complex physics)
 #[derive(SystemSet, Debug, Hash, PartialEq, Eq, Clone)]
 pub enum ComplexPhysicsSet {
@@ -112,8 +115,8 @@ pub fn add_aircraft_plugin(app: &mut App, config: AircraftConfig) -> &mut App {
     info!("Adding aircraft plugin... {:?}", config);
     match config {
         // Add the FullAircraftPlugin for detailed physics simulation
-        AircraftConfig::Full(config) => app.add_plugins(FullAircraftPlugin::new(config)),
+        AircraftConfig::Full(config) => app.add_plugins(FullAircraftPlugin::new_single(config)),
         // Add the DubinsAircraftPlugin for simplified physics simulation
-        AircraftConfig::Dubins(config) => app.add_plugins(DubinsAircraftPlugin::new(config)),
+        AircraftConfig::Dubins(config) => app.add_plugins(DubinsAircraftPlugin::new_single(config)),
     }
 }

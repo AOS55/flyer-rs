@@ -12,7 +12,9 @@ pub mod terrain;
 mod transformation;
 
 pub use agent::{AgentPlugin, Id, Identifier, LatestFrame};
-pub use aircraft::{add_aircraft_plugin, AircraftPluginBase, ComplexPhysicsSet};
+pub use aircraft::{
+    add_aircraft_plugin, AircraftBaseInitialized, AircraftPluginBase, ComplexPhysicsSet,
+};
 pub use camera::CameraPlugin;
 pub use dubins_aircraft::DubinsAircraftPlugin;
 pub use environment::EnvironmentPlugin;

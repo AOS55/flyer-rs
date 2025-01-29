@@ -1,11 +1,4 @@
-// use crate::{plugins::RenderRequestEvent, resources::AgentState};
-// use bevy::{
-//     prelude::*,
-//     render::view::screenshot::{Screenshot, ScreenshotCaptured},
-//     window::PrimaryWindow,
-// };
-
-use base64;
+use base64::Engine;
 use bevy::prelude::*;
 use std::io::Write;
 
@@ -32,24 +25,6 @@ pub fn render_frame(
         frame: latest_frame.data.clone(),
     });
     frame_state.new_frame_available = false;
-
-    // for _event in render_events.read() {
-    //     warn!("Render frame unavailable!");
-    //     if !frame_state.new_frame_available {
-    //         info!("Exiting and trying again next frame");
-    //         return; // Exit and try again next frame
-    //     }
-    //     info!(
-    //         "Render frame: latest_frame size = {}",
-    //         latest_frame.data.len()
-    //     );
-    //     complete_events.send(RenderCompleteEvent {
-    //         frame: latest_frame.data.clone(),
-    //     });
-
-    //     // Reset the flag after sending the frame
-    //     frame_state.new_frame_available = false;
-    // }
 }
 
 // Should only run once RenderCompleteEvent is received
@@ -82,7 +57,7 @@ pub fn handle_render_response(
                     continue;
                 }
 
-                let base64_frame = base64::encode(&event.frame);
+                let base64_frame = base64::prelude::BASE64_STANDARD.encode(&event.frame);
                 let response = serde_json::json!({
                     "frame": base64_frame,
                     "width": server.config.agent_config.render_width,
@@ -118,53 +93,3 @@ pub fn handle_render_response(
         }
     }
 }
-
-// Old method to capture a screenshot from a running system (for render() API method)
-// // Tracks whether a screenshot has been triggered
-// #[derive(Resource, Default)]
-// pub struct ScreenshotState {
-//     triggered: bool,
-// }
-
-// /// System for capturing and processing screenshots.
-// ///
-// /// This system triggers a screenshot of the primary window and captures its pixel data
-// /// when the screenshot is ready. The captured image data is stored in the `AgentState`
-// /// resource's render buffer for further processing or analysis.
-// pub fn capture_frame(
-//     mut commands: Commands,
-//     mut events: EventReader<ScreenshotCaptured>,
-//     windows: Query<Entity, With<PrimaryWindow>>,
-//     mut screenshot_state: ResMut<ScreenshotState>,
-//     agent_state: ResMut<AgentState>,
-// ) {
-//     // Step 1: Trigger a screenshot once
-//     if !screenshot_state.triggered {
-//         if let Ok(window_entity) = windows.get_single() {
-//             commands.spawn(Screenshot::window(window_entity));
-//             screenshot_state.triggered = true;
-//             println!("Screenshot triggered!");
-//         }
-//     }
-
-//     // Step 2: Capture the screenshot when ready
-//     for event in events.read() {
-//         let image = &event.0; // Access the `Image` from ScreenshotCaptured
-
-//         println!(
-//             "Screenshot captured: width={}, height={}, bytes={}",
-//             image.texture_descriptor.size.width,
-//             image.texture_descriptor.size.height,
-//             image.data.len(),
-//         );
-
-//         // Add the image byte data to the render buffer
-//         let mut render_buffer = agent_state.render_buffer.lock().unwrap();
-//         *render_buffer = Some(image.data.clone());
-
-//         // Reset to allow triggering another screenshot
-//         screenshot_state.triggered = false;
-
-//         println!("Screenshot processing complete!");
-//     }
-// }

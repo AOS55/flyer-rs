@@ -124,7 +124,7 @@ fn main() {
     };
 
     // Add aircraft plugin with config
-    app.add_plugins(DubinsAircraftPlugin::new(aircraft_config));
+    app.add_plugins(DubinsAircraftPlugin::new_single(aircraft_config));
 
     // Add physics update system
     app.add_systems(FixedUpdate, dubins_aircraft_system);

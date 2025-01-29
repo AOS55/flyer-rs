@@ -56,7 +56,7 @@ fn main() {
     };
 
     // Add aircraft plugin
-    app.add_plugins(DubinsAircraftPlugin::new(aircraft_config));
+    app.add_plugins(DubinsAircraftPlugin::new_single(aircraft_config));
 
     // Add our systems
     app.add_systems(
