@@ -30,16 +30,28 @@ pub fn sending_response(agent_state: Res<AgentState>, mut server: ResMut<ServerS
                 all_observations.insert(id_str.clone(), obs);
             }
 
-            // Get terminations
-            if let Some(&termination) = termination_buffer.get(id) {
-                all_terminations.insert(id_str.clone(), termination);
-            }
-
             // Get rewards
             if let Some(&reward) = reward_buffer.get(id) {
                 all_rewards.insert(id_str.clone(), reward);
             }
+
+            // Get terminations
+            if let Some(&termination) = termination_buffer.get(id) {
+                all_terminations.insert(id_str.clone(), termination);
+            }
         }
+
+        // Make truncation global (all aircraft are spawned synchronously)
+        let truncated = if agent_state.current_step >= server.config.max_episode_steps {
+            true
+        } else {
+            false
+        };
+
+        info!(
+            "current_step: {:?}, max_episode_steps: {:?}, truncated: {:?}",
+            agent_state.current_step, server.config.max_episode_steps, truncated
+        );
 
         // Send response via TCP
         if !all_observations.is_empty() {
@@ -49,7 +61,7 @@ pub fn sending_response(agent_state: Res<AgentState>, mut server: ResMut<ServerS
                         obs: all_observations,
                         reward: all_rewards,
                         terminated: all_terminations,
-                        truncated: false,
+                        truncated,
                         info: serde_json::json!({}),
                     };
 

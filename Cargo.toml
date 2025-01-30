@@ -13,7 +13,7 @@ categories = ["simulation"]
 name = "flyer"
 
 [[bin]]
-name = "serve"
+name = "flyer_serve"
 path = "src/bin/serve.rs"
 
 [dependencies]
@@ -23,6 +23,7 @@ image = "0.24.7"
 bevy = { version = "0.15" }
 crossbeam-channel = "0.5.14"
 base64 = "0.22.1"
+include_dir = "0.7"
 
 # Math and physics
 glam = { version = "0.24.2", features = ["mint", "serde"] }

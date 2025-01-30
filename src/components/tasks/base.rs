@@ -47,6 +47,7 @@ impl Default for TaskType {
             target: 0.0,
             tolerance: 2.0,
             control_type: Default::default(),
+            prev_value: None,
         })
     }
 }
@@ -59,8 +60,8 @@ impl TaskComponent {
         collision: &CollisionComponent,
     ) -> f64 {
         match &self.task_type {
-            TaskType::Control(params) => {
-                TaskComponent::calculate_dubins_control_reward(state, &params)
+            TaskType::Control(mut params) => {
+                TaskComponent::calculate_dubins_control_reward(state, &mut params)
             }
             TaskType::Goal(params) => TaskComponent::calculate_goal_reward(&state.spatial, &params),
             TaskType::Trajectory(params) => {

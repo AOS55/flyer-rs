@@ -3,6 +3,7 @@ use std::{
     env,
     io::{BufRead, BufReader, Write},
     net::{TcpListener, TcpStream},
+    path::{Path, PathBuf},
     sync::{Arc, Mutex},
 };
 
@@ -89,14 +90,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     });
 
     // Configure asset directory
-    let current_dir = env::current_dir().unwrap();
-    let asset_path = current_dir
-        .join("flyer-rs/assets")
-        .to_str()
-        .unwrap()
-        .to_string();
+    let asset_path = get_asset_path();
+    println!("Using asset path: {}", asset_path.display());
 
-    app = setup_app(app, env_config.clone(), asset_path);
+    app = setup_app(
+        app,
+        env_config.clone(),
+        asset_path.to_string_lossy().to_string(),
+    );
 
     // Mark the server state as initialized
     app.world_mut()
@@ -107,7 +108,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Add event and systems for handling step requests
     app
         // Command handling in PreUpdate
-        .add_systems(FixedFirst, debug_state)
+        // .add_systems(FixedFirst, debug_state)
         .add_systems(FixedPreUpdate, handle_commands.run_if(waiting_state))
         // Action handling and Physics in Update
         .add_systems(
@@ -165,9 +166,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-fn debug_state(current_state: ResMut<ServerState>) {
-    info!("CURRENT STATE: {:?}", current_state.sim_state);
-}
+// fn debug_state(current_state: ResMut<ServerState>) {
+//     info!("CURRENT STATE: {:?}", current_state.sim_state);
+// }
 
 fn waiting_state(state: Res<ServerState>) -> bool {
     state.sim_state == SimState::WaitingForAction
@@ -187,6 +188,30 @@ fn resetting_state(state: Res<ServerState>) -> bool {
 
 fn rendering(state: Res<ServerState>) -> bool {
     state.sim_state == SimState::Rendering
+}
+
+fn get_asset_path() -> PathBuf {
+    // Priority 1: Environment variable
+    if let Ok(asset_path) = env::var("FLYER_ASSETS_PATH") {
+        return PathBuf::from(asset_path);
+    }
+
+    // Priority 2: Installed assets in a standard system-wide location
+    let system_asset_path = Path::new("/usr/local/share/flyer/assets");
+    if system_asset_path.exists() {
+        return system_asset_path.to_path_buf();
+    }
+
+    // Priority 3: Relative path for local development
+    let current_dir = env::current_dir().unwrap();
+    let dev_asset_path = current_dir.join("flyer-rs/assets");
+    if dev_asset_path.exists() {
+        return dev_asset_path;
+    }
+
+    // If all else fails, return a default and log an error
+    eprintln!("Assets not found in any standard location");
+    PathBuf::from("assets")
 }
 
 /// Function to receive the initial configuration from the client.

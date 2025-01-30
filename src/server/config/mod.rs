@@ -14,7 +14,6 @@ use crate::{
         },
         ActionSpace, ObservationSpace,
     },
-    utils::RngManager,
 };
 
 mod builders;
@@ -74,10 +73,6 @@ impl EnvConfig {
             .max_episode_steps(self.max_episode_steps)
             .steps_per_action(self.steps_per_action)
             .time_step(self.time_step);
-
-        // Set up RNG manager with new seed
-        let rng_manager = RngManager::new(new_seed);
-        builder.rng_manager = Some(rng_manager.clone());
 
         // Rebuild aircraft configurations
         for (id, config) in &self.aircraft_configs {

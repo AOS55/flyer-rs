@@ -195,6 +195,7 @@ impl ControlTaskConfigBuilder {
             target: self.target.unwrap(),
             tolerance: self.tolerance.unwrap(),
             control_type: self.control_type.unwrap(),
+            prev_value: None,
         };
 
         Ok(TaskType::Control(params))

@@ -11,7 +11,7 @@ use crate::{
 
 pub fn running_physics(
     mut update_control: ResMut<UpdateControl>,
-    agent_state: ResMut<AgentState>,
+    mut agent_state: ResMut<AgentState>,
     mut server: ResMut<ServerState>,
     mut dubins_query: Query<
         (Entity, &Identifier, &mut DubinsAircraftState),
@@ -70,6 +70,8 @@ pub fn running_physics(
         if update_control.remaining_steps == 0 {
             info!("Physics steps complete, transitioning to response state");
             server.sim_state = SimState::SendingResponse;
+            agent_state.current_step += 1; // Increment step counter
         }
     }
+    agent_state.update_time(server.config.time_step); // Update simulation time
 }

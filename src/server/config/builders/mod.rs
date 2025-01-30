@@ -17,7 +17,6 @@ use crate::{
     resources::{AgentConfig, RenderMode, UpdateMode},
     server::config::errors::ConfigError,
     server::{ActionSpace, EnvConfig, ObservationSpace},
-    utils::RngManager,
 };
 
 pub use act::ActionSpaceBuilder;
@@ -38,7 +37,7 @@ pub use terrain::{HeightNoiseConfigBuilder, NoiseConfigBuilder, TerrainConfigBui
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EnvConfigBuilder {
     #[serde(skip)]
-    pub rng_manager: Option<RngManager>,
+    pub seed: Option<u64>,
     pub max_episode_steps: Option<u32>,
     pub steps_per_action: Option<usize>,
     pub time_step: Option<f64>,
@@ -59,7 +58,7 @@ pub struct EnvConfigBuilder {
 impl Default for EnvConfigBuilder {
     fn default() -> Self {
         Self {
-            rng_manager: None,
+            seed: None,
             max_episode_steps: None,
             steps_per_action: None,
             time_step: None,
@@ -107,9 +106,6 @@ impl EnvConfigBuilder {
             .get("seed")
             .and_then(|v| v.as_u64())
             .unwrap_or_else(rand::random);
-
-        let rng_manager = RngManager::new(seed);
-        builder.rng_manager = Some(rng_manager.clone());
 
         // Parse basic configuration
         if let Some(steps) = json_value.get("max_episode_steps").and_then(|v| v.as_u64()) {
@@ -194,9 +190,7 @@ impl EnvConfigBuilder {
     }
 
     pub fn build(self) -> Result<EnvConfig, ConfigError> {
-        let rng_manager = self
-            .rng_manager
-            .unwrap_or_else(|| RngManager::new(rand::random()));
+        let seed = self.seed.unwrap_or_else(rand::random);
 
         // Build configurations from HashMaps
         let mut aircraft_configs: HashMap<String, AircraftConfig> = HashMap::new();
@@ -216,8 +210,11 @@ impl EnvConfigBuilder {
             observation_spaces.insert(id.clone(), builder.build()?);
         }
 
+        use bevy::prelude::*;
+        info!("building with seed: {:?}", seed);
+
         Ok(EnvConfig {
-            seed: rng_manager.master_seed(),
+            seed,
             update_mode: UpdateMode::Gym,
             max_episode_steps: self.max_episode_steps.unwrap_or(1000),
             steps_per_action: self.steps_per_action.unwrap_or(10),
