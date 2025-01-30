@@ -6,6 +6,7 @@ use std::{
     path::{Path, PathBuf},
     sync::{Arc, Mutex},
 };
+use dirs::data_local_dir;
 
 use flyer::{
     plugins::{
@@ -191,25 +192,33 @@ fn rendering(state: Res<ServerState>) -> bool {
 }
 
 fn get_asset_path() -> PathBuf {
-    // Priority 1: Environment variable
+    // Priority 1: User-defined environment variable
     if let Ok(asset_path) = env::var("FLYER_ASSETS_PATH") {
         return PathBuf::from(asset_path);
     }
 
-    // Priority 2: Installed assets in a standard system-wide location
+    // Priority 2: User data directory (cross-platform)
+    if let Some(local_path) = data_local_dir() {
+        let asset_dir = local_path.join("flyer/assets");
+        if asset_dir.exists() {
+            return asset_dir;
+        }
+    }
+
+    // Priority 3: System-wide location
     let system_asset_path = Path::new("/usr/local/share/flyer/assets");
     if system_asset_path.exists() {
         return system_asset_path.to_path_buf();
     }
 
-    // Priority 3: Relative path for local development
+    // Priority 4: Relative path (for development)
     let current_dir = env::current_dir().unwrap();
     let dev_asset_path = current_dir.join("flyer-rs/assets");
     if dev_asset_path.exists() {
         return dev_asset_path;
     }
 
-    // If all else fails, return a default and log an error
+    // If all else fails, return a reasonable fallback
     eprintln!("Assets not found in any standard location");
     PathBuf::from("assets")
 }
