@@ -1,6 +1,6 @@
 use argmin::{
-    core::{CostFunction, Error, Executor, Gradient},
-    solver::{linesearch::MoreThuenteLineSearch, quasinewton::LBFGS},
+    core::{CostFunction, Error, Executor, Gradient, IterState, OptimizationResult},
+    solver::{linesearch::MoreThuenteLineSearch, neldermead::NelderMead, quasinewton::LBFGS},
 };
 use bevy::prelude::*;
 use nalgebra::{UnitQuaternion, Vector3};
@@ -22,6 +22,8 @@ pub struct TrimOptimizer {
     aircraft_config: FullAircraftConfig,
     condition: TrimCondition,
     settings: TrimSolverConfig,
+    characteristic_force: f64,
+    characteristic_moment: f64,
 }
 
 impl CostFunction for TrimOptimizer {
@@ -47,9 +49,9 @@ impl CostFunction for TrimOptimizer {
         let residuals = self.calculate_residuals(&state);
 
         let force_weight = 1.0;
-        let moment_weight = 10.0;
-        let gamma_weight = 100.0;
-        let mu_weight = 100.0;
+        let moment_weight = 1.0;
+        let gamma_weight = 10.0;
+        let mu_weight = 10.0;
 
         let cost = force_weight * residuals.forces.norm_squared()
             + moment_weight * residuals.moments.norm_squared()
@@ -68,20 +70,26 @@ impl Gradient for TrimOptimizer {
 
     fn gradient(&self, param: &Self::Param) -> Result<Self::Gradient, Error> {
         // Implement finite difference gradient calculation
-        let eps = 1e-3;
+        let eps = 1e-6;
         let n = param.len();
         let mut grad = vec![0.0; n];
-        let f0 = self.cost(param)?;
 
         for i in 0..n {
+            // Central differences
             let mut param_plus = param.clone();
-            param_plus[i] += eps; // Don't scale the step size
-            let f1 = self.cost(&param_plus)?;
+            let mut param_minus = param.clone();
+            param_plus[i] += eps;
+            param_minus[i] -= eps;
 
-            if f1.is_finite() && f0.is_finite() {
-                grad[i] = (f1 - f0) / eps;
-                // Log transform while preserving sign
-                grad[i] = 0.01 * grad[i].signum() * grad[i].abs().ln();
+            let f_plus = self.cost(&param_plus)?;
+            let f_minus = self.cost(&param_minus)?;
+
+            if f_plus.is_finite() && f_minus.is_finite() {
+                grad[i] = (f_plus - f_minus) / eps;
+                // Scale large gradients
+                if grad[i].abs() > 1.0 {
+                    grad[i] = grad[i].signum() * grad[i].abs().sqrt();
+                }
             }
         }
 
@@ -90,6 +98,31 @@ impl Gradient for TrimOptimizer {
 }
 
 impl TrimOptimizer {
+    pub fn new(
+        physics_config: PhysicsConfig,
+        initial_spatial: SpatialComponent,
+        initial_prop: PropulsionState,
+        aircraft_config: FullAircraftConfig,
+        condition: TrimCondition,
+        settings: TrimSolverConfig,
+    ) -> Self {
+        // Calculate characteristic values for normalization
+        let mass = aircraft_config.mass.mass;
+        let gravity = physics_config.gravity.norm();
+        let wingspan = aircraft_config.geometry.wing_span;
+
+        Self {
+            physics_config,
+            initial_spatial,
+            initial_prop,
+            aircraft_config,
+            condition,
+            settings,
+            characteristic_force: mass * gravity,
+            characteristic_moment: mass * gravity * wingspan,
+        }
+    }
+
     fn create_virtual_physics(&self) -> (VirtualPhysics, Entity) {
         let mut virtual_physics = VirtualPhysics::new(&self.physics_config);
         let virtual_aircraft = virtual_physics.spawn_aircraft(
@@ -100,7 +133,7 @@ impl TrimOptimizer {
         (virtual_physics, virtual_aircraft)
     }
 
-    fn calculate_residuals(&self, state: &TrimState) -> TrimResiduals {
+    pub fn calculate_residuals(&self, state: &TrimState) -> TrimResiduals {
         let (mut virtual_physics, virtual_aircraft) = self.create_virtual_physics();
 
         println!("State: {:?}", state);
@@ -146,15 +179,15 @@ impl TrimOptimizer {
 
         virtual_physics.set_state(virtual_aircraft, &velocity, &attitude);
         virtual_physics.set_controls(virtual_aircraft, &control_surfaces);
-        virtual_physics.run_steps(virtual_aircraft, 20);
+        virtual_physics.run_steps(virtual_aircraft, 50);
 
         // Calculate forces at final state
         let (forces, moments) = virtual_physics.calculate_forces(virtual_aircraft);
         let (final_spatial, _final_controls) = virtual_physics.get_state(virtual_aircraft);
 
         TrimResiduals {
-            forces,
-            moments,
+            forces: forces / self.characteristic_force,
+            moments: moments / self.characteristic_moment,
             gamma_error: match self.condition {
                 TrimCondition::SteadyClimb { gamma, .. } => {
                     let actual_gamma =
@@ -196,6 +229,13 @@ pub struct TrimSolver {
     pub best_state: TrimState,
     pub best_cost: f64,
     pub iteration: usize,
+    use_gradient_refinement: bool,
+    stage: OptimizationStage,
+}
+
+pub enum OptimizationStage {
+    DirectSearch,  // Initial coarse optimization
+    GradientBased, // Fine-tuning with LBFGS
 }
 
 impl TrimSolver {
@@ -207,14 +247,14 @@ impl TrimSolver {
         condition: TrimCondition,
         physics_config: &PhysicsConfig,
     ) -> Self {
-        let optimizer = TrimOptimizer {
-            physics_config: physics_config.clone(),
-            initial_spatial: initial_spatial_state,
-            initial_prop: initial_prop_state,
+        let optimizer = TrimOptimizer::new(
+            physics_config.clone(),
+            initial_spatial_state,
+            initial_prop_state,
             aircraft_config,
             condition,
             settings,
-        };
+        );
 
         Self {
             optimizer,
@@ -222,6 +262,8 @@ impl TrimSolver {
             best_state: TrimState::default(),
             best_cost: f64::MAX,
             iteration: 0,
+            use_gradient_refinement: settings.use_gradient_refinement,
+            stage: OptimizationStage::DirectSearch,
         }
     }
 
@@ -232,18 +274,123 @@ impl TrimSolver {
         self.iteration = 0;
     }
 
-    pub fn iterate(&mut self) {
+    pub fn iterate(&mut self) -> Result<bool, Error> {
+        match self.stage {
+            OptimizationStage::DirectSearch => {
+                let result = self.direct_search_step()?;
+
+                if let Some(param) = &result.state.param {
+                    let current_cost = result.state.cost;
+                    let trim_state = TrimState::from_vector(param);
+
+                    // Update best solution if better
+                    if current_cost < self.best_cost {
+                        self.best_cost = current_cost;
+                        self.best_state = trim_state.clone();
+                        self.current_state = trim_state;
+                    }
+
+                    // Switch to gradient-based if direct search converges or stalls
+                    if self.iteration > 50 && current_cost < 1.0 && self.use_gradient_refinement {
+                        self.stage = OptimizationStage::GradientBased;
+                        println!(
+                            "Switching to gradient-based optimization. Cost: {}",
+                            current_cost
+                        );
+                    }
+                }
+            }
+            OptimizationStage::GradientBased => {
+                let result = self.gradient_step()?;
+
+                if let Some(param) = &result.state.param {
+                    let current_cost = result.state.cost;
+                    let trim_state = TrimState::from_vector(param);
+
+                    // Update best solution if better
+                    if current_cost < self.best_cost {
+                        self.best_cost = current_cost;
+                        self.best_state = trim_state.clone();
+                        self.current_state = trim_state;
+                    }
+                }
+            }
+        }
+        self.iteration += 1;
+        Ok(self.has_converged())
+    }
+
+    fn direct_search_step(
+        &mut self,
+    ) -> Result<
+        OptimizationResult<
+            TrimOptimizer,
+            NelderMead<Vec<f64>, f64>,
+            IterState<Vec<f64>, (), (), (), (), f64>,
+        >,
+        Error,
+    > {
+        let init_param = self.current_state.to_vector();
+        let n = init_param.len();
+        let mut simplex = Vec::with_capacity(n + 1);
+        simplex.push(init_param.clone());
+
+        // Create remaining vertices with small perturbations
+        for i in 0..n {
+            let mut vertex = init_param.clone();
+
+            // Scale the perturbation based on parameter magnitude
+            let perturbation = if vertex[i].abs() > 1e-10 {
+                0.05 * vertex[i].abs() // 5% of current value
+            } else {
+                0.001 // Small constant for near-zero parameters
+            };
+
+            vertex[i] += perturbation;
+            simplex.push(vertex);
+        }
+
+        let solver = NelderMead::new(simplex).with_sd_tolerance(1e-4)?;
+
+        let optimizer = TrimOptimizer::new(
+            self.optimizer.physics_config.clone(),
+            self.optimizer.initial_spatial.clone(),
+            self.optimizer.initial_prop.clone(),
+            self.optimizer.aircraft_config.clone(),
+            self.optimizer.condition,
+            self.optimizer.settings.clone(),
+        );
+
+        Executor::new(optimizer, solver)
+            .configure(|state| {
+                state
+                    .max_iters(100)
+                    .target_cost(self.optimizer.settings.cost_tolerance)
+            })
+            .run()
+    }
+
+    fn gradient_step(
+        &mut self,
+    ) -> Result<
+        OptimizationResult<
+            TrimOptimizer,
+            LBFGS<MoreThuenteLineSearch<Vec<f64>, Vec<f64>, f64>, Vec<f64>, Vec<f64>, f64>,
+            IterState<Vec<f64>, Vec<f64>, (), (), (), f64>,
+        >,
+        Error,
+    > {
         println!("Starting iteration {}", self.iteration);
 
         // Create optimizer from current state
-        let optimizer = TrimOptimizer {
-            physics_config: self.optimizer.physics_config.clone(),
-            initial_spatial: self.optimizer.initial_spatial.clone(),
-            initial_prop: self.optimizer.initial_prop.clone(),
-            aircraft_config: self.optimizer.aircraft_config.clone(),
-            condition: self.optimizer.condition,
-            settings: self.optimizer.settings.clone(),
-        };
+        let optimizer = TrimOptimizer::new(
+            self.optimizer.physics_config.clone(),
+            self.optimizer.initial_spatial.clone(),
+            self.optimizer.initial_prop.clone(),
+            self.optimizer.aircraft_config.clone(),
+            self.optimizer.condition,
+            self.optimizer.settings.clone(),
+        );
 
         // Convert current state to Vector
         let init_param = self.current_state.to_vector();
@@ -256,51 +403,21 @@ impl TrimSolver {
         }
 
         // Set up line search
-        // let linesearch = MoreThuenteLineSearch::new()
-        //     .with_c(1e-4, 0.5)
-        //     .expect("Failed to configure line search");
-        let linesearch = MoreThuenteLineSearch::new();
+        let linesearch = MoreThuenteLineSearch::new()
+            .with_c(1e-4, 0.5)
+            .expect("Failed to configure line search");
 
         // Set up LBFGS solver
         let solver = LBFGS::new(linesearch, 7);
 
-        let res = Executor::new(optimizer, solver)
+        Executor::new(optimizer, solver)
             .configure(|state| {
                 state
                     .param(init_param)
                     .max_iters(2000)
                     .target_cost(self.optimizer.settings.cost_tolerance)
             })
-            .run();
-
-        println!("Result: {}", res.unwrap());
-
-        // match res {
-        //     Ok(final_state) => {
-        //         println!("Result: {}", final_state);
-
-        //         println!("Optimization result: {:?}", final_state.state);
-        //         if let Some(best_param) = &final_state.state.best_param {
-        //             let new_state = TrimState::from_vector(best_param); // Use best_param directly
-        //             let new_cost = final_state.state.best_cost;
-
-        //             println!("New State: {:?}", new_state);
-
-        //             if new_cost < self.best_cost {
-        //                 self.best_cost = new_cost.clone();
-        //                 self.best_state = new_state.clone();
-        //             }
-        //             self.current_state = new_state;
-        //         } else {
-        //             warn!("Optimization succeeded, but best_param is None.");
-        //         }
-        //     }
-        //     Err(e) => {
-        //         warn!("Optimization step failed: {:?}", e);
-        //     }
-        // }
-
-        self.iteration += 1;
+            .run()
     }
 
     pub fn has_converged(&self) -> bool {
@@ -352,7 +469,6 @@ mod tests {
         app.insert_resource(TrimSolverConfig {
             max_iterations: 100,
             cost_tolerance: 1e-3,
-            state_tolerance: 1e-4,
             use_gradient_refinement: true,
             bounds: TrimBounds::default(),
         });
@@ -497,69 +613,163 @@ mod tests {
         }
     }
 
-    // #[test]
-    // fn test_solver_iteration() {
-    //     let mut app = create_test_app();
+    #[test]
+    fn test_basic_trim_convergence() {
+        let mut app = create_test_app();
 
-    //     // Modify solver settings to make convergence slower
-    //     app.world_mut()
-    //         .resource_mut::<TrimSolverConfig>()
-    //         .cost_tolerance = 1e-8; // Make convergence harder
-    //     app.world_mut()
-    //         .resource_mut::<TrimSolverConfig>()
-    //         .max_iterations = 1000; // Allow more iterations
+        {
+            let mut solver_config = app.world_mut().resource_mut::<TrimSolverConfig>();
+            solver_config.cost_tolerance = 1e-2;
+            solver_config.max_iterations = 100;
 
-    //     let aircraft_entity = spawn_test_aircraft(&mut app);
+            // Add more reasonable bounds
+            solver_config.bounds = TrimBounds {
+                elevator_range: (-0.5, 0.5),
+                aileron_range: (-0.3, 0.3),
+                rudder_range: (-0.3, 0.3),
+                throttle_range: (0.1, 0.9),
+                alpha_range: (-0.2, 0.2),
+                beta_range: (-0.1, 0.1),
+                phi_range: (-0.2, 0.2),
+                theta_range: (-0.2, 0.2),
+            };
+        }
 
-    //     // Initial update to initialize
-    //     println!("\n=== Initial Update ===");
-    //     app.update();
+        let aircraft_entity = spawn_test_aircraft(&mut app);
 
-    //     // Get initial cost
-    //     let initial_cost = {
-    //         let needs_trim = app
-    //             .world()
-    //             .get::<NeedsTrim>(aircraft_entity)
-    //             .expect("NeedsTrim component should exist");
+        if let Some(mut spatial) = app.world_mut().get_mut::<SpatialComponent>(aircraft_entity) {
+            spatial.velocity = Vector3::new(50.0, 0.0, 0.0);
+            spatial.attitude = UnitQuaternion::from_euler_angles(0.0, 0.0, 0.0);
+        }
 
-    //         let solver = needs_trim.solver.as_ref().unwrap();
-    //         println!("\nAfter initialization:");
-    //         println!("  Current state: {:?}", solver.current_state);
-    //         println!("  Best cost: {}", solver.best_cost);
+        let mut last_cost = f64::INFINITY;
+        let mut stall_counter = 0;
 
-    //         needs_trim.solver.as_ref().unwrap().best_cost
-    //     };
+        for i in 0..50 {
+            app.update();
 
-    //     // Track costs across iterations
-    //     let mut costs = vec![initial_cost];
+            if let Some(needs_trim) = app.world().get::<NeedsTrim>(aircraft_entity) {
+                if let Some(ref solver) = needs_trim.solver {
+                    let current_cost = solver.best_cost;
+                    println!("Iteration {}: Cost = {}", i, current_cost);
 
-    //     // Run iterations and collect costs
-    //     for i in 0..10 {
-    //         app.update();
-    //         println!("\n=== Running Iterations ===");
-    //         if let Some(needs_trim) = app.world().get::<NeedsTrim>(aircraft_entity) {
-    //             if let Some(ref solver) = needs_trim.solver {
-    //                 println!("  Current cost: {}", solver.best_cost);
-    //                 println!("  Iteration count: {}", solver.iteration);
+                    // Check for reasonable cost values
+                    if !current_cost.is_finite() {
+                        panic!("Cost became non-finite at iteration {}", i);
+                    }
 
-    //                 costs.push(solver.best_cost);
-    //             }
-    //         } else {
-    //             println!("NeedsTrim component removed after {} iterations", i + 1);
-    //             break;
-    //         }
-    //     }
+                    // Check if we're making progress
+                    if (last_cost - current_cost).abs() < 1e-6 {
+                        stall_counter += 1;
+                        if stall_counter > 5 {
+                            println!("Optimization stalled - not making progress");
+                            break;
+                        }
+                    } else {
+                        stall_counter = 0;
+                    }
 
-    //     // Find the minimum cost achieved
-    //     let min_cost = costs.iter().copied().fold(f64::INFINITY, f64::min);
+                    // Success condition
+                    if current_cost < 1e-2 {
+                        println!("Successfully converged at iteration {}", i);
+                        return;
+                    }
 
-    //     assert!(
-    //         min_cost < initial_cost,
-    //         "Cost should decrease with iterations. Initial: {}, Current: {}",
-    //         initial_cost,
-    //         min_cost
-    //     );
-    // }
+                    last_cost = current_cost;
+                }
+            } else {
+                // NeedsTrim component removed - should be converged
+                return;
+            }
+        }
+
+        // If we get here, print final state for debugging
+        if let Some(needs_trim) = app.world().get::<NeedsTrim>(aircraft_entity) {
+            if let Some(ref solver) = needs_trim.solver {
+                println!("Final state: {:?}", solver.current_state);
+                println!(
+                    "Final residuals: {:?}",
+                    solver.optimizer.calculate_residuals(&solver.current_state)
+                );
+            }
+        }
+
+        panic!("Failed to converge within iteration limit");
+    }
+
+    #[test]
+    fn test_gradient_calculation() {
+        let physics_config = PhysicsConfig::default();
+        let initial_spatial = SpatialComponent::default();
+        let initial_prop = PropulsionState::default();
+        let aircraft_config = create_test_aircraft_config();
+        let condition = TrimCondition::StraightAndLevel { airspeed: 100.0 };
+        let settings = TrimSolverConfig::default();
+
+        let optimizer = TrimOptimizer::new(
+            physics_config,
+            initial_spatial,
+            initial_prop,
+            aircraft_config,
+            condition,
+            settings,
+        );
+
+        let state = TrimState::default();
+        let param = state.to_vector();
+
+        let gradient = optimizer.gradient(&param).unwrap();
+
+        // Verify gradient is not all zeros
+        assert!(
+            gradient.iter().any(|&x| x.abs() > 1e-6),
+            "Gradient should not be all zeros: {:?}",
+            gradient
+        );
+
+        // Verify gradient magnitude is reasonable
+        let gradient_norm = gradient.iter().map(|x| x * x).sum::<f64>().sqrt();
+        assert!(
+            gradient_norm < 1e3,
+            "Gradient magnitude should be reasonable: {}",
+            gradient_norm
+        );
+    }
+
+    #[test]
+    fn test_residuals_calculation() {
+        let physics_config = PhysicsConfig::default();
+        let initial_spatial = SpatialComponent::default();
+        let initial_prop = PropulsionState::default();
+        let aircraft_config = create_test_aircraft_config();
+        let condition = TrimCondition::StraightAndLevel { airspeed: 100.0 };
+        let settings = TrimSolverConfig::default();
+
+        let optimizer = TrimOptimizer::new(
+            physics_config,
+            initial_spatial,
+            initial_prop,
+            aircraft_config,
+            condition,
+            settings,
+        );
+
+        let state = TrimState::default();
+        let residuals = optimizer.calculate_residuals(&state);
+
+        println!("Forces: {:?}", residuals.forces);
+        println!("Moments: {:?}", residuals.moments);
+
+        // Check that residuals are finite
+        assert!(
+            residuals.forces.iter().all(|x| x.is_finite()),
+            "Forces should be finite"
+        );
+        assert!(
+            residuals.moments.iter().all(|x| x.is_finite()),
+            "Moments should be finite"
+        );
+    }
 
     #[test]
     fn test_residuals_determinism() {
@@ -594,14 +804,14 @@ mod tests {
         let condition = TrimCondition::StraightAndLevel { airspeed: 100.0 };
         let settings = TrimSolverConfig::default();
 
-        let optimizer = TrimOptimizer {
+        let optimizer = TrimOptimizer::new(
             physics_config,
             initial_spatial,
             initial_prop,
             aircraft_config,
             condition,
             settings,
-        };
+        );
 
         // Calculate residuals multiple times
         let residuals1 = optimizer.calculate_residuals(&test_state);
@@ -660,135 +870,90 @@ mod tests {
         );
     }
 
-    // #[test]
-    // fn test_solver_convergence() {
-    //     let mut app = create_test_app();
-    //     let aircraft_entity = spawn_test_aircraft(&mut app);
+    #[test]
+    fn test_solver_convergence() {
+        let mut app = create_test_app();
+        let aircraft_entity = spawn_test_aircraft(&mut app);
 
-    //     app.add_systems(Update, trim_aircraft_system);
+        app.add_systems(Update, trim_aircraft_system);
 
-    //     // Run until convergence or max iterations
-    //     let max_updates = 500;
-    //     let mut converged = false;
+        // Run until convergence or max iterations
+        let max_updates = 500;
+        let mut converged = false;
 
-    //     for i in 0..max_updates {
-    //         println!("iter: {}", i);
-    //         app.update();
+        for i in 0..max_updates {
+            println!("iter: {}", i);
+            app.update();
 
-    //         // Check if component was removed (indicating convergence)
-    //         if app.world().get::<NeedsTrim>(aircraft_entity).is_none() {
-    //             converged = true;
-    //             println!("Converged after {} iterations", i);
-    //             break;
-    //         }
-    //     }
+            // Check if component was removed (indicating convergence)
+            if app.world().get::<NeedsTrim>(aircraft_entity).is_none() {
+                converged = true;
+                println!("Converged after {} iterations", i);
+                break;
+            }
+        }
 
-    //     assert!(converged, "Solver should converge within max iterations");
+        assert!(converged, "Solver should converge within max iterations");
 
-    //     // Verify final state
-    //     let spatial = app
-    //         .world()
-    //         .get::<SpatialComponent>(aircraft_entity)
-    //         .unwrap();
-    //     let air_data = app.world().get::<AirData>(aircraft_entity).unwrap();
+        // Verify final state
+        let spatial = app
+            .world()
+            .get::<SpatialComponent>(aircraft_entity)
+            .unwrap();
+        let air_data = app.world().get::<AirData>(aircraft_entity).unwrap();
 
-    //     // Check that forces are balanced
-    //     assert!(
-    //         air_data.true_airspeed > 98.0 && air_data.true_airspeed < 102.0,
-    //         "Airspeed should be near target: {}",
-    //         air_data.true_airspeed
-    //     );
+        // Check that forces are balanced
+        assert!(
+            air_data.true_airspeed > 98.0 && air_data.true_airspeed < 102.0,
+            "Airspeed should be near target: {}",
+            air_data.true_airspeed
+        );
 
-    //     let (roll, pitch, _) = spatial.attitude.euler_angles();
-    //     assert!(roll.abs() < 0.1, "Roll angle should be near zero: {}", roll);
-    //     assert!(
-    //         pitch.abs() < 0.2,
-    //         "Pitch angle should be reasonable: {}",
-    //         pitch
-    //     );
-    // }
+        let (roll, pitch, _) = spatial.attitude.euler_angles();
+        assert!(roll.abs() < 0.1, "Roll angle should be near zero: {}", roll);
+        assert!(
+            pitch.abs() < 0.2,
+            "Pitch angle should be reasonable: {}",
+            pitch
+        );
+    }
 
-    // #[test]
-    // fn test_solver_bounds() {
-    //     let mut app = create_test_app();
-    //     let aircraft_entity = spawn_test_aircraft(&mut app);
+    #[test]
+    fn test_solver_bounds() {
+        let mut app = create_test_app();
+        let aircraft_entity = spawn_test_aircraft(&mut app);
 
-    //     app.update();
+        app.update();
 
-    //     let needs_trim = app
-    //         .world()
-    //         .get::<NeedsTrim>(aircraft_entity)
-    //         .expect("NeedsTrim component should exist");
-    //     let solver = needs_trim.solver.as_ref().unwrap();
+        let needs_trim = app
+            .world()
+            .get::<NeedsTrim>(aircraft_entity)
+            .expect("NeedsTrim component should exist");
+        let solver = needs_trim.solver.as_ref().unwrap();
 
-    //     // Get solver state
-    //     let state = solver.current_state;
-    //     let bounds = &solver.settings.bounds;
+        // Get solver state
+        let state = solver.current_state;
+        let bounds = &solver.optimizer.settings.bounds;
 
-    //     assert!(
-    //         state.elevator >= bounds.elevator_range.0 && state.elevator <= bounds.elevator_range.1,
-    //         "Elevator out of bounds: {}",
-    //         state.elevator
-    //     );
+        assert!(
+            state.elevator >= bounds.elevator_range.0 && state.elevator <= bounds.elevator_range.1,
+            "Elevator out of bounds: {}",
+            state.elevator
+        );
 
-    //     assert!(
-    //         state.power_lever >= bounds.throttle_range.0
-    //             && state.power_lever <= bounds.throttle_range.1,
-    //         "Throttle out of bounds: {}",
-    //         state.power_lever
-    //     );
+        assert!(
+            state.power_lever >= bounds.throttle_range.0
+                && state.power_lever <= bounds.throttle_range.1,
+            "Throttle out of bounds: {}",
+            state.power_lever
+        );
 
-    //     assert!(
-    //         state.alpha >= bounds.alpha_range.0 && state.alpha <= bounds.alpha_range.1,
-    //         "Alpha out of bounds: {}",
-    //         state.alpha
-    //     );
-    // }
-
-    // #[test]
-    // fn test_solver_cost_calculation() {
-    //     let mut app = create_test_app();
-    //     let aircraft_entity = spawn_test_aircraft(&mut app);
-
-    //     app.update();
-
-    //     let needs_trim = app
-    //         .world()
-    //         .get::<NeedsTrim>(aircraft_entity)
-    //         .expect("NeedsTrim component should exist");
-    //     let solver = needs_trim.solver.as_ref().unwrap();
-
-    //     // Create test residuals
-    //     let perfect_residuals = TrimResiduals {
-    //         forces: Vector3::zeros(),
-    //         moments: Vector3::zeros(),
-    //         gamma_error: 0.0,
-    //         mu_error: 0.0,
-    //     };
-
-    //     let imperfect_residuals = TrimResiduals {
-    //         forces: Vector3::new(100.0, 0.0, 100.0),
-    //         moments: Vector3::new(10.0, 10.0, 10.0),
-    //         gamma_error: 0.1,
-    //         mu_error: 0.1,
-    //     };
-
-    //     // Test cost function behavior
-    //     let perfect_cost = solver.calculate_cost(&perfect_residuals);
-
-    //     assert!(perfect_cost >= 0.0, "Cost should never be negative");
-    //     assert!(
-    //         perfect_cost < solver.settings.cost_tolerance,
-    //         "Perfect trim should have near-zero cost"
-    //     );
-
-    //     let imperfect_cost = solver.calculate_cost(&imperfect_residuals);
-
-    //     assert!(
-    //         imperfect_cost > 0.0,
-    //         "Imperfect trim should have positive cost"
-    //     );
-    // }
+        assert!(
+            state.alpha >= bounds.alpha_range.0 && state.alpha <= bounds.alpha_range.1,
+            "Alpha out of bounds: {}",
+            state.alpha
+        );
+    }
 
     #[test]
     fn test_invalid_initial_conditions() {

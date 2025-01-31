@@ -21,7 +21,6 @@ pub fn propulsion_system(
     physics_config: Res<PhysicsConfig>,
 ) {
     let dt = physics_config.timestep;
-    println!("Running propulsion system!");
     for (controls, mut propulsion_state, mut physics, air_data, aircraft_config) in query.iter_mut()
     {
         // Remove any existing propulsive forces before adding new ones

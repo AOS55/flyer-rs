@@ -1,14 +1,12 @@
 use bevy::prelude::*;
 
 /// Configuration for the trim solver
-#[derive(Resource, Debug, Clone)]
+#[derive(Resource, Debug, Clone, Copy)]
 pub struct TrimSolverConfig {
     /// Maximum number of iterations
     pub max_iterations: usize,
     /// Convergence tolerance for cost function
     pub cost_tolerance: f64,
-    /// Convergence tolerance for state changes
-    pub state_tolerance: f64,
     /// Whether to use gradient refinement
     pub use_gradient_refinement: bool,
     /// Bounds for control surfaces and states
@@ -20,7 +18,6 @@ impl Default for TrimSolverConfig {
         Self {
             max_iterations: 1000,
             cost_tolerance: 1e-4,
-            state_tolerance: 1e-6,
             use_gradient_refinement: true,
             bounds: TrimBounds::default(),
         }
@@ -28,7 +25,7 @@ impl Default for TrimSolverConfig {
 }
 
 /// Bounds for trim variables
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct TrimBounds {
     pub elevator_range: (f64, f64),
     pub aileron_range: (f64, f64),

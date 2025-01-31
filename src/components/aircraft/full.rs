@@ -84,7 +84,7 @@ impl Default for AircraftControlSurfaces {
             elevator: 0.0,
             aileron: 0.0,
             rudder: 0.0,
-            power_lever: 0.0,
+            power_lever: 0.5,
         }
     }
 }

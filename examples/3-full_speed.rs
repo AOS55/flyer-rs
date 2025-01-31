@@ -104,7 +104,7 @@ fn main() {
     app.add_plugins((
         StartupSequencePlugin,
         PhysicsPlugin::with_config(PhysicsConfig {
-            timestep: 1.0 / 1e6, // 1GHz physics timestep
+            timestep: 1.0 / 1e6, // 1MHz physics timestep
             ..default()
         }),
     ));

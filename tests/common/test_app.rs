@@ -1,11 +1,14 @@
-use bevy::prelude::*;
+use bevy::{image::Image, prelude::*};
 use flyer::{
-    components::{AircraftConfig, DubinsAircraftConfig, FullAircraftConfig},
+    components::{
+        AircraftConfig, DubinsAircraftConfig, FullAircraftConfig, TrimBounds, TrimRequest,
+        TrimSolverConfig,
+    },
     plugins::*,
     resources::{EnvironmentConfig, PhysicsConfig, TerrainConfig, UpdateMode},
     systems::{
         aero_force_system, air_data_system, dubins_aircraft_system, force_calculator_system,
-        physics_integrator_system, propulsion_system,
+        handle_trim_requests, physics_integrator_system, propulsion_system, trim_aircraft_system,
     },
 };
 
@@ -79,6 +82,9 @@ impl TestAppBuilder {
 
         // Add required plugins
         app.add_plugins(MinimalPlugins)
+            .add_plugins(AssetPlugin::default())
+            .init_asset::<Image>()
+            .init_resource::<Assets<TextureAtlasLayout>>()
             .add_plugins(TransformationPlugin::new(1.0))
             .add_plugins(PhysicsPlugin::with_config(
                 self.physics_config.unwrap_or_default(),
@@ -125,15 +131,16 @@ impl TestAppBuilder {
         );
 
         // Add Trim systems (should be plugin)
-        // app.add_systems(Update, (handle_trim_requests, trim_aircraft_system).chain());
+        app.add_systems(Update, (handle_trim_requests, trim_aircraft_system).chain());
 
-        // app.insert_resource(TrimSolverConfig {
-        //     max_iterations: 1000,
-        //     cost_tolerance: 1e-6,
-        //     state_tolerance: 1e-8,
-        //     use_gradient_refinement: true,
-        //     bounds: TrimBounds::default(),
-        // });
+        app.insert_resource(TrimSolverConfig {
+            max_iterations: 1000,
+            cost_tolerance: 1e-3,
+            use_gradient_refinement: true,
+            bounds: TrimBounds::default(),
+        });
+
+        app.add_event::<TrimRequest>();
 
         // Run an initial update to initialize everything
         app.update();

@@ -42,7 +42,7 @@ pub fn trim_aircraft_system(
                 needs_trim.condition,
                 &physics_config.clone(),
             );
-
+            println!("Initial_guess: {:?}, {:?}", &air_data, &control_surfaces);
             // Use current state as initial guess
             let initial_guess = TrimState::to_trim_state(&spatial, &control_surfaces, &air_data);
             solver.initialize(initial_guess);
@@ -53,7 +53,7 @@ pub fn trim_aircraft_system(
         // Run a few iterations each frame
         if let Some(ref mut solver) = &mut needs_trim.solver {
             if !solver.has_converged() && solver.iteration < settings.max_iterations {
-                solver.iterate();
+                let _ = solver.iterate();
             }
 
             // Check if we're done
