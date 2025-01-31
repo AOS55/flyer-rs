@@ -1,4 +1,5 @@
 use bevy::prelude::*;
+use dirs::data_local_dir;
 use std::{
     env,
     io::{BufRead, BufReader, Write},
@@ -6,7 +7,6 @@ use std::{
     path::{Path, PathBuf},
     sync::{Arc, Mutex},
 };
-use dirs::data_local_dir;
 
 use flyer::{
     plugins::{

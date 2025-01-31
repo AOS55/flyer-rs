@@ -64,7 +64,6 @@ impl FixedStartConfigBuilder {
 
     pub fn from_json(value: &Value) -> Result<Self, ConfigError> {
         let mut builder = Self::new();
-
         if let Some(pos) = value.get("position") {
             builder.position = Some(Vector3::new(
                 pos.get("x").and_then(|v| v.as_f64()).unwrap_or(0.0),
@@ -99,21 +98,17 @@ impl RandomStartConfigBuilder {
         let mut builder = Self::new();
         builder.seed = Some(seed);
 
-        if let Some(config) = value.get("random_start") {
-            // Parse position configuration
-            if let Some(pos_config) = config.get("position") {
-                builder.position = RandomPosConfigBuilder::from_json(pos_config)?;
-            }
+        // Look directly at position/speed/heading instead of expecting "random_start" wrapper
+        if let Some(pos_config) = value.get("position") {
+            builder.position = RandomPosConfigBuilder::from_json(pos_config)?;
+        }
 
-            // Parse speed configuration
-            if let Some(speed_config) = config.get("speed") {
-                builder.speed = RandomSpeedConfigBuilder::from_json(speed_config)?;
-            }
+        if let Some(speed_config) = value.get("speed") {
+            builder.speed = RandomSpeedConfigBuilder::from_json(speed_config)?;
+        }
 
-            // Parse heading configuration
-            if let Some(heading_config) = config.get("heading") {
-                builder.heading = RandomHeadingConfigBuilder::from_json(heading_config)?;
-            }
+        if let Some(heading_config) = value.get("heading") {
+            builder.heading = RandomHeadingConfigBuilder::from_json(heading_config)?;
         }
 
         Ok(builder)

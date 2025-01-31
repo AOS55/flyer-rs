@@ -70,6 +70,7 @@ impl EnvConfig {
     pub fn rebuild_with_seed(&self, new_seed: u64) -> Result<Self, ConfigError> {
         info!("Rebuilding config with seed: {}", new_seed);
         let mut builder = EnvConfigBuilder::new()
+            .seed(new_seed)
             .max_episode_steps(self.max_episode_steps)
             .steps_per_action(self.steps_per_action)
             .time_step(self.time_step);

@@ -78,6 +78,11 @@ impl EnvConfigBuilder {
         Self::default()
     }
 
+    pub fn seed(mut self, seed: u64) -> Self {
+        self.seed = Some(seed);
+        self
+    }
+
     pub fn max_episode_steps(mut self, steps: u32) -> Self {
         self.max_episode_steps = Some(steps);
         self
@@ -101,11 +106,10 @@ impl EnvConfigBuilder {
     pub fn from_json(json_value: &Value) -> Result<Self, ConfigError> {
         let mut builder = Self::new();
 
-        // Parse seed
-        let seed = json_value
-            .get("seed")
-            .and_then(|v| v.as_u64())
-            .unwrap_or_else(rand::random);
+        // Parse and store seed if provided, otherwise leave as None
+        if let Some(seed) = json_value.get("seed").and_then(|v| v.as_u64()) {
+            builder = builder.seed(seed);
+        }
 
         // Parse basic configuration
         if let Some(steps) = json_value.get("max_episode_steps").and_then(|v| v.as_u64()) {
@@ -118,12 +122,16 @@ impl EnvConfigBuilder {
             builder = builder.time_step(dt);
         }
 
+        let effective_seed = builder.seed.unwrap_or_else(rand::random);
+
         // Parse aircraft configurations
         if let Some(aircraft_configs) = json_value.get("aircraft_config").and_then(|v| v.as_array())
         {
+            use bevy::prelude::*;
+            warn!("found aircraft configs: {:?}", aircraft_configs);
             for (i, config) in aircraft_configs.iter().enumerate() {
                 let id = format!("aircraft_{}", i);
-                let mut aircraft_agent = create_aircraft_builder(config, seed)?; // Might need to add to the seed to seperate aircraft or rng to the seed
+                let mut aircraft_agent = create_aircraft_builder(config, effective_seed)?; // Might need to add to the seed to seperate aircraft or rng to the seed
 
                 // Set id name in builder
                 match &mut aircraft_agent.aircraft_builder {
@@ -149,7 +157,7 @@ impl EnvConfigBuilder {
         // Parse terrain configuration
         if let Some(terrain_config) = json_value.get("terrain_config") {
             let mut config = TerrainConfigBuilder::from_json(terrain_config)?;
-            config.seed = seed;
+            config.seed = effective_seed;
             builder = builder.terrain_config(config);
         }
 
@@ -209,9 +217,6 @@ impl EnvConfigBuilder {
         for (id, builder) in self.observation_builders {
             observation_spaces.insert(id.clone(), builder.build()?);
         }
-
-        use bevy::prelude::*;
-        info!("building with seed: {:?}", seed);
 
         Ok(EnvConfig {
             seed,

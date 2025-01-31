@@ -149,10 +149,6 @@ impl RandomStartConfig {
         // Ensure min_altitude < max_altitude
         let (min_altitude, max_altitude) =
             if self.position.min_altitude >= self.position.max_altitude {
-                warn!(
-                "Invalid altitude range: min_altitude ({}) >= max_altitude ({}). Swapping values.",
-                self.position.min_altitude, self.position.max_altitude
-            );
                 (self.position.max_altitude, self.position.min_altitude)
             } else {
                 (self.position.min_altitude, self.position.max_altitude)
