@@ -24,6 +24,7 @@ pub use physics::{Force, ForceCategory, Moment, PhysicsComponent, ReferenceFrame
 pub use spatial::SpatialComponent;
 pub use tasks::{TaskComponent, TaskType};
 pub use trim::{
-    NeedsTrim, TrimBounds, TrimCondition, TrimRequest, TrimResiduals, TrimResult, TrimSolver,
-    TrimSolverConfig, TrimState,
+    LateralBounds, LateralResiduals, LateralTrimState, LongitudinalBounds, LongitudinalResiduals,
+    LongitudinalTrimState, NeedsTrim, TrimBounds, TrimCondition, TrimRequest, TrimResiduals,
+    TrimResult, TrimSolver, TrimSolverConfig, TrimStage, TrimState,
 };

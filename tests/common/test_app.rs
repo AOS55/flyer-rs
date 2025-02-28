@@ -1,8 +1,8 @@
 use bevy::{image::Image, prelude::*};
 use flyer::{
     components::{
-        AircraftConfig, DubinsAircraftConfig, FullAircraftConfig, TrimBounds, TrimRequest,
-        TrimSolverConfig,
+        AircraftConfig, DubinsAircraftConfig, FullAircraftConfig, LateralBounds,
+        LongitudinalBounds, TrimRequest, TrimSolverConfig,
     },
     plugins::*,
     resources::{EnvironmentConfig, PhysicsConfig, TerrainConfig, UpdateMode},
@@ -137,7 +137,8 @@ impl TestAppBuilder {
             max_iterations: 1000,
             cost_tolerance: 1e-3,
             use_gradient_refinement: true,
-            bounds: TrimBounds::default(),
+            longitudinal_bounds: LongitudinalBounds::default(),
+            lateral_bounds: LateralBounds::default(),
         });
 
         app.add_event::<TrimRequest>();

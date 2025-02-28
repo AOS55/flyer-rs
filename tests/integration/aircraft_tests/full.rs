@@ -3,7 +3,7 @@ use bevy::prelude::*;
 use flyer::{
     components::{
         AirData, AircraftControlSurfaces, NeedsTrim, PhysicsComponent, PropulsionState,
-        SpatialComponent, TrimCondition,
+        SpatialComponent, TrimCondition, TrimStage,
     },
     resources::PhysicsConfig,
 };
@@ -53,6 +53,7 @@ fn test_straight_level_flight() {
                 world.entity_mut(entity).insert(NeedsTrim {
                     condition: TrimCondition::StraightAndLevel { airspeed: 100.0 },
                     solver: None,
+                    stage: TrimStage::Longitudinal,
                 });
                 true
             } else {

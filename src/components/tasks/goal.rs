@@ -32,7 +32,7 @@ impl TaskComponent {
             }
             GoalRewardType::Dense => {
                 // Exponential decay based on distance
-                let scale_factor = 5.0; // Controls how quickly reward drops off
+                let scale_factor = 0.1; // Controls how quickly reward drops off
                 if distance <= params.tolerance {
                     1.0
                 } else {

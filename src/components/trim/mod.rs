@@ -3,7 +3,10 @@ mod event;
 mod solver;
 mod state;
 
-pub use config::{TrimBounds, TrimSolverConfig};
-pub use event::{NeedsTrim, TrimRequest};
+pub use config::{LateralBounds, LongitudinalBounds, TrimBounds, TrimSolverConfig};
+pub use event::{NeedsTrim, TrimRequest, TrimStage};
 pub use solver::TrimSolver;
-pub use state::{TrimCondition, TrimResiduals, TrimResult, TrimState};
+pub use state::{
+    LateralResiduals, LateralTrimState, LongitudinalResiduals, LongitudinalTrimState,
+    TrimCondition, TrimResiduals, TrimResult, TrimState,
+};

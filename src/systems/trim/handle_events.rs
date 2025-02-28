@@ -1,12 +1,19 @@
+use crate::components::{NeedsTrim, TrimCondition, TrimRequest, TrimStage};
 use bevy::prelude::*;
-
-use crate::components::{NeedsTrim, TrimRequest};
 
 pub fn handle_trim_requests(mut commands: Commands, mut trim_requests: EventReader<TrimRequest>) {
     for request in trim_requests.read() {
+        // Determine initial trim stage based on condition
+        let initial_stage = match request.condition {
+            TrimCondition::StraightAndLevel { .. } => TrimStage::Longitudinal,
+            TrimCondition::SteadyClimb { .. } => TrimStage::Longitudinal,
+            TrimCondition::CoordinatedTurn { .. } => TrimStage::Longitudinal, // Still start with longitudinal
+        };
+
         commands.entity(request.entity).insert(NeedsTrim {
             condition: request.condition,
             solver: None,
+            stage: initial_stage,
         });
     }
 }

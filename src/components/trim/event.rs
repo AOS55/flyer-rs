@@ -6,6 +6,14 @@ use crate::components::{TrimCondition, TrimSolver};
 pub struct NeedsTrim {
     pub condition: TrimCondition,
     pub solver: Option<TrimSolver>,
+    pub stage: TrimStage,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub enum TrimStage {
+    Longitudinal,
+    Lateral,
+    Complete,
 }
 
 #[derive(Event)]

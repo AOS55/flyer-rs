@@ -1,5 +1,7 @@
 use bevy::prelude::*;
+use bevy::time::Time;
 use nalgebra::{UnitQuaternion, Vector3};
+use std::time::Duration;
 
 use crate::{
     components::{
@@ -12,25 +14,59 @@ use crate::{
     },
 };
 
+// Define system sets for ordering
+#[derive(SystemSet, Debug, Hash, PartialEq, Eq, Clone)]
+enum PhysicsSet {
+    AirData,
+    Forces,
+    Integration,
+}
+
 /// A virtual physics simulation that can run independently of the main simulation time
-#[derive(Debug)]
 pub struct VirtualPhysics {
     world: World,
+    schedule: Schedule,
+    dt: f64,
 }
 
 impl VirtualPhysics {
     pub fn new(physics_config: &PhysicsConfig) -> Self {
         let mut world = World::new();
 
+        // Add required resources
         world.insert_resource(physics_config.clone());
+        world.insert_resource(Time::<Fixed>::from_seconds(physics_config.timestep));
 
-        let env_config = EnvironmentConfig::default(); // Assume nill wind for now
+        let env_config = EnvironmentConfig::default(); // Assume nil wind for now
         world.insert_resource(EnvironmentModel::new(&env_config));
         world.insert_resource(AerodynamicsConfig {
             min_airspeed_threshold: 0.0,
         });
 
-        Self { world }
+        // Create and configure schedule
+        let mut schedule = Schedule::default();
+
+        // Configure sets to ensure proper ordering
+        schedule.configure_sets(
+            (
+                PhysicsSet::AirData,
+                PhysicsSet::Forces,
+                PhysicsSet::Integration,
+            )
+                .chain(),
+        );
+
+        // Add systems to their respective sets
+        schedule.add_systems(air_data_system.in_set(PhysicsSet::AirData));
+        schedule
+            .add_systems((aero_force_system, force_calculator_system).in_set(PhysicsSet::Forces));
+        schedule.add_systems(physics_integrator_system.in_set(PhysicsSet::Integration));
+
+        Self {
+            world,
+            schedule,
+            dt: physics_config.timestep,
+        }
     }
 
     /// Create a virtual aircraft entity with given state and config
@@ -60,46 +96,69 @@ impl VirtualPhysics {
     /// Run the physics simulation for a specified number of steps
     pub fn run_steps(&mut self, _entity: Entity, steps: usize) {
         for _ in 0..steps {
-            // Create a fake time resource for the fixed timestep
-            // TODO: Ensure the update occurs for dt on each but can go faster than dt
-            // let time = Time::new_fixed(Duration::from_secs_f64(dt));
-            // self.world.insert_resource(time);
+            // Update time resource
+            if let Some(mut time) = self.world.get_resource_mut::<Time<Fixed>>() {
+                time.advance_by(Duration::from_secs_f64(self.dt));
+            }
 
-            // Run the physics systems in sequence
-            let mut air_data_schedule = Schedule::default();
-            air_data_schedule.add_systems(air_data_system);
-            air_data_schedule.run(&mut self.world);
-
-            let mut aero_schedule = Schedule::default();
-            aero_schedule.add_systems(aero_force_system);
-            aero_schedule.run(&mut self.world);
-
-            let mut force_schedule = Schedule::default();
-            force_schedule.add_systems(force_calculator_system);
-            force_schedule.run(&mut self.world);
-
-            let mut integrator_schedule = Schedule::default();
-            integrator_schedule.add_systems(physics_integrator_system);
-            integrator_schedule.run(&mut self.world);
+            // Run all systems in sequence using the configured schedule
+            self.schedule.run(&mut self.world);
         }
     }
 
     /// Calculate forces and moments at current state without integrating
+    // pub fn calculate_forces(&mut self, entity: Entity) -> (Vector3<f64>, Vector3<f64>) {
+    //     // Use the same schedule but stop before integration
+    //     if let Some(mut time) = self.world.get_resource_mut::<Time<Fixed>>() {
+    //         time.advance_by(Duration::from_secs_f64(self.dt));
+    //     }
+
+    //     // Run only the force calculation systems
+    //     let mut force_schedule = Schedule::default();
+    //     force_schedule.configure_sets((PhysicsSet::AirData, PhysicsSet::Forces).chain());
+
+    //     force_schedule.add_systems(air_data_system.in_set(PhysicsSet::AirData));
+    //     force_schedule
+    //         .add_systems((aero_force_system, force_calculator_system).in_set(PhysicsSet::Forces));
+
+    //     force_schedule.run(&mut self.world);
+
+    //     // Get the resulting forces and moments
+    //     let physics = self
+    //         .world
+    //         .get::<PhysicsComponent>(entity)
+    //         .expect("Entity should have PhysicsComponent");
+
+    //     (physics.net_force, physics.net_moment)
+    // }
+
     pub fn calculate_forces(&mut self, entity: Entity) -> (Vector3<f64>, Vector3<f64>) {
-        // Run force calculation systems without integration
-        let mut air_data_schedule = Schedule::default();
-        air_data_schedule.add_systems(air_data_system);
-        air_data_schedule.run(&mut self.world);
+        // Reset forces at the start
+        if let Some(mut physics) = self.world.get_mut::<PhysicsComponent>(entity) {
+            physics.net_force = Vector3::zeros();
+            physics.net_moment = Vector3::zeros();
+        }
 
-        let mut aero_schedule = Schedule::default();
-        aero_schedule.add_systems(aero_force_system);
-        aero_schedule.run(&mut self.world);
-
+        // Create a schedule for force calculation
         let mut force_schedule = Schedule::default();
-        force_schedule.add_systems(force_calculator_system);
+
+        // Configure systems to run in sequence
+        force_schedule.configure_sets((PhysicsSet::AirData, PhysicsSet::Forces).chain());
+
+        // Add air data system
+        force_schedule.add_systems(air_data_system.in_set(PhysicsSet::AirData));
+
+        // Add force calculation systems
+        force_schedule.add_systems(
+            (aero_force_system, force_calculator_system)
+                .chain()
+                .in_set(PhysicsSet::Forces),
+        );
+
+        // Run the schedule
         force_schedule.run(&mut self.world);
 
-        // Get the resulting forces and moments
+        // Get the final forces and moments
         let physics = self
             .world
             .get::<PhysicsComponent>(entity)
@@ -148,25 +207,290 @@ impl VirtualPhysics {
 
 #[cfg(test)]
 mod tests {
+    use super::*;
+    use crate::components::{
+        AircraftAeroCoefficients, AircraftGeometry, AircraftType, DragCoefficients,
+        LiftCoefficients, MassModel, PitchCoefficients, PropulsionConfig,
+    };
+    use nalgebra::Matrix3;
+    use std::f64::consts::PI;
+
+    fn create_test_aircraft_config() -> FullAircraftConfig {
+        let mass = 1000.0; // 1000 kg
+        FullAircraftConfig {
+            name: "test_aircraft".to_string(),
+            ac_type: AircraftType::Custom("TestAircraft".to_string()),
+            mass: MassModel {
+                mass,
+                inertia: Matrix3::from_diagonal(&Vector3::new(1000.0, 2000.0, 1500.0)),
+                inertia_inv: Matrix3::from_diagonal(&Vector3::new(
+                    1.0 / 1000.0,
+                    1.0 / 2000.0,
+                    1.0 / 1500.0,
+                )),
+            },
+            geometry: AircraftGeometry {
+                wing_area: 16.0,
+                wing_span: 10.0,
+                mac: 1.6,
+            },
+            aero_coef: AircraftAeroCoefficients {
+                lift: LiftCoefficients {
+                    c_l_0: 0.2,
+                    c_l_alpha: 5.0,
+                    ..Default::default()
+                },
+                drag: DragCoefficients {
+                    c_d_0: 0.02,
+                    c_d_alpha2: 0.1,
+                    ..Default::default()
+                },
+                pitch: PitchCoefficients {
+                    c_m_0: 0.0,
+                    c_m_alpha: -1.0,
+                    c_m_q: -10.0,
+                    c_m_deltae: -1.0,
+                    ..Default::default()
+                },
+                ..Default::default()
+            },
+            propulsion: PropulsionConfig::twin_otter(),
+            start_config: Default::default(),
+            task_config: Default::default(),
+        }
+    }
 
     #[test]
     fn test_physics_initialization() {
-        // Test aircraft entity creation
-        // Verify initial state setting
-        // Check component setup
+        let physics_config = PhysicsConfig {
+            timestep: 0.01,
+            gravity: Vector3::new(0.0, 0.0, 9.81),
+            max_velocity: 200.0,
+            max_angular_velocity: 10.0,
+        };
+
+        let mut virtual_physics = VirtualPhysics::new(&physics_config);
+
+        // Create initial state
+        let spatial = SpatialComponent {
+            position: Vector3::new(0.0, 0.0, -1000.0),
+            velocity: Vector3::new(100.0, 0.0, 0.0),
+            attitude: UnitQuaternion::from_euler_angles(0.0, 0.05, 0.0),
+            angular_velocity: Vector3::zeros(),
+        };
+
+        let propulsion = PropulsionState::default();
+        let config = create_test_aircraft_config();
+
+        // Spawn aircraft and verify entity creation
+        let entity = virtual_physics.spawn_aircraft(&spatial, &propulsion, &config);
+
+        // Verify component setup
+        let spawned_spatial = virtual_physics
+            .world
+            .get::<SpatialComponent>(entity)
+            .expect("Entity should have SpatialComponent");
+        let spawned_physics = virtual_physics
+            .world
+            .get::<PhysicsComponent>(entity)
+            .expect("Entity should have PhysicsComponent");
+
+        // Check initial state matches
+        assert_eq!(spawned_spatial.velocity, spatial.velocity);
+        assert_eq!(spawned_spatial.position, spatial.position);
+        assert_eq!(spawned_physics.mass, config.mass.mass);
     }
 
     #[test]
     fn test_physics_step() {
-        // Test single physics step
-        // Verify force calculations
-        // Check state integration
+        let physics_config = PhysicsConfig {
+            timestep: 0.01,
+            gravity: Vector3::new(0.0, 0.0, 9.81),
+            max_velocity: 200.0,
+            max_angular_velocity: 10.0,
+        };
+
+        let mut virtual_physics = VirtualPhysics::new(&physics_config);
+
+        // Create initial state with level flight
+        let initial_velocity = 100.0;
+        let spatial = SpatialComponent {
+            position: Vector3::new(0.0, 0.0, -1000.0),
+            velocity: Vector3::new(initial_velocity, 0.0, 0.0),
+            attitude: UnitQuaternion::from_euler_angles(0.0, 0.05, 0.0),
+            angular_velocity: Vector3::zeros(),
+        };
+
+        let propulsion = PropulsionState::default();
+        let config = create_test_aircraft_config();
+        let entity = virtual_physics.spawn_aircraft(&spatial, &propulsion, &config);
+
+        // Set trim-like control inputs
+        virtual_physics.set_controls(
+            entity,
+            &AircraftControlSurfaces {
+                elevator: -0.05,
+                aileron: 0.0,
+                rudder: 0.0,
+                power_lever: 0.6,
+            },
+        );
+
+        // Run single step
+        virtual_physics.run_steps(entity, 1);
+
+        // Get new state
+        let (new_spatial, _) = virtual_physics.get_state(entity);
+
+        // Verify reasonable physics behavior
+        assert!(
+            new_spatial.velocity.norm() > 0.0,
+            "Velocity should not be zero"
+        );
+        assert!(
+            new_spatial.velocity.norm() < physics_config.max_velocity,
+            "Velocity should not exceed max velocity"
+        );
+
+        // Check conservation of energy (approximately)
+        let initial_energy = 0.5 * config.mass.mass * initial_velocity.powi(2)
+            + config.mass.mass * physics_config.gravity.norm() * 1000.0;
+        let final_energy = 0.5 * config.mass.mass * new_spatial.velocity.norm().powi(2)
+            + config.mass.mass * physics_config.gravity.norm() * (-new_spatial.position.z);
+
+        assert!(
+            (final_energy - initial_energy).abs() / initial_energy < 0.1,
+            "Energy should be approximately conserved"
+        );
     }
 
     #[test]
     fn test_force_calculation() {
-        // Test force/moment calculation
-        // Verify coordinate transformations
-        // Check boundary conditions
+        let physics_config = PhysicsConfig {
+            timestep: 0.01,
+            gravity: Vector3::new(0.0, 0.0, 9.81),
+            max_velocity: 200.0,
+            max_angular_velocity: 10.0,
+        };
+
+        let mut virtual_physics = VirtualPhysics::new(&physics_config);
+
+        // Test different flight conditions
+        let test_conditions = vec![
+            // Level flight
+            (
+                Vector3::new(100.0, 0.0, 0.0),
+                UnitQuaternion::from_euler_angles(0.0, 0.0, 0.0),
+            ),
+            // Pitched up
+            (
+                Vector3::new(100.0, 0.0, 0.0),
+                UnitQuaternion::from_euler_angles(0.0, PI / 8.0, 0.0),
+            ),
+            // Banked turn
+            (
+                Vector3::new(100.0, 0.0, 0.0),
+                UnitQuaternion::from_euler_angles(PI / 6.0, 0.0, 0.0),
+            ),
+        ];
+
+        let config = create_test_aircraft_config();
+        let propulsion = PropulsionState::default();
+        let base_spatial = SpatialComponent {
+            position: Vector3::new(0.0, 0.0, -1000.0),
+            velocity: Vector3::zeros(),
+            attitude: UnitQuaternion::identity(),
+            angular_velocity: Vector3::zeros(),
+        };
+
+        let entity = virtual_physics.spawn_aircraft(&base_spatial, &propulsion, &config);
+
+        for (velocity, attitude) in test_conditions {
+            // Set state
+            virtual_physics.set_state(entity, &velocity, &attitude);
+
+            // Calculate forces
+            let (forces, moments) = virtual_physics.calculate_forces(entity);
+
+            // Verify forces are finite
+            assert!(
+                forces.iter().all(|f| f.is_finite()),
+                "Forces should be finite: {:?}",
+                forces
+            );
+            assert!(
+                moments.iter().all(|m| m.is_finite()),
+                "Moments should be finite: {:?}",
+                moments
+            );
+
+            // Verify force magnitudes are reasonable
+            let dynamic_pressure = 0.5 * 1.225 * velocity.norm().powi(2);
+            let max_expected_force = dynamic_pressure * config.geometry.wing_area * 3.0; // Reasonable max CL of 3.0
+
+            assert!(
+                forces.norm() < max_expected_force,
+                "Force magnitude should be reasonable: {} vs {}",
+                forces.norm(),
+                max_expected_force
+            );
+        }
     }
+
+    // TODO: Implement physics solver error constraint
+    // #[test]
+    // fn test_boundary_conditions() {
+    //     let physics_config = PhysicsConfig {
+    //         timestep: 0.001,
+    //         gravity: Vector3::new(0.0, 0.0, 9.81),
+    //         max_velocity: 200.0,
+    //         max_angular_velocity: 10.0,
+    //     };
+
+    //     let mut virtual_physics = VirtualPhysics::new(&physics_config);
+    //     let config = create_test_aircraft_config();
+    //     let propulsion = PropulsionState::default();
+
+    //     // Test extreme conditions
+    //     let extreme_conditions = vec![
+    //         // Zero velocity
+    //         (Vector3::zeros(), UnitQuaternion::identity()),
+    //         // Very high velocity
+    //         (Vector3::new(300.0, 0.0, 0.0), UnitQuaternion::identity()),
+    //         // Extreme attitude
+    //         (
+    //             Vector3::new(100.0, 0.0, 0.0),
+    //             UnitQuaternion::from_euler_angles(0.0, PI / 4.0, 0.0),
+    //         ),
+    //     ];
+
+    //     let base_spatial = SpatialComponent {
+    //         position: Vector3::new(0.0, 0.0, -1000.0),
+    //         velocity: Vector3::zeros(),
+    //         attitude: UnitQuaternion::identity(),
+    //         angular_velocity: Vector3::zeros(),
+    //     };
+
+    //     let entity = virtual_physics.spawn_aircraft(&base_spatial, &propulsion, &config);
+
+    //     for (velocity, attitude) in extreme_conditions {
+    //         virtual_physics.set_state(entity, &velocity, &attitude);
+
+    //         // Verify physics remains stable
+    //         virtual_physics.run_steps(entity, 10);
+
+    //         let (new_spatial, _) = virtual_physics.get_state(entity);
+
+    //         assert!(
+    //             new_spatial.velocity.iter().all(|v| v.is_finite()),
+    //             "Velocity should remain finite: {:?}",
+    //             new_spatial.velocity
+    //         );
+    //         assert!(
+    //             new_spatial.angular_velocity.iter().all(|w| w.is_finite()),
+    //             "Angular velocity should remain finite: {:?}",
+    //             new_spatial.angular_velocity
+    //         );
+    //     }
+    // }
 }

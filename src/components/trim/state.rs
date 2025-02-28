@@ -13,66 +13,93 @@ pub enum TrimCondition {
     CoordinatedTurn { airspeed: f64, bank_angle: f64 },
 }
 
+/// Longitudinal trim state
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct LongitudinalTrimState {
+    pub elevator: f64,
+    pub power_lever: f64,
+    pub alpha: f64,
+    pub theta: f64,
+}
+
+/// Lateral trim state
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct LateralTrimState {
+    pub aileron: f64,
+    pub rudder: f64,
+    pub beta: f64,
+    pub phi: f64,
+}
+
 /// State variables that define the trim solution
 #[derive(Debug, Clone, Copy)]
 pub struct TrimState {
-    // Control Surface positions
-    pub elevator: f64,
-    pub aileron: f64,
-    pub rudder: f64,
-    pub power_lever: f64,
+    pub longitudinal: LongitudinalTrimState,
+    pub lateral: LateralTrimState,
+}
 
-    // Aircraft state
-    pub alpha: f64, // Angle of attack
-    pub beta: f64,  // Sideslip angle
-    pub phi: f64,   // Roll angle
-    pub theta: f64, // Pitch angle
+impl Default for LongitudinalTrimState {
+    fn default() -> Self {
+        Self {
+            elevator: 0.0,
+            power_lever: 0.3,
+            alpha: 0.05,
+            theta: 0.05,
+        }
+    }
+}
+
+impl Default for LateralTrimState {
+    fn default() -> Self {
+        Self {
+            aileron: 0.0,
+            rudder: 0.0,
+            beta: 0.0,
+            phi: 0.0,
+        }
+    }
 }
 
 impl Default for TrimState {
     fn default() -> Self {
         Self {
-            elevator: 0.0,
-            aileron: 0.0,
-            rudder: 0.0,
-            power_lever: 0.3, // Reasonable initial guess
-            alpha: 0.05,      // ~3 degrees
-            beta: 0.0,
-            phi: 0.0,
-            theta: 0.05, // ~3 degrees
+            longitudinal: LongitudinalTrimState::default(),
+            lateral: LateralTrimState::default(),
+        }
+    }
+}
+
+impl LongitudinalTrimState {
+    pub fn to_vector(&self) -> Vec<f64> {
+        vec![self.elevator, self.power_lever, self.alpha, self.theta]
+    }
+
+    pub fn from_vector(vec: &[f64]) -> Self {
+        Self {
+            elevator: vec[0],
+            power_lever: vec[1],
+            alpha: vec[2],
+            theta: vec[3],
+        }
+    }
+}
+
+impl LateralTrimState {
+    pub fn to_vector(&self) -> Vec<f64> {
+        vec![self.aileron, self.rudder, self.beta, self.phi]
+    }
+
+    pub fn from_vector(vec: &[f64]) -> Self {
+        Self {
+            aileron: vec[0],
+            rudder: vec[1],
+            beta: vec[2],
+            phi: vec[3],
         }
     }
 }
 
 impl TrimState {
-    /// Convert the trim state to a vector for optimization
-    pub fn to_vector(&self) -> Vec<f64> {
-        vec![
-            self.elevator,
-            self.aileron,
-            self.rudder,
-            self.power_lever,
-            self.alpha,
-            self.beta,
-            self.phi,
-            self.theta,
-        ]
-    }
-
-    /// Creates a trim state from a vector
-    pub fn from_vector(vec: &[f64]) -> Self {
-        Self {
-            elevator: vec[0],
-            aileron: vec[1],
-            rudder: vec[2],
-            power_lever: vec[3],
-            alpha: vec[4],
-            beta: vec[5],
-            phi: vec[6],
-            theta: vec[7],
-        }
-    }
-
     pub fn to_trim_state(
         spatial: &SpatialComponent,
         control_surfaces: &AircraftControlSurfaces,
@@ -81,14 +108,18 @@ impl TrimState {
         let (phi, theta, _) = spatial.attitude.euler_angles();
 
         Self {
-            elevator: control_surfaces.elevator,
-            aileron: control_surfaces.aileron,
-            rudder: control_surfaces.rudder,
-            power_lever: control_surfaces.power_lever,
-            alpha: air_data.alpha,
-            beta: air_data.beta,
-            phi,
-            theta,
+            longitudinal: LongitudinalTrimState {
+                elevator: control_surfaces.elevator,
+                power_lever: control_surfaces.power_lever,
+                alpha: air_data.alpha,
+                theta,
+            },
+            lateral: LateralTrimState {
+                aileron: control_surfaces.aileron,
+                rudder: control_surfaces.rudder,
+                beta: air_data.beta,
+                phi,
+            },
         }
     }
 
@@ -98,44 +129,61 @@ impl TrimState {
         air_data: &mut AirData,
         spatial: &mut SpatialComponent,
     ) {
-        control_surfaces.aileron = self.aileron;
-        control_surfaces.elevator = self.elevator;
-        control_surfaces.rudder = self.rudder;
-        control_surfaces.power_lever = self.power_lever;
+        // Apply longitudinal states
+        control_surfaces.elevator = self.longitudinal.elevator;
+        control_surfaces.power_lever = self.longitudinal.power_lever;
+        air_data.alpha = self.longitudinal.alpha;
 
-        air_data.alpha = self.alpha;
-        air_data.beta = self.beta;
+        // Apply lateral states
+        control_surfaces.aileron = self.lateral.aileron;
+        control_surfaces.rudder = self.lateral.rudder;
+        air_data.beta = self.lateral.beta;
 
         spatial.attitude = UnitQuaternion::from_euler_angles(
-            self.phi, self.theta, 0.0, // Yaw not considered in trim
+            self.lateral.phi,
+            self.longitudinal.theta,
+            0.0, // Yaw not considered in trim
         );
+    }
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct LongitudinalResiduals {
+    pub vertical_force: f64,   // Lift - Weight balance
+    pub horizontal_force: f64, // Thrust - Drag balance
+    pub pitch_moment: f64,     // Pitch equilibrium
+    pub gamma_error: f64,      // Flight path angle error
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct LateralResiduals {
+    pub side_force: f64,      // Lateral force balance
+    pub roll_moment: f64,     // Roll equilibrium
+    pub yaw_moment: f64,      // Yaw equilibrium
+    pub turn_rate_error: f64, // Turn rate matching
+}
+
+#[derive(Debug, Clone)]
+pub struct TrimResiduals {
+    pub longitudinal: LongitudinalResiduals,
+    pub lateral: LateralResiduals,
+}
+
+impl Default for TrimResiduals {
+    fn default() -> Self {
+        Self {
+            longitudinal: LongitudinalResiduals::default(),
+            lateral: LateralResiduals::default(),
+        }
     }
 }
 
 /// Results from the trim calculation
 #[derive(Debug, Clone)]
 pub struct TrimResult {
-    /// The found trim state
     pub state: TrimState,
-    /// Whether the solver converged
     pub converged: bool,
-    /// Final cost value
     pub cost: f64,
-    /// Number of iterations taken
     pub iterations: usize,
-    /// Residual forces and moments
     pub residuals: TrimResiduals,
-}
-
-/// Residual forces and moments from trim calculation
-#[derive(Debug, Clone, Default)]
-pub struct TrimResiduals {
-    /// Net forces in body frame (N)
-    pub forces: Vector3<f64>,
-    /// Net moments in body frame (N⋅m)
-    pub moments: Vector3<f64>,
-    /// Flight path angle error (rad)
-    pub gamma_error: f64,
-    /// Bank angle error (rad)
-    pub mu_error: f64,
 }

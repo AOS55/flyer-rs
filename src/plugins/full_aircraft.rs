@@ -79,10 +79,10 @@ impl Plugin for FullAircraftPlugin {
 
         // 1. Setup aircraft assets (textures, sprite layouts)
         if !app.world().contains_resource::<AircraftBaseInitialized>() {
-            app.add_systems(
-                Startup,
-                (AircraftPluginBase::setup_assets,).in_set(StartupStage::BuildUtilities),
-            );
+            // app.add_systems(
+            //     Startup,
+            //     (AircraftPluginBase::setup_assets,).in_set(StartupStage::BuildUtilities),
+            // );
         }
         // 3. Spawn the full aircraft entity during startup
         app.add_systems(
