@@ -139,6 +139,7 @@ impl TestAppBuilder {
             use_gradient_refinement: true,
             longitudinal_bounds: LongitudinalBounds::default(),
             lateral_bounds: LateralBounds::default(),
+            debug_level: 0,
         });
 
         app.add_event::<TrimRequest>();
@@ -202,6 +203,19 @@ impl TestApp {
         let world = self.app.world_mut();
         let mut query = world.query::<(&mut A, &mut B, &mut C)>();
         query.get_single_mut(world).ok()
+    }
+    
+    pub fn query_tuple3_single<A, B, C>(
+        &mut self,
+    ) -> Option<(&A, &B, &C)>
+    where
+        A: Component,
+        B: Component,
+        C: Component,
+    {
+        let world = self.app.world_mut();
+        let mut query = world.query::<(&A, &B, &C)>();
+        query.get_single(world).ok()
     }
 
     pub fn query_all<T: Component>(&mut self) -> Vec<&T> {

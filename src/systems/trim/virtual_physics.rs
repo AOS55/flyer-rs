@@ -24,7 +24,7 @@ enum PhysicsSet {
 
 /// A virtual physics simulation that can run independently of the main simulation time
 pub struct VirtualPhysics {
-    world: World,
+    pub world: World,
     schedule: Schedule,
     dt: f64,
 }
@@ -137,6 +137,10 @@ impl VirtualPhysics {
         if let Some(mut physics) = self.world.get_mut::<PhysicsComponent>(entity) {
             physics.net_force = Vector3::zeros();
             physics.net_moment = Vector3::zeros();
+            
+            // Clear existing forces to ensure clean state
+            physics.forces.clear();
+            physics.moments.clear();
         }
 
         // Create a schedule for force calculation
@@ -165,6 +169,16 @@ impl VirtualPhysics {
             .expect("Entity should have PhysicsComponent");
 
         (physics.net_force, physics.net_moment)
+    }
+    
+    /// Resets forces and moments on an entity
+    pub fn reset_forces(&mut self, entity: Entity) {
+        if let Some(mut physics) = self.world.get_mut::<PhysicsComponent>(entity) {
+            physics.net_force = Vector3::zeros();
+            physics.net_moment = Vector3::zeros();
+            physics.forces.clear();
+            physics.moments.clear();
+        }
     }
 
     /// Get the current state of the virtual aircraft

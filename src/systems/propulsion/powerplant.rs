@@ -75,10 +75,11 @@ pub fn propulsion_system(
                     category: ForceCategory::Propulsive,
                 };
 
-                println!(
-                    "engine_config: {:?}, engine_state {:?}",
-                    engine_config, updated_state
-                );
+                // Remove debug print that was flooding the output
+                // println!(
+                //     "engine_config: {:?}, engine_state {:?}",
+                //     engine_config, updated_state
+                // );
 
                 (updated_state, force)
             })

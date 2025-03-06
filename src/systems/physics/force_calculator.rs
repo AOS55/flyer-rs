@@ -63,13 +63,20 @@ pub fn force_calculator_system(
         }
 
         // Add gravitational force
+        // Convert gravity vector to body frame for consistent force handling
+        let gravity_inertial = config.gravity * physics.mass;
+        let gravity_body = spatial.attitude.inverse() * gravity_inertial;
+        
         let gravity_force = Force {
-            vector: config.gravity * physics.mass,
+            vector: gravity_body,
             point: None,
-            frame: ReferenceFrame::Inertial,
+            frame: ReferenceFrame::Body,  // Now in body frame for consistency
             category: ForceCategory::Gravitational,
         };
-        physics.net_force += gravity_force.vector;
+        
+        // Transform to inertial for net force calculation (consistent with other forces)
+        let gravity_force_inertial = spatial.attitude * gravity_force.vector;
+        physics.net_force += gravity_force_inertial;
         physics.forces.push(gravity_force.clone()); // Use clone to avoid move
     }
 }

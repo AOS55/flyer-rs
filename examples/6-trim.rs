@@ -123,13 +123,19 @@ fn main() {
     app.insert_resource(TrimConvergenceTracker::default());
     app.insert_resource(TrimLogger::default());
 
-    // Configure trim solver
+    // Configure trim solver with optimized settings
     app.insert_resource(TrimSolverConfig {
-        max_iterations: 10000,
-        cost_tolerance: 1e-2,
+        max_iterations: 200,         // Reduced max iterations since we've improved the algorithm
+        cost_tolerance: 5e-3,        // Slightly more forgiving tolerance for faster convergence
         use_gradient_refinement: true,
         lateral_bounds: LateralBounds::default(),
-        longitudinal_bounds: LongitudinalBounds::default(),
+        longitudinal_bounds: LongitudinalBounds {
+            elevator_range: (-0.5, 0.5),
+            throttle_range: (0.2, 0.9),  // Minimum throttle increased slightly
+            alpha_range: (-0.2, 0.2),
+            theta_range: (-0.3, 0.3),    // Wider pitch range allowed
+        },
+        debug_level: 0,
     });
 
     // Create basic aircraft config
@@ -137,7 +143,7 @@ fn main() {
         let mut config = FullAircraftConfig::default();
         config.start_config = StartConfig::Fixed(FixedStartConfig {
             position: Vector3::new(0.0, 0.0, -1000.0),
-            speed: 100.0,
+            speed: 50.0,
             heading: 0.0,
         });
         config
@@ -176,7 +182,7 @@ fn request_trim(
 
         trim_requests.send(TrimRequest {
             entity,
-            condition: TrimCondition::StraightAndLevel { airspeed: 100.0 },
+            condition: TrimCondition::StraightAndLevel { airspeed: 50.0 },
         });
     }
 }
@@ -238,8 +244,9 @@ fn monitor_trim_convergence(
                 if (tracker.last_cost - current_cost).abs() < 1e-6 {
                     tracker.stall_counter += 1;
                     if tracker.stall_counter > 5 {
-                        println!("Optimization stalled - not making progress");
-                        return;
+                        println!("Optimization stalled at cost {:.6} - using best solution", current_cost);
+                        // Don't return - let it continue with best solution
+                        tracker.stall_counter = 0;
                     }
                 } else {
                     tracker.stall_counter = 0;

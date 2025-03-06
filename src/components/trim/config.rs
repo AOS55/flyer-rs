@@ -14,6 +14,8 @@ pub struct TrimSolverConfig {
     pub lateral_bounds: LateralBounds,
     /// Bounds for longitudinal control surfaces and states
     pub longitudinal_bounds: LongitudinalBounds,
+    /// Debug output level (0=none, 1=minimal, 2=verbose)
+    pub debug_level: usize,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -76,6 +78,7 @@ impl Default for TrimSolverConfig {
             use_gradient_refinement: true,
             lateral_bounds: LateralBounds::default(),
             longitudinal_bounds: LongitudinalBounds::default(),
+            debug_level: 1, // Default to minimal debug output
         }
     }
 }
