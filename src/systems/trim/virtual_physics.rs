@@ -106,38 +106,12 @@ impl VirtualPhysics {
         }
     }
 
-    /// Calculate forces and moments at current state without integrating
-    // pub fn calculate_forces(&mut self, entity: Entity) -> (Vector3<f64>, Vector3<f64>) {
-    //     // Use the same schedule but stop before integration
-    //     if let Some(mut time) = self.world.get_resource_mut::<Time<Fixed>>() {
-    //         time.advance_by(Duration::from_secs_f64(self.dt));
-    //     }
-
-    //     // Run only the force calculation systems
-    //     let mut force_schedule = Schedule::default();
-    //     force_schedule.configure_sets((PhysicsSet::AirData, PhysicsSet::Forces).chain());
-
-    //     force_schedule.add_systems(air_data_system.in_set(PhysicsSet::AirData));
-    //     force_schedule
-    //         .add_systems((aero_force_system, force_calculator_system).in_set(PhysicsSet::Forces));
-
-    //     force_schedule.run(&mut self.world);
-
-    //     // Get the resulting forces and moments
-    //     let physics = self
-    //         .world
-    //         .get::<PhysicsComponent>(entity)
-    //         .expect("Entity should have PhysicsComponent");
-
-    //     (physics.net_force, physics.net_moment)
-    // }
-
     pub fn calculate_forces(&mut self, entity: Entity) -> (Vector3<f64>, Vector3<f64>) {
         // Reset forces at the start
         if let Some(mut physics) = self.world.get_mut::<PhysicsComponent>(entity) {
             physics.net_force = Vector3::zeros();
             physics.net_moment = Vector3::zeros();
-            
+
             // Clear existing forces to ensure clean state
             physics.forces.clear();
             physics.moments.clear();
@@ -170,7 +144,7 @@ impl VirtualPhysics {
 
         (physics.net_force, physics.net_moment)
     }
-    
+
     /// Resets forces and moments on an entity
     pub fn reset_forces(&mut self, entity: Entity) {
         if let Some(mut physics) = self.world.get_mut::<PhysicsComponent>(entity) {
@@ -186,7 +160,7 @@ impl VirtualPhysics {
         let spatial = self
             .world
             .get::<SpatialComponent>(entity)
-            .expect("Entity should have FullAircraftState")
+            .expect("Entity should have SpatialComponent")
             .clone();
 
         let control_surfaces = self
@@ -451,60 +425,136 @@ mod tests {
         }
     }
 
-    // TODO: Implement physics solver error constraint
-    // #[test]
-    // fn test_boundary_conditions() {
-    //     let physics_config = PhysicsConfig {
-    //         timestep: 0.001,
-    //         gravity: Vector3::new(0.0, 0.0, 9.81),
-    //         max_velocity: 200.0,
-    //         max_angular_velocity: 10.0,
-    //     };
+    #[test]
+    fn test_physics_reset() {
+        // Test that the reset_forces function properly clears all forces
 
-    //     let mut virtual_physics = VirtualPhysics::new(&physics_config);
-    //     let config = create_test_aircraft_config();
-    //     let propulsion = PropulsionState::default();
+        let physics_config = PhysicsConfig {
+            timestep: 0.01,
+            gravity: Vector3::new(0.0, 0.0, 9.81),
+            max_velocity: 200.0,
+            max_angular_velocity: 10.0,
+        };
 
-    //     // Test extreme conditions
-    //     let extreme_conditions = vec![
-    //         // Zero velocity
-    //         (Vector3::zeros(), UnitQuaternion::identity()),
-    //         // Very high velocity
-    //         (Vector3::new(300.0, 0.0, 0.0), UnitQuaternion::identity()),
-    //         // Extreme attitude
-    //         (
-    //             Vector3::new(100.0, 0.0, 0.0),
-    //             UnitQuaternion::from_euler_angles(0.0, PI / 4.0, 0.0),
-    //         ),
-    //     ];
+        let mut virtual_physics = VirtualPhysics::new(&physics_config);
 
-    //     let base_spatial = SpatialComponent {
-    //         position: Vector3::new(0.0, 0.0, -1000.0),
-    //         velocity: Vector3::zeros(),
-    //         attitude: UnitQuaternion::identity(),
-    //         angular_velocity: Vector3::zeros(),
-    //     };
+        // Create initial state
+        let spatial = SpatialComponent {
+            position: Vector3::new(0.0, 0.0, -1000.0),
+            velocity: Vector3::new(100.0, 0.0, 0.0),
+            attitude: UnitQuaternion::from_euler_angles(0.0, 0.05, 0.0),
+            angular_velocity: Vector3::zeros(),
+        };
 
-    //     let entity = virtual_physics.spawn_aircraft(&base_spatial, &propulsion, &config);
+        let propulsion = PropulsionState::default();
+        let config = create_test_aircraft_config();
+        let entity = virtual_physics.spawn_aircraft(&spatial, &propulsion, &config);
 
-    //     for (velocity, attitude) in extreme_conditions {
-    //         virtual_physics.set_state(entity, &velocity, &attitude);
+        // Calculate forces (this should populate the forces)
+        virtual_physics.calculate_forces(entity);
 
-    //         // Verify physics remains stable
-    //         virtual_physics.run_steps(entity, 10);
+        // Get physics component to check forces
+        let physics_before = virtual_physics
+            .world
+            .get::<PhysicsComponent>(entity)
+            .expect("Entity should have PhysicsComponent");
 
-    //         let (new_spatial, _) = virtual_physics.get_state(entity);
+        // Verify forces are non-zero
+        assert!(
+            physics_before.net_force.norm() > 0.0,
+            "Forces should be non-zero after calculation"
+        );
 
-    //         assert!(
-    //             new_spatial.velocity.iter().all(|v| v.is_finite()),
-    //             "Velocity should remain finite: {:?}",
-    //             new_spatial.velocity
-    //         );
-    //         assert!(
-    //             new_spatial.angular_velocity.iter().all(|w| w.is_finite()),
-    //             "Angular velocity should remain finite: {:?}",
-    //             new_spatial.angular_velocity
-    //         );
-    //     }
-    // }
+        // Reset forces
+        virtual_physics.reset_forces(entity);
+
+        // Get physics component again
+        let physics_after = virtual_physics
+            .world
+            .get::<PhysicsComponent>(entity)
+            .expect("Entity should have PhysicsComponent");
+
+        // Verify forces are now zero
+        assert_eq!(
+            physics_after.net_force,
+            Vector3::zeros(),
+            "Forces should be zero after reset"
+        );
+
+        assert_eq!(
+            physics_after.net_moment,
+            Vector3::zeros(),
+            "Moments should be zero after reset"
+        );
+
+        assert_eq!(
+            physics_after.forces.len(),
+            0,
+            "Force vector should be empty after reset"
+        );
+    }
+
+    #[test]
+    fn test_lateral_trim_forces() {
+        // Test that the virtual physics correctly models lateral forces for banked flight
+
+        let physics_config = PhysicsConfig {
+            timestep: 0.01,
+            gravity: Vector3::new(0.0, 0.0, 9.81),
+            max_velocity: 200.0,
+            max_angular_velocity: 10.0,
+        };
+
+        let mut virtual_physics = VirtualPhysics::new(&physics_config);
+
+        // Create initial state with bank angle
+        let bank_angle = std::f64::consts::PI / 6.0; // 30 degrees
+        let spatial = SpatialComponent {
+            position: Vector3::new(0.0, 0.0, -1000.0),
+            velocity: Vector3::new(100.0, 0.0, 0.0),
+            attitude: UnitQuaternion::from_euler_angles(bank_angle, 0.05, 0.0),
+            angular_velocity: Vector3::zeros(),
+        };
+
+        let propulsion = PropulsionState::default();
+        let config = create_test_aircraft_config();
+        let entity = virtual_physics.spawn_aircraft(&spatial, &propulsion, &config);
+
+        // Set control inputs
+        virtual_physics.set_controls(
+            entity,
+            &AircraftControlSurfaces {
+                elevator: -0.05,
+                aileron: 0.1, // Add some aileron for roll stability
+                rudder: 0.05, // Add some rudder for yaw stability
+                power_lever: 0.6,
+            },
+        );
+
+        // Calculate forces
+        let (forces, moments) = virtual_physics.calculate_forces(entity);
+
+        println!("Forces: {:?}", forces);
+        println!("Moments: {:?}", moments);
+        
+        // In a banked turn, we should see non-zero lateral forces
+        assert!(
+            forces.y.abs() > 500.0, // Based on observed value of ~890
+            "Banked attitude should produce significant lateral forces, got: {:.2}",
+            forces.y
+        );
+
+        // We should also see roll and yaw moments
+        assert!(
+            moments.x.abs() > 200.0, // Based on observed value of ~400
+            "Banked attitude should produce roll moments, got: {:.2}",
+            moments.x
+        );
+
+        assert!(
+            moments.z.abs() > 1000.0, // Based on observed value of ~8000
+            "Banked attitude should produce yaw moments, got: {:.2}",
+            moments.z
+        );
+    }
 }
