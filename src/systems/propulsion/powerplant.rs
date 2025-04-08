@@ -181,6 +181,79 @@ mod tests {
     }
 
     #[test]
+    fn test_engine_spool_down() {
+        let config = PowerplantConfig::default();
+        let mut state = PowerplantState::default();
+
+        // Start with engine at full thrust
+        state.power_lever = 1.0;
+        state.thrust_fraction = 1.0;
+        state.running = true;
+
+        // Set throttle to idle
+        state.power_lever = 0.0;
+
+        // Update for one second
+        update_powerplant_state(&mut state, &config, 1.0);
+
+        // Check that thrust is decreasing but not immediately at zero
+        assert!(state.thrust_fraction < 1.0);
+        assert!(state.thrust_fraction > 0.0);
+        // Engine should be turned off at idle
+        assert!(!state.running);
+    }
+
+    #[test]
+    fn test_engine_on_off_state() {
+        let config = PowerplantConfig::default();
+        let mut state = PowerplantState::default();
+
+        // Engine initially off, then set throttle above zero
+        assert!(!state.running);
+        state.power_lever = 0.5;
+
+        // Update state - should turn on
+        update_powerplant_state(&mut state, &config, 0.1);
+        assert!(state.running);
+
+        // Set throttle to zero
+        state.power_lever = 0.0;
+
+        // Update state - should turn off
+        update_powerplant_state(&mut state, &config, 0.1);
+        assert!(!state.running);
+    }
+
+    #[test]
+    fn test_propulsion_state_methods() {
+        // Test multi-engine propulsion state
+        let mut propulsion = PropulsionState::new(2);
+        
+        // Initially engines should be off with zero throttle
+        assert_eq!(propulsion.engine_states.len(), 2);
+        assert_eq!(propulsion.engine_states[0].power_lever, 0.0);
+        assert_eq!(propulsion.engine_states[1].power_lever, 0.0);
+        assert!(!propulsion.engine_states[0].running);
+        assert!(!propulsion.engine_states[1].running);
+        
+        // Test setting power lever for all engines
+        propulsion.set_power_lever(0.8);
+        assert_eq!(propulsion.engine_states[0].power_lever, 0.8);
+        assert_eq!(propulsion.engine_states[1].power_lever, 0.8);
+        
+        // Test setting individual engine power lever
+        propulsion.set_engine_power_lever(0, 0.5);
+        propulsion.set_engine_power_lever(1, 0.6);
+        assert_eq!(propulsion.engine_states[0].power_lever, 0.5);
+        assert_eq!(propulsion.engine_states[1].power_lever, 0.6);
+        
+        // Test turning engines on
+        propulsion.turn_engines_on();
+        assert!(propulsion.engine_states[0].running);
+        assert!(propulsion.engine_states[1].running);
+    }
+
+    #[test]
     fn test_thrust_calculation() {
         let config = PowerplantConfig::default();
         let mut state = PowerplantState::default();
@@ -199,5 +272,10 @@ mod tests {
         // Test with airspeed
         let (thrust_speed, _) = calculate_thrust(&config, &state, 1.225, 100.0);
         assert!(thrust_speed < thrust);
+        
+        // Test engine off (zero fuel flow)
+        state.running = false;
+        let (_, fuel_flow_off) = calculate_thrust(&config, &state, 1.225, 0.0);
+        assert_eq!(fuel_flow_off, 0.0);
     }
 }
