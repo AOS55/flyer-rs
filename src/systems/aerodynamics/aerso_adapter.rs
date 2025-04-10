@@ -1,7 +1,7 @@
 use crate::components::{AircraftAeroCoefficients, AircraftControlSurfaces, AircraftGeometry};
 use aerso::types::{Force, Torque};
 use aerso::{AeroEffect, AirState};
-use nalgebra::Vector3;
+use nalgebra::{Vector3, QR};
 use std::f64::consts::PI;
 
 /// Adapter system for interfacing aircraft aerodynamic computations with the Aerso library.
@@ -57,9 +57,21 @@ impl AersoAdapter {
         let r = rates.z.clamp(-50.0 * PI / 180.0, 50.0 * PI / 180.0);
 
         // Compute non-dimensional angular rates.
-        let p_hat = (self.geometry.wing_span * p) / (2.0 * air_state.airspeed);
-        let q_hat = (self.geometry.mac * q) / (2.0 * air_state.airspeed);
-        let r_hat = (self.geometry.wing_span * r) / (2.0 * air_state.airspeed);
+        // let p_hat = (self.geometry.wing_span * p) / (2.0 * air_state.airspeed);
+        // let q_hat = (self.geometry.mac * q) / (2.0 * air_state.airspeed);
+        // let r_hat = (self.geometry.wing_span * r) / (2.0 * air_state.airspeed);
+
+        let airspeed_ms = air_state.airspeed.max(0.1);
+        const M_TO_FT: f64 = 3.28084;
+        let airspeed_fps = airspeed_ms * M_TO_FT;
+        let span_ft = self.geometry.wing_span * M_TO_FT;
+        let mac_ft = self.geometry.mac * M_TO_FT;
+
+        let v_denom_ft = 2.0 * airspeed_fps + 1e-9;
+
+        let p_hat = (span_ft / v_denom_ft) * p;
+        let q_hat = (mac_ft / v_denom_ft) * q;
+        let r_hat = (span_ft / v_denom_ft) * r;
 
         // Aerodynamic force and moment coefficients.
         let c_d = coeffs.drag.c_d_0
@@ -94,12 +106,10 @@ impl AersoAdapter {
             + (coeffs.roll.c_l_deltaa * controls.aileron)
             + (coeffs.roll.c_l_deltar * controls.rudder);
 
-        // Note: In this model, positive elevator deflection causes positive pitching moment
-        // (nose up) which is opposite to conventional aircraft but matches the test expectations
         let c_m = coeffs.pitch.c_m_0
             + (coeffs.pitch.c_m_alpha * alpha)
             + (coeffs.pitch.c_m_q * q_hat)
-            + (coeffs.pitch.c_m_deltae * controls.elevator)  // Positive elevator -> positive moment
+            + (coeffs.pitch.c_m_deltae * controls.elevator)
             + (coeffs.pitch.c_m_alpha_q * alpha * q_hat)
             + (coeffs.pitch.c_m_alpha2_q * q_hat * alpha.powi(2))
             + (coeffs.pitch.c_m_alpha2_deltae * controls.elevator * alpha.powi(2))
@@ -121,9 +131,9 @@ impl AersoAdapter {
         // Sideforce is positive along Y (right)
         // Lift force is negative along Z (upward in NED, following right-hand rule)
         let forces = Vector3::new(
-            -air_state.q * self.geometry.wing_area * c_d,  // Drag is negative along X-axis
-            air_state.q * self.geometry.wing_area * c_y,   // Sideforce along Y-axis
-            -air_state.q * self.geometry.wing_area * c_l,  // Lift is negative along Z-axis (up)
+            -air_state.q * self.geometry.wing_area * c_d, // Drag is negative along X-axis
+            air_state.q * self.geometry.wing_area * c_y,  // Sideforce along Y-axis
+            -air_state.q * self.geometry.wing_area * c_l, // Lift is negative along Z-axis (up)
         );
 
         // Compute aerodynamic moments in the body frame.
