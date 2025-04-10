@@ -6,7 +6,7 @@ use crate::{
         AirData, AircraftControlSurfaces, CollisionComponent, FullAircraftConfig, PhysicsComponent,
         PlayerController, PropulsionState, SpatialComponent, StartConfig, TaskComponent,
     },
-    plugins::{AircraftBaseInitialized, AircraftPluginBase, Id, Identifier, StartupStage},
+    plugins::{AircraftBaseInitialized, Id, Identifier, StartupStage},
 };
 
 /// Plugin to handle "Full Aircraft" systems.
