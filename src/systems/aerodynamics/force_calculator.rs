@@ -1,128 +1,230 @@
-use aerso::{AeroEffect, AirState};
 use bevy::prelude::*;
+use nalgebra::Vector3; // Make sure nalgebra is in scope
+use std::f64::consts::PI; // Keep PI if needed for clamping/calcs
 
-use super::aerso_adapter::AersoAdapter;
+// Import necessary components and the simplified AirDataValues struct
 use crate::components::{
-    AirData, AircraftControlSurfaces, Force, ForceCategory, FullAircraftConfig, Moment,
-    PhysicsComponent, ReferenceFrame, SpatialComponent,
+    AirData, AircraftAeroCoefficients, AircraftControlSurfaces, AircraftGeometry, Force,
+    ForceCategory, FullAircraftConfig, Moment, PhysicsComponent, ReferenceFrame, SpatialComponent,
 };
 use crate::resources::AerodynamicsConfig;
 
-/// System for calculating aerodynamic forces and moments acting on aircraft.
+// Assuming AirDataValues is defined elsewhere (e.g., air_data.rs or calculate.rs)
+// use crate::aerodynamics::air_data::AirDataValues;
+// Placeholder definition if not imported:
+#[derive(Debug, Clone, Default)]
+pub struct AirDataValues {
+    pub true_airspeed: f64,
+    pub alpha: f64,
+    pub beta: f64,
+    pub density: f64,
+    pub dynamic_pressure: f64,
+    pub relative_velocity_body: Vector3<f64>,
+}
+
+// --- Pure Calculation Logic ---
+
+/// Calculates aerodynamic forces and moments in the BODY frame based on aircraft state.
+/// This is the "pure function" part.
 ///
-/// This system computes the aerodynamic forces and moments based on the aircraft's geometry,
-/// aerodynamic coefficients, control surface inputs, air data, and spatial properties. The
-/// results are added to the aircraft's physics component.
+/// # Arguments
+/// * `geometry` - Aircraft geometric properties.
+/// * `coeffs` - Aircraft aerodynamic coefficients.
+/// * `air_data` - Calculated air data values (airspeed, alpha, beta, q, etc.).
+/// * `angular_velocity_body` - Rotational rates in the body frame (p, q, r).
+/// * `controls` - Current control surface deflections.
+///
+/// # Returns
+/// A tuple containing: `(body_forces: Vector3<f64>, body_moments: Vector3<f64>)`
+pub fn calculate_aerodynamic_forces_moments(
+    geometry: &AircraftGeometry,
+    coeffs: &AircraftAeroCoefficients,
+    air_data: &AirDataValues,
+    angular_velocity_body: &Vector3<f64>,
+    controls: &AircraftControlSurfaces,
+) -> (Vector3<f64>, Vector3<f64>) {
+    // Early exit if no dynamic pressure or very low airspeed
+    if air_data.dynamic_pressure <= 1e-6 || air_data.true_airspeed <= 0.1 {
+        return (Vector3::zeros(), Vector3::zeros());
+    }
+
+    // --- Replicate logic from AersoAdapter::compute_forces ---
+    // Get necessary values from air_data struct
+    let alpha = air_data.alpha;
+    let beta = air_data.beta;
+    let q_dyn = air_data.dynamic_pressure; // Dynamic pressure 'q'
+
+    // Clamp angles and rates to valid ranges (using example values from original code)
+    let alpha = alpha.clamp(-10.0 * PI / 180.0, 40.0 * PI / 180.0);
+    let beta = beta.clamp(-20.0 * PI / 180.0, 20.0 * PI / 180.0);
+    let p = angular_velocity_body
+        .x
+        .clamp(-100.0 * PI / 180.0, 100.0 * PI / 180.0);
+    let q = angular_velocity_body
+        .y
+        .clamp(-50.0 * PI / 180.0, 50.0 * PI / 180.0);
+    let r = angular_velocity_body
+        .z
+        .clamp(-50.0 * PI / 180.0, 50.0 * PI / 180.0);
+
+    // Calculate non-dimensional rates (p_hat, q_hat, r_hat)
+    // (Using the ft conversion from original code - review if this is necessary)
+    const M_TO_FT: f64 = 3.28084;
+    let airspeed_fps = air_data.true_airspeed * M_TO_FT;
+    let span_ft = geometry.wing_span * M_TO_FT;
+    let mac_ft = geometry.mac * M_TO_FT;
+    let v_denom_ft = 2.0 * airspeed_fps + 1e-9; // Add epsilon for stability at low speed
+    let p_hat = (span_ft / v_denom_ft) * p;
+    let q_hat = (mac_ft / v_denom_ft) * q;
+    let r_hat = (span_ft / v_denom_ft) * r;
+
+    // --- Calculate Aerodynamic Coefficients (CD, CY, CL, Cl, Cm, Cn) ---
+    // (This section directly copies the coefficient calculations from the original AersoAdapter)
+    let c_d = coeffs.drag.c_d_0
+        + (coeffs.drag.c_d_alpha * alpha)
+        + (coeffs.drag.c_d_alpha_q * alpha * q_hat)
+        + (coeffs.drag.c_d_alpha_deltae * alpha * controls.elevator)
+        + (coeffs.drag.c_d_alpha2 * alpha.powi(2))
+        + (coeffs.drag.c_d_alpha2_q * q_hat * alpha.powi(2))
+        + (coeffs.drag.c_d_alpha2_deltae * controls.elevator * alpha.powi(2))
+        + (coeffs.drag.c_d_alpha3 * alpha.powi(3))
+        + (coeffs.drag.c_d_alpha3_q * q_hat * alpha.powi(3))
+        + (coeffs.drag.c_d_alpha4 * alpha.powi(4));
+
+    let c_y = coeffs.side_force.c_y_beta * beta
+        + (coeffs.side_force.c_y_p * p_hat)
+        + (coeffs.side_force.c_y_r * r_hat)
+        + (coeffs.side_force.c_y_deltaa * controls.aileron)
+        + (coeffs.side_force.c_y_deltar * controls.rudder);
+
+    let c_l = coeffs.lift.c_l_0
+        + (coeffs.lift.c_l_alpha * alpha)
+        + (coeffs.lift.c_l_q * q_hat)
+        + (coeffs.lift.c_l_deltae * controls.elevator)
+        + (coeffs.lift.c_l_alpha_q * alpha * q_hat)
+        + (coeffs.lift.c_l_alpha2 * alpha.powi(2))
+        + (coeffs.lift.c_l_alpha3 * alpha.powi(3))
+        + (coeffs.lift.c_l_alpha4 * alpha.powi(4));
+
+    let c_l_roll = coeffs.roll.c_l_beta * beta // Roll moment coefficient 'Cl'
+        + (coeffs.roll.c_l_p * p_hat)
+        + (coeffs.roll.c_l_r * r_hat)
+        + (coeffs.roll.c_l_deltaa * controls.aileron)
+        + (coeffs.roll.c_l_deltar * controls.rudder);
+
+    let c_m = coeffs.pitch.c_m_0             // Pitch moment coefficient 'Cm'
+        + (coeffs.pitch.c_m_alpha * alpha)
+        + (coeffs.pitch.c_m_q * q_hat)
+        + (coeffs.pitch.c_m_deltae * controls.elevator)
+        + (coeffs.pitch.c_m_alpha_q * alpha * q_hat)
+        + (coeffs.pitch.c_m_alpha2_q * q_hat * alpha.powi(2))
+        + (coeffs.pitch.c_m_alpha2_deltae * controls.elevator * alpha.powi(2))
+        + (coeffs.pitch.c_m_alpha3_q * q_hat * alpha.powi(3))
+        + (coeffs.pitch.c_m_alpha3_deltae * controls.elevator * alpha.powi(3))
+        + (coeffs.pitch.c_m_alpha4 * alpha.powi(4));
+
+    let c_n = coeffs.yaw.c_n_beta * beta     // Yaw moment coefficient 'Cn'
+        + (coeffs.yaw.c_n_p * p_hat)
+        + (coeffs.yaw.c_n_r * r_hat)
+        + (coeffs.yaw.c_n_deltaa * controls.aileron)
+        + (coeffs.yaw.c_n_deltar * controls.rudder)
+        + (coeffs.yaw.c_n_beta2 * beta.powi(2))
+        + (coeffs.yaw.c_n_beta3 * beta.powi(3));
+
+    // --- Calculate Forces (Body Frame) ---
+    // Standard aero axes convention: Fx (drag is neg), Fy (sideforce), Fz (lift is neg)
+    let forces_body = Vector3::new(
+        -q_dyn * geometry.wing_area * c_d, // Drag opposes positive X
+        q_dyn * geometry.wing_area * c_y,  // Sideforce along positive Y
+        -q_dyn * geometry.wing_area * c_l, // Lift opposes positive Z (points up)
+    );
+
+    // --- Calculate Moments (Body Frame) ---
+    // Standard aero axes convention: L (roll), M (pitch), N (yaw)
+    let moments_body = Vector3::new(
+        q_dyn * geometry.wing_area * geometry.wing_span * c_l_roll, // Roll Moment (L) about X axis
+        q_dyn * geometry.wing_area * geometry.mac * c_m,            // Pitch Moment (M) about Y axis
+        q_dyn * geometry.wing_area * geometry.wing_span * c_n,      // Yaw Moment (N) about Z axis
+    );
+
+    (forces_body, moments_body)
+}
+
+/// System for calculating aerodynamic forces and moments acting on aircraft.
+/// Queries components, calls the pure calculation function, updates PhysicsComponent.
 pub fn aero_force_system(
     mut aircraft: Query<(
         &AircraftControlSurfaces,
-        &AirData,
+        &AirData, // Query the component to get input values
         &SpatialComponent,
-        &mut PhysicsComponent,
-        &FullAircraftConfig,
+        &mut PhysicsComponent, // Need mutable access to add forces/moments
+        &FullAircraftConfig,   // Contains geometry and coefficients
     )>,
-    aero_config: Res<AerodynamicsConfig>,
+    aero_config: Res<AerodynamicsConfig>, // Keep config for threshold check
 ) {
     // println!("Running Aero Force System!");
-    for (controls, air_data, spatial, mut physics, config) in aircraft.iter_mut() {
-        calculate_and_apply_aero_forces(
-            controls,
-            air_data,
-            spatial,
-            &mut physics,
-            config,
-            &aero_config,
+    for (controls, air_data_comp, spatial, mut physics, config) in aircraft.iter_mut() {
+        // 1. Perform pre-checks (e.g., airspeed threshold)
+        if air_data_comp.true_airspeed < aero_config.min_airspeed_threshold {
+            // If skipping calculation, ensure any previous aero forces are cleared
+            // to prevent stale forces from persisting.
+            physics
+                .forces
+                .retain(|f| f.category != ForceCategory::Aerodynamic);
+            physics
+                .moments
+                .retain(|m| m.category != ForceCategory::Aerodynamic);
+            continue; // Skip this entity if below threshold
+        }
+
+        // 2. Prepare inputs for the pure calculation function
+        // Create the simple AirDataValues struct from the component fields
+        // Assumes air_data_system ran before this system in the Bevy schedule
+        let air_data_values = AirDataValues {
+            true_airspeed: air_data_comp.true_airspeed,
+            alpha: air_data_comp.alpha,
+            beta: air_data_comp.beta,
+            density: air_data_comp.density,
+            dynamic_pressure: air_data_comp.dynamic_pressure,
+            relative_velocity_body: air_data_comp.relative_velocity,
+        };
+
+        // 3. Call the pure calculation function
+        let (forces_body, moments_body) = calculate_aerodynamic_forces_moments(
+            &config.geometry,          // Pass geometry ref from config
+            &config.aero_coef,         // Pass aero coefficients ref from config
+            &air_data_values,          // Pass the prepared air data values struct
+            &spatial.angular_velocity, // Pass body-frame angular velocity from spatial
+            controls,                  // Pass controls state ref
         );
+
+        // 4. Update the PhysicsComponent
+        // Clear existing aerodynamic forces/moments first
+        physics
+            .forces
+            .retain(|f| f.category != ForceCategory::Aerodynamic);
+        physics
+            .moments
+            .retain(|m| m.category != ForceCategory::Aerodynamic);
+
+        // Add the newly calculated force/moment if they are significant
+        // Use a small threshold to avoid adding negligible floating point noise
+        if forces_body.norm_squared() > 1e-9 {
+            physics.add_force(Force {
+                vector: forces_body,
+                point: None, // Aerodynamic forces typically applied at Aerodynamic Center, but often simplified to CG
+                frame: ReferenceFrame::Body, // The function calculates in Body frame
+                category: ForceCategory::Aerodynamic,
+            });
+        }
+        if moments_body.norm_squared() > 1e-9 {
+            physics.add_moment(Moment {
+                vector: moments_body,
+                frame: ReferenceFrame::Body, // The function calculates in Body frame
+                category: ForceCategory::Aerodynamic,
+            });
+        }
     }
-}
-
-/// Core aerodynamic calculation function that doesn't depend on Bevy ECS
-/// Can be used both from the system and directly from tests
-pub fn calculate_and_apply_aero_forces(
-    controls: &AircraftControlSurfaces,
-    air_data: &AirData,
-    spatial: &SpatialComponent,
-    physics: &mut PhysicsComponent,
-    config: &FullAircraftConfig,
-    aero_config: &AerodynamicsConfig,
-) {
-    // Early return if airspeed is below threshold
-    if air_data.true_airspeed < aero_config.min_airspeed_threshold {
-        return;
-    }
-
-    // Create adapter outside of the calculation
-    let adapter = AersoAdapter::new(config.geometry.clone(), config.aero_coef.clone());
-
-    // Collect all necessary data before calculation
-    let aero_forces = prepare_aero_forces(&adapter, controls, air_data, spatial);
-    // println!("Forces Config: {:?}", config);
-
-    // Clear existing aerodynamic forces and moments before adding new ones
-    physics
-        .forces
-        .retain(|force| force.category != ForceCategory::Aerodynamic);
-    physics
-        .moments
-        .retain(|moment| moment.category != ForceCategory::Aerodynamic);
-
-    // Apply the calculated forces and moments
-    apply_aero_forces(physics, aero_forces);
-}
-
-/// Represents the calculated aerodynamic forces and moments
-struct AeroForces {
-    force: Force,
-    moment: Moment,
-}
-
-/// Prepares aerodynamic forces and moments without mutating any state
-fn prepare_aero_forces(
-    adapter: &AersoAdapter,
-    control_surfaces: &AircraftControlSurfaces,
-    air_data: &AirData,
-    spatial: &SpatialComponent,
-) -> AeroForces {
-    let air_state = AirState {
-        alpha: air_data.alpha,
-        beta: air_data.beta,
-        airspeed: air_data.true_airspeed,
-        q: air_data.dynamic_pressure,
-    };
-
-    let input = vec![
-        control_surfaces.aileron,
-        control_surfaces.elevator,
-        control_surfaces.rudder,
-        control_surfaces.power_lever,
-    ];
-
-    let (aero_force, aero_torque) = adapter.get_effect(air_state, spatial.angular_velocity, &input);
-
-    let force_vector = match aero_force.frame {
-        aerso::types::Frame::Body => aero_force.force,
-        aerso::types::Frame::World => spatial.attitude.inverse() * aero_force.force,
-    };
-
-    AeroForces {
-        force: Force {
-            vector: force_vector,
-            point: None,
-            frame: ReferenceFrame::Body,
-            category: ForceCategory::Aerodynamic,
-        },
-        moment: Moment {
-            vector: aero_torque.torque,
-            frame: ReferenceFrame::Body,
-            category: ForceCategory::Aerodynamic,
-        },
-    }
-}
-
-/// Applies the calculated forces and moments to the physics component
-fn apply_aero_forces(physics: &mut PhysicsComponent, aero_forces: AeroForces) {
-    physics.add_force(aero_forces.force);
-    physics.add_moment(aero_forces.moment);
 }
 
 #[cfg(test)]
@@ -422,7 +524,11 @@ mod tests {
                 density: 1.225,
                 alpha: angle_rad,
                 beta: 0.0,
-                relative_velocity: Vector3::new(speed * angle_rad.cos(), 0.0, -speed * angle_rad.sin()),
+                relative_velocity: Vector3::new(
+                    speed * angle_rad.cos(),
+                    0.0,
+                    -speed * angle_rad.sin(),
+                ),
                 wind_velocity: Vector3::zeros(),
             };
 
@@ -509,8 +615,8 @@ mod tests {
                 aileron: 0.0,
                 rudder: 0.0,
                 expected_moment_x: |m| m.abs() < 1.0, // No significant roll
-                expected_moment_y: |m| m.abs() > 10000.0,  // Large pitch moment with sign check below
-                expected_moment_z: |m| m.abs() < 1.0, // No significant yaw
+                expected_moment_y: |m| m.abs() > 10000.0, // Large pitch moment with sign check below
+                expected_moment_z: |m| m.abs() < 1.0,     // No significant yaw
             },
             TestCase {
                 name: "elevator_down",
@@ -518,8 +624,8 @@ mod tests {
                 aileron: 0.0,
                 rudder: 0.0,
                 expected_moment_x: |m| m.abs() < 1.0, // No significant roll
-                expected_moment_y: |m| m.abs() > 10000.0,  // Large pitch moment with sign check below
-                expected_moment_z: |m| m.abs() < 1.0, // No significant yaw
+                expected_moment_y: |m| m.abs() > 10000.0, // Large pitch moment with sign check below
+                expected_moment_z: |m| m.abs() < 1.0,     // No significant yaw
             },
             TestCase {
                 name: "aileron_right",
@@ -534,16 +640,16 @@ mod tests {
                 name: "rudder_right",
                 elevator: 0.0,
                 aileron: 0.0,
-                rudder: 0.3,                           // Positive rudder (yaw right)
-                expected_moment_x: |m| m.abs() > 10.0, // Some roll due to rudder
+                rudder: 0.3,                             // Positive rudder (yaw right)
+                expected_moment_x: |m| m.abs() > 10.0,   // Some roll due to rudder
                 expected_moment_y: |m| m.abs() < 5000.0, // Minimal pitch
-                expected_moment_z: |m| m.abs() > 1000.0,  // Significant yaw moment
+                expected_moment_z: |m| m.abs() > 1000.0, // Significant yaw moment
             },
         ];
 
         // Set a standard flight condition
         let speed = 70.0;
-        
+
         // Create aircraft config with realistic coefficients
         let config = FullAircraftConfig {
             name: "test_aircraft".to_string(),
@@ -689,7 +795,7 @@ mod tests {
 
         // Initial flight condition
         let speed = 80.0;
-        
+
         // Create aircraft config with realistic coefficients
         let config = FullAircraftConfig {
             name: "test_aircraft".to_string(),
@@ -763,7 +869,7 @@ mod tests {
             {
                 // Convert body force to inertial frame for validation
                 let inertial_force = spatial.attitude * aero_force.vector;
-                
+
                 println!(
                     "Attitude '{}': roll={:.1}°, pitch={:.1}°, yaw={:.1}°",
                     test.name,
@@ -780,7 +886,7 @@ mod tests {
                     aero_force.vector.iter().all(|v| v.is_finite()),
                     "Forces should remain finite"
                 );
-                
+
                 assert!(
                     inertial_force.iter().all(|v| v.is_finite()),
                     "Inertial forces should remain finite"
@@ -797,7 +903,7 @@ mod tests {
         // - Control surface deflections
         // - Non-zero angular rates
         let speed = 60.0;
-        
+
         // Create aircraft config with realistic coefficients
         let config = FullAircraftConfig {
             name: "test_aircraft".to_string(),
@@ -829,7 +935,7 @@ mod tests {
 
         // Set angles
         let alpha = 8.0 * PI / 180.0; // 8 degrees AoA
-        let beta = 5.0 * PI / 180.0;  // 5 degrees sideslip
+        let beta = 5.0 * PI / 180.0; // 5 degrees sideslip
 
         // Create air data
         let air_data = AirData {
