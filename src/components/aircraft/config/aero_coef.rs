@@ -182,6 +182,17 @@ impl AircraftAeroCoefficients {
             YawCoefficients::generic_transport(),
         )
     }
+
+    pub fn cessna_172() -> AircraftAeroCoefficients {
+        AircraftAeroCoefficients::new(
+            DragCoefficients::cessna_172(),
+            LiftCoefficients::cessna_172(),
+            SideForceCoefficients::cessna_172(),
+            RollCoefficients::cessna_172(),
+            PitchCoefficients::cessna_172(),
+            YawCoefficients::cessna_172(),
+        )
+    }
 }
 
 impl DragCoefficients {
@@ -192,7 +203,7 @@ impl DragCoefficients {
             c_d_alpha_q: -54.05,
             c_d_alpha_deltae: 0.111,
             c_d_alpha2: 2.988,
-            c_d_alpha2_q: 302.1,
+            c_d_alpha2_q: -302.1,
             c_d_alpha2_deltae: 0.156,
             c_d_alpha3: -7.743,
             c_d_alpha3_q: -218.8,
@@ -227,6 +238,21 @@ impl DragCoefficients {
             c_d_alpha3: 1.819,
             c_d_alpha3_q: 355.3,
             c_d_alpha4: -6.563,
+        }
+    }
+
+    pub fn cessna_172() -> DragCoefficients {
+        DragCoefficients {
+            c_d_0: 0.05,
+            c_d_alpha: 0.0,
+            c_d_alpha_q: 0.0,
+            c_d_alpha_deltae: 0.0,
+            c_d_alpha2: 0.0,
+            c_d_alpha2_q: 0.0,
+            c_d_alpha2_deltae: 0.0,
+            c_d_alpha3: 0.0,
+            c_d_alpha3_q: 0.0,
+            c_d_alpha4: 0.0,
         }
     }
 }
@@ -270,6 +296,19 @@ impl LiftCoefficients {
             c_l_alpha4: 46.13,
         }
     }
+
+    pub fn cessna_172() -> LiftCoefficients {
+        LiftCoefficients {
+            c_l_0: 0.3,
+            c_l_alpha: 4.0,
+            c_l_q: 0.0,
+            c_l_deltae: 0.0,
+            c_l_alpha_q: 0.0,
+            c_l_alpha2: 0.0,
+            c_l_alpha3: 0.0,
+            c_l_alpha4: 0.0,
+        }
+    }
 }
 
 impl SideForceCoefficients {
@@ -302,6 +341,16 @@ impl SideForceCoefficients {
             c_y_deltar: 0.253,
         }
     }
+
+    pub fn cessna_172() -> SideForceCoefficients {
+        SideForceCoefficients {
+            c_y_beta: -0.5,
+            c_y_p: 0.0,
+            c_y_r: 0.0,
+            c_y_deltaa: -0.0,
+            c_y_deltar: 0.0,
+        }
+    }
 }
 
 impl RollCoefficients {
@@ -332,6 +381,16 @@ impl RollCoefficients {
             c_l_r: 0.061,
             c_l_deltaa: 0.079,
             c_l_deltar: 0.021,
+        }
+    }
+
+    pub fn cessna_172() -> RollCoefficients {
+        RollCoefficients {
+            c_l_beta: -0.1,
+            c_l_p: -0.5,
+            c_l_r: 0.0,
+            c_l_deltaa: 0.2,
+            c_l_deltar: 0.0,
         }
     }
 }
@@ -381,6 +440,21 @@ impl PitchCoefficients {
             c_m_alpha4: 0.803,
         }
     }
+
+    pub fn cessna_172() -> PitchCoefficients {
+        PitchCoefficients {
+            c_m_0: 0.0,
+            c_m_alpha: 2.0,
+            c_m_q: 0.0,
+            c_m_deltae: -2.0,
+            c_m_alpha_q: 0.0,
+            c_m_alpha2_q: 0.0,
+            c_m_alpha2_deltae: 0.0,
+            c_m_alpha3_q: 0.0,
+            c_m_alpha3_deltae: 0.0,
+            c_m_alpha4: 0.0,
+        }
+    }
 }
 
 impl YawCoefficients {
@@ -390,7 +464,7 @@ impl YawCoefficients {
             c_n_p: -0.043,
             c_n_r: -0.426,
             c_n_deltaa: 0.023,
-            c_n_deltar: 0.087,
+            c_n_deltar: -0.087,
             c_n_beta2: 0.337,
             c_n_beta3: -0.766,
         }
@@ -417,6 +491,18 @@ impl YawCoefficients {
             c_n_deltar: 0.129,
             c_n_beta2: 0.184,
             c_n_beta3: -0.377,
+        }
+    }
+
+    pub fn cessna_172() -> YawCoefficients {
+        YawCoefficients {
+            c_n_beta: 0.1,
+            c_n_p: 0.0,
+            c_n_r: -0.15,
+            c_n_deltaa: 0.0,
+            c_n_deltar: 0.0,
+            c_n_beta2: 0.0,
+            c_n_beta3: 0.0,
         }
     }
 }
