@@ -13,14 +13,14 @@ use std::{fs::File, io::Write};
 
 fn main() {
     println!("Testing trim convergence for straight and level flight");
-    
+
     let mut app = App::new();
     app.add_plugins(MinimalPlugins)
         .add_plugins(PhysicsPlugin::with_config(PhysicsConfig::default()))
         .add_plugins(EnvironmentPlugin::new());
 
     let mut virtual_physics = VirtualPhysics::new(&PhysicsConfig::default());
-    
+
     // Configure trim solver with optimized settings
     let solver_config = TrimSolverConfig {
         max_iterations: 100,
@@ -42,18 +42,16 @@ fn main() {
     // Test various trim configurations
     let trim_configs = vec![
         // Initial exploratory tests
-        (-0.02, 0.60, -0.05),  // Slightly nose down, moderate power, elevator up
-        (-0.01, 0.55, -0.03),  // Near level, moderate power, slight elevator up
-        (0.00, 0.50, 0.00),    // Level, moderate power, neutral elevator
-        (0.01, 0.45, 0.02),    // Slightly nose up, lower power, slight elevator down
-        
+        (-0.02, 0.60, -0.05), // Slightly nose down, moderate power, elevator up
+        (-0.01, 0.55, -0.03), // Near level, moderate power, slight elevator up
+        (0.00, 0.50, 0.00),   // Level, moderate power, neutral elevator
+        (0.01, 0.45, 0.02),   // Slightly nose up, lower power, slight elevator down
         // Previous tests suggested around here
-        (0.03, 0.51, -0.01),   // Small positive alpha, moderate power, slight elevator up
-        (-0.01, 0.56, -0.02),  // Small negative alpha, moderate power, slight elevator up
-        
+        (0.03, 0.51, -0.01), // Small positive alpha, moderate power, slight elevator up
+        (-0.01, 0.56, -0.02), // Small negative alpha, moderate power, slight elevator up
         // Based on optimizer outputs
-        (-0.08, 0.75, -0.05),  // Negative alpha, higher power, elevator up
-        (-0.10, 0.80, -0.06),  // More negative alpha, higher power, elevator up
+        (-0.08, 0.75, -0.05), // Negative alpha, higher power, elevator up
+        (-0.10, 0.80, -0.06), // More negative alpha, higher power, elevator up
     ];
 
     // Store the best configurations
@@ -63,13 +61,17 @@ fn main() {
 
     println!("\nEvaluating potential trim solutions:");
     println!("-------------------------------------");
-    
+
     for (i, &(alpha, throttle, elevator)) in trim_configs.iter().enumerate() {
-        println!("\nTest Configuration #{}: ", i+1);
-        println!("  Alpha: {:.2}° ({:.3} rad)", (alpha as f64).to_degrees(), alpha);
+        println!("\nTest Configuration #{}: ", i + 1);
+        println!(
+            "  Alpha: {:.2}° ({:.3} rad)",
+            (alpha as f64).to_degrees(),
+            alpha
+        );
         println!("  Throttle: {:.3}", throttle);
         println!("  Elevator: {:.3}", elevator);
-        
+
         // Analyze the trim point in detail
         let results = analyze_trim_point_detailed(
             &mut virtual_physics,
@@ -78,9 +80,9 @@ fn main() {
             elevator,
             &solver_config,
         );
-        
+
         println!("  Trim cost: {:.6}", results.cost);
-        
+
         // Track the best trim solution
         if results.cost < lowest_cost {
             lowest_cost = results.cost;
@@ -88,109 +90,149 @@ fn main() {
             best_results = Some(results);
         }
     }
-    
+
     // Analyze the best configuration in detail
     println!("\n\n=== BEST TRIM SOLUTION ===");
-    println!("Alpha: {:.2}° ({:.3} rad)", (best_config.0 as f64).to_degrees(), best_config.0);
+    println!(
+        "Alpha: {:.2}° ({:.3} rad)",
+        (best_config.0 as f64).to_degrees(),
+        best_config.0
+    );
     println!("Throttle: {:.3}", best_config.1);
     println!("Elevator: {:.3}", best_config.2);
     println!("Cost: {:.6}", lowest_cost);
-    
+
     let best_result = best_results.unwrap();
-    
+
     println!("\nForce Balance:");
-    println!("  Vertical force: {:.6} (target: 0)", best_result.residuals.vertical_force);
-    println!("  Horizontal force: {:.6} (target: 0)", best_result.residuals.horizontal_force);
-    println!("  Pitch moment: {:.6} (target: 0)", best_result.residuals.pitch_moment);
-    println!("  Flight path angle: {:.3}° (target: 0°)", best_result.residuals.gamma_error.to_degrees());
-    
+    println!(
+        "  Vertical force: {:.6} (target: 0)",
+        best_result.residuals.vertical_force
+    );
+    println!(
+        "  Horizontal force: {:.6} (target: 0)",
+        best_result.residuals.horizontal_force
+    );
+    println!(
+        "  Pitch moment: {:.6} (target: 0)",
+        best_result.residuals.pitch_moment
+    );
+    println!(
+        "  Flight path angle: {:.3}° (target: 0°)",
+        best_result.residuals.gamma_error.to_degrees()
+    );
+
     // Extended stability simulation for the best config
     println!("\nRunning extended stability simulation...");
     let (forces, moments, states) = simulate_trim_point(
         &mut virtual_physics,
         best_config.0,
         best_config.1,
-        best_config.2
+        best_config.2,
     );
-    
+
     // Calculate stability metrics
     let velocity_variations: Vec<f64> = states
         .windows(2)
         .map(|w| (w[1].0.velocity - w[0].0.velocity).norm())
         .collect();
-    
+
     let mean_variation = velocity_variations.iter().sum::<f64>() / velocity_variations.len() as f64;
     let max_variation = velocity_variations.iter().fold(0.0f64, |a, &b| a.max(b));
-    
+
     println!("Stability metrics:");
     println!("  Mean velocity variation: {:.6}", mean_variation);
     println!("  Max velocity variation: {:.6}", max_variation);
-    
+
     // Calculate final mean forces and moments
     let mean_forces = forces.iter().sum::<Vector3<f64>>() / forces.len() as f64;
     let mean_moments = moments.iter().sum::<Vector3<f64>>() / moments.len() as f64;
-    
+
     // Get final state
     let final_state = states.last().unwrap();
     let (roll, pitch, yaw) = final_state.0.attitude.euler_angles();
     let flight_path = (-final_state.0.velocity.z / final_state.0.velocity.x).atan();
-    
+
     println!("\nFinal state after extended simulation:");
     println!("  Roll: {:.3}°", roll.to_degrees());
     println!("  Pitch: {:.3}°", pitch.to_degrees());
     println!("  Yaw: {:.3}°", yaw.to_degrees());
     println!("  Flight path: {:.3}°", flight_path.to_degrees());
     println!("  Airspeed: {:.1} m/s", final_state.0.velocity.norm());
-    
+
     // Verify the trim solution meets our criteria
     let aircraft_config = FullAircraftConfig::default();
     let characteristic_force = aircraft_config.mass.mass * 9.81;
     let characteristic_moment = characteristic_force * aircraft_config.geometry.wing_span;
-    
+
     // Normalize for assertions
     let norm_vf = mean_forces.z / characteristic_force;
     let norm_hf = mean_forces.x / characteristic_force;
     let norm_pm = mean_moments.y / characteristic_moment;
-    
+
     println!("\nVerification of trim constraints:");
-    
+
     // Vertical force (lift balances weight)
     let vf_ok = norm_vf.abs() < 0.1;
-    println!("  ✓ Vertical force balance: {:.4} ({}) - should be near 0.0", 
-             norm_vf, if vf_ok { "PASS" } else { "FAIL" });
-    
+    println!(
+        "  ✓ Vertical force balance: {:.4} ({}) - should be near 0.0",
+        norm_vf,
+        if vf_ok { "PASS" } else { "FAIL" }
+    );
+
     // Horizontal force (thrust balances drag)
-    let hf_ok = norm_hf.abs() < 0.2;  // More tolerance for horizontal equilibrium
-    println!("  ✓ Horizontal force balance: {:.4} ({}) - should be near 0.0", 
-             norm_hf, if hf_ok { "PASS" } else { "FAIL" });
-    
+    let hf_ok = norm_hf.abs() < 0.2; // More tolerance for horizontal equilibrium
+    println!(
+        "  ✓ Horizontal force balance: {:.4} ({}) - should be near 0.0",
+        norm_hf,
+        if hf_ok { "PASS" } else { "FAIL" }
+    );
+
     // Pitch moment (nose-up/down torque)
     let pm_ok = norm_pm.abs() < 0.01;
-    println!("  ✓ Pitch moment balance: {:.4} ({}) - should be near 0.0", 
-             norm_pm, if pm_ok { "PASS" } else { "FAIL" });
-    
+    println!(
+        "  ✓ Pitch moment balance: {:.4} ({}) - should be near 0.0",
+        norm_pm,
+        if pm_ok { "PASS" } else { "FAIL" }
+    );
+
     // Flight path (straight)
     let fp_ok = flight_path.abs().to_degrees() < 2.0;
-    println!("  ✓ Flight path angle: {:.3}° ({}) - should be near 0.0°", 
-             flight_path.to_degrees(), if fp_ok { "PASS" } else { "FAIL" });
-    
+    println!(
+        "  ✓ Flight path angle: {:.3}° ({}) - should be near 0.0°",
+        flight_path.to_degrees(),
+        if fp_ok { "PASS" } else { "FAIL" }
+    );
+
     // Roll angle (level)
     let roll_ok = roll.abs().to_degrees() < 1.0;
-    println!("  ✓ Roll angle: {:.3}° ({}) - should be near 0.0°", 
-             roll.to_degrees(), if roll_ok { "PASS" } else { "FAIL" });
-    
+    println!(
+        "  ✓ Roll angle: {:.3}° ({}) - should be near 0.0°",
+        roll.to_degrees(),
+        if roll_ok { "PASS" } else { "FAIL" }
+    );
+
     // Overall assessment
     let trim_ok = vf_ok && hf_ok && pm_ok && fp_ok && roll_ok;
-    println!("\nTrim solution is {}!", if trim_ok { "VALID" } else { "INVALID" });
-    
+    println!(
+        "\nTrim solution is {}!",
+        if trim_ok { "VALID" } else { "INVALID" }
+    );
+
     // Save results to file for visualization
     let mut file = File::create("trim_verification.csv").unwrap();
     writeln!(
         file,
         "step,time,force_x,force_y,force_z,moment_x,moment_y,moment_z,vx,vy,vz,roll,pitch,yaw"
-    ).unwrap();
-    
-    for (i, ((force, moment), state)) in forces.iter().zip(moments.iter()).zip(states.iter()).enumerate() {
+    )
+    .unwrap();
+
+    for (i, ((force, moment), state)) in forces
+        .iter()
+        .zip(moments.iter())
+        .zip(states.iter())
+        .enumerate()
+    {
         let (roll, pitch, yaw) = state.0.attitude.euler_angles();
         writeln!(
             file,
@@ -209,9 +251,10 @@ fn main() {
             roll.to_degrees(),
             pitch.to_degrees(),
             yaw.to_degrees()
-        ).unwrap();
+        )
+        .unwrap();
     }
-    
+
     println!("\nDetailed results saved to trim_verification.csv");
 }
 
@@ -425,20 +468,5 @@ fn analyze_trim_point_detailed(
     TrimAnalysisResult {
         cost: constrained_cost,
         residuals,
-    }
-}
-
-fn create_cost_landscape(virtual_physics: &mut VirtualPhysics, solver_config: &TrimSolverConfig) {
-    let mut file = File::create("trim_cost_landscape.csv").unwrap();
-    // Add CSV header...
-
-    // Create a finer mesh around promising regions
-    for &alpha in &[-0.05f64, 0.0, 0.05, 0.1] {
-        for elevator in (0..30).map(|i| -0.3 + (i as f64) * 0.02) {
-            for throttle in (0..30).map(|i| 0.3 + (i as f64) * 0.02) {
-                // Simulate and analyze point...
-                // Write results to CSV...
-            }
-        }
     }
 }
