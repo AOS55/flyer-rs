@@ -12,7 +12,6 @@ pub fn handle_trim_requests(mut commands: Commands, mut trim_requests: EventRead
 
         commands.entity(request.entity).insert(NeedsTrim {
             condition: request.condition,
-            solver: None,
             stage: initial_stage,
         });
     }
