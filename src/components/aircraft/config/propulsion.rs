@@ -100,4 +100,17 @@ impl PropulsionConfig {
         };
         Self::twin_engine(base_engine, 1.0, -1.0, 0.0)
     }
+    
+    pub fn cessna_172() -> Self {
+        let engine = PowerplantConfig {
+            name: "Lycoming O-320".to_string(),
+            max_thrust: 3000.0,      // N - Simplified single value
+            min_thrust: 0.0,         // N
+            tsfc: 0.3 / 3600.0,      // kg/(N·s)
+            spool_up_time: 1.0,      // s
+            spool_down_time: 1.0,    // s
+            ..Default::default()
+        };
+        Self::single_engine(engine)  // Single engine config
+    }
 }

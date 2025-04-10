@@ -101,6 +101,16 @@ impl FullAircraftConfig {
                 start_config: StartConfig::default(),
                 task_config: TaskType::default(),
             },
+            AircraftType::Cessna172 => Self {
+                name: "Cessna172".to_string(),
+                ac_type: AircraftType::Cessna172,
+                mass: MassModel::cessna_172(),
+                geometry: AircraftGeometry::cessna_172(),
+                aero_coef: AircraftAeroCoefficients::cessna_172(),
+                propulsion: PropulsionConfig::cessna_172(),
+                start_config: StartConfig::default(),
+                task_config: TaskType::default(),
+            },
             AircraftType::Custom(string) => Self {
                 name: string.clone(),
                 ac_type: AircraftType::Custom(string),
@@ -160,6 +170,10 @@ impl FullAircraftConfig {
     pub fn generic_transport() -> Self {
         Self::from_programmed(AircraftType::GenericTransport)
     }
+
+    pub fn cessna172() -> Self {
+        Self::from_programmed(AircraftType::Cessna172)
+    }
 }
 
 /// Source for aircraft configuration.
@@ -176,6 +190,7 @@ pub enum AircraftType {
     TwinOtter,
     F4Phantom,
     GenericTransport,
+    Cessna172,
     Custom(String),
 }
 
@@ -189,6 +204,7 @@ impl AircraftType {
             AircraftType::TwinOtter => "aircraft/twin_otter.png",
             AircraftType::F4Phantom => "aircraft/f4_phantom.png",
             AircraftType::GenericTransport => "aircraft/generic_transport.png",
+            AircraftType::Cessna172 => "aircraft/generic_transport.png", // Reuse generic texture for now
             AircraftType::Custom(path) => path,
         }
     }
