@@ -26,5 +26,5 @@ pub use tasks::{TaskComponent, TaskType};
 pub use trim::{
     LateralBounds, LateralResiduals, LateralTrimState, LongitudinalBounds, LongitudinalResiduals,
     LongitudinalTrimState, NeedsTrim, TrimBounds, TrimCondition, TrimRequest, TrimResiduals,
-    TrimResult, TrimSolver, TrimSolverConfig, TrimStage, TrimState,
+    TrimResult, TrimSolverConfig, TrimStage, TrimState,
 };

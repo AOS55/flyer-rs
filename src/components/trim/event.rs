@@ -1,6 +1,6 @@
 use bevy::prelude::*;
 
-use crate::components::{TrimCondition, TrimSolver};
+use crate::components::TrimCondition;
 
 #[derive(Component)]
 pub struct NeedsTrim {
