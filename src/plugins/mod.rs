@@ -10,6 +10,7 @@ mod physics;
 mod staging;
 pub mod terrain;
 mod transformation;
+mod trim;
 
 pub use agent::{AgentPlugin, Id, Identifier, LatestFrame};
 pub use aircraft::{
@@ -28,3 +29,4 @@ pub use physics::PhysicsPlugin;
 pub use staging::{SimState, StartupSequencePlugin, StartupStage};
 pub use terrain::TerrainPlugin;
 pub use transformation::TransformationPlugin;
+pub use trim::TrimPlugin;
