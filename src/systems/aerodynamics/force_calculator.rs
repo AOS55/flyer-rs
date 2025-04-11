@@ -1,8 +1,7 @@
 use bevy::prelude::*;
-use nalgebra::Vector3; // Make sure nalgebra is in scope
-use std::f64::consts::PI; // Keep PI if needed for clamping/calcs
+use nalgebra::Vector3;
+use std::f64::consts::PI;
 
-// Import necessary components and the simplified AirDataValues struct
 use crate::components::{
     AirData, AircraftAeroCoefficients, AircraftControlSurfaces, AircraftGeometry, Force,
     ForceCategory, FullAircraftConfig, Moment, PhysicsComponent, ReferenceFrame, SpatialComponent,
@@ -10,17 +9,7 @@ use crate::components::{
 use crate::resources::AerodynamicsConfig;
 
 // Assuming AirDataValues is defined elsewhere (e.g., air_data.rs or calculate.rs)
-// use crate::aerodynamics::air_data::AirDataValues;
-// Placeholder definition if not imported:
-#[derive(Debug, Clone, Default)]
-pub struct AirDataValues {
-    pub true_airspeed: f64,
-    pub alpha: f64,
-    pub beta: f64,
-    pub density: f64,
-    pub dynamic_pressure: f64,
-    pub relative_velocity_body: Vector3<f64>,
-}
+use crate::systems::AirDataValues;
 
 // --- Pure Calculation Logic ---
 
@@ -68,15 +57,13 @@ pub fn calculate_aerodynamic_forces_moments(
         .clamp(-50.0 * PI / 180.0, 50.0 * PI / 180.0);
 
     // Calculate non-dimensional rates (p_hat, q_hat, r_hat)
-    // (Using the ft conversion from original code - review if this is necessary)
-    const M_TO_FT: f64 = 3.28084;
-    let airspeed_fps = air_data.true_airspeed * M_TO_FT;
-    let span_ft = geometry.wing_span * M_TO_FT;
-    let mac_ft = geometry.mac * M_TO_FT;
-    let v_denom_ft = 2.0 * airspeed_fps + 1e-9; // Add epsilon for stability at low speed
-    let p_hat = (span_ft / v_denom_ft) * p;
-    let q_hat = (mac_ft / v_denom_ft) * q;
-    let r_hat = (span_ft / v_denom_ft) * r;
+    let airspeed = air_data.true_airspeed;
+    let span = geometry.wing_span;
+    let mac = geometry.mac;
+    let v_denom = 2.0 * airspeed + 1e-9; // Add epsilon for stability at low speed
+    let p_hat = (span / v_denom) * p;
+    let q_hat = (mac / v_denom) * q;
+    let r_hat = (span / v_denom) * r;
 
     // --- Calculate Aerodynamic Coefficients (CD, CY, CL, Cl, Cm, Cn) ---
     // (This section directly copies the coefficient calculations from the original AersoAdapter)
@@ -162,7 +149,6 @@ pub fn aero_force_system(
     )>,
     aero_config: Res<AerodynamicsConfig>, // Keep config for threshold check
 ) {
-    // println!("Running Aero Force System!");
     for (controls, air_data_comp, spatial, mut physics, config) in aircraft.iter_mut() {
         // 1. Perform pre-checks (e.g., airspeed threshold)
         if air_data_comp.true_airspeed < aero_config.min_airspeed_threshold {

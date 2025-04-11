@@ -1,7 +1,8 @@
 use crate::components::{AircraftAeroCoefficients, AircraftControlSurfaces, AircraftGeometry};
 use aerso::types::{Force, Torque};
 use aerso::{AeroEffect, AirState};
-use nalgebra::{Vector3, QR};
+use bevy::color::palettes::css::MEDIUM_TURQUOISE;
+use nalgebra::Vector3;
 use std::f64::consts::PI;
 
 /// Adapter system for interfacing aircraft aerodynamic computations with the Aerso library.
@@ -61,17 +62,15 @@ impl AersoAdapter {
         // let q_hat = (self.geometry.mac * q) / (2.0 * air_state.airspeed);
         // let r_hat = (self.geometry.wing_span * r) / (2.0 * air_state.airspeed);
 
-        let airspeed_ms = air_state.airspeed.max(0.1);
-        const M_TO_FT: f64 = 3.28084;
-        let airspeed_fps = airspeed_ms * M_TO_FT;
-        let span_ft = self.geometry.wing_span * M_TO_FT;
-        let mac_ft = self.geometry.mac * M_TO_FT;
+        let airspeed = air_state.airspeed.max(0.1);
+        let span = self.geometry.wing_span;
+        let mac = self.geometry.mac;
 
-        let v_denom_ft = 2.0 * airspeed_fps + 1e-9;
+        let v_denom = (2.0 * airspeed) + 1e-9;
 
-        let p_hat = (span_ft / v_denom_ft) * p;
-        let q_hat = (mac_ft / v_denom_ft) * q;
-        let r_hat = (span_ft / v_denom_ft) * r;
+        let p_hat = (span / v_denom) * p;
+        let q_hat = (mac / v_denom) * q;
+        let r_hat = (span / v_denom) * r;
 
         // Aerodynamic force and moment coefficients.
         let c_d = coeffs.drag.c_d_0
