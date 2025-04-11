@@ -51,6 +51,11 @@ impl EnvironmentModel {
         let ned_position: Vector3<f64> = Vector3::new(position.x, position.y, -position.z);
         self.density_model.get_density(&ned_position)
     }
+
+    pub fn get_density_at_altitude(&self, altitude: f64) -> f64 {
+        let ned_position: Vector3<f64> = Vector3::new(0.0, 0.0, -altitude);
+        self.density_model.get_density(&ned_position)
+    }
 }
 
 #[cfg(test)]
