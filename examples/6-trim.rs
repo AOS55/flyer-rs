@@ -3,20 +3,9 @@
 use bevy::{app::AppExit, prelude::*};
 use flyer::{
     components::{
-        AirData,
-        AircraftControlSurfaces,
-        FixedStartConfig,
-        Force,
-        ForceCategory,
-        FullAircraftConfig,
-        NeedsTrim,
-        PhysicsComponent,
-        SpatialComponent,
-        StartConfig,
-        TrimCondition,
-        TrimRequest,
-        TrimSolverConfig, // Added Trim components/events
-        TrimStage,
+        AirData, AircraftControlSurfaces, FixedStartConfig, ForceCategory, FullAircraftConfig,
+        NeedsTrim, PhysicsComponent, SpatialComponent, StartConfig, TrimCondition, TrimRequest,
+        TrimSolverConfig,
     },
     plugins::{
         // Removed TrimPlugin from here
@@ -259,7 +248,7 @@ fn update_aircraft_controls(
 ) {
     let current_time = time.elapsed_secs_f64();
     // Increase this hold duration to give trim time and observe steady flight
-    let trim_hold_duration = 15.0; // Hold trimmed controls for 15 seconds
+    // let trim_hold_duration = 15.0; // Hold trimmed controls for 15 seconds
     let pulse_duration = 1.0;
     let pulse_start_time = 15.0; // Start pulses after hold
 
