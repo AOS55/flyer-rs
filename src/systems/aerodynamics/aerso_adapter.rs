@@ -1,7 +1,6 @@
 use crate::components::{AircraftAeroCoefficients, AircraftControlSurfaces, AircraftGeometry};
 use aerso::types::{Force, Torque};
 use aerso::{AeroEffect, AirState};
-use bevy::color::palettes::css::MEDIUM_TURQUOISE;
 use nalgebra::Vector3;
 use std::f64::consts::PI;
 

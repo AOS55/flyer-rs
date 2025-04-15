@@ -3,7 +3,7 @@ use crate::components::{
 };
 use crate::resources::PhysicsConfig;
 use bevy::prelude::*;
-use nalgebra::{Matrix3, UnitQuaternion, Vector3}; // Added Matrix3, UnitQuaternion just in case
+use nalgebra::{UnitQuaternion, Vector3}; // Added Matrix3, UnitQuaternion just in case
 
 // --- Pure Calculation Logic ---
 
@@ -354,7 +354,7 @@ mod tests {
             let mut world = World::new();
             world.insert_resource(physics_config.clone());
 
-            let mut physics = PhysicsComponent::new(mass, nalgebra::Matrix3::identity() * 10.0);
+            let physics = PhysicsComponent::new(mass, nalgebra::Matrix3::identity() * 10.0);
 
             let spatial = SpatialComponent {
                 position: Vector3::zeros(),

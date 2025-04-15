@@ -125,224 +125,270 @@ pub fn air_data_system(
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::resources::{AerodynamicsConfig, EnvironmentConfig, EnvironmentModel};
+    use super::*; // Imports calculate_air_data, AirDataValues
     use approx::assert_relative_eq;
-    use nalgebra::UnitQuaternion;
+    use nalgebra::{UnitQuaternion, Vector3};
     use std::f64::consts::PI;
 
-    fn setup_test_app() -> App {
-        let mut app = App::new();
-        app.insert_resource(AerodynamicsConfig {
-            min_airspeed_threshold: 0.5,
-        });
-        app.insert_resource(EnvironmentModel::new(&EnvironmentConfig::default()));
-        app
-    }
+    // --- Constants for Tests ---
+    const STD_DENSITY: f64 = 1.225; // Standard sea level density
+    const TEST_EPSILON: f64 = 1e-9; // Tolerance for floating point comparisons
+    const MIN_AIRSPEED_THRESHOLD: f64 = 0.5; // Default threshold for tests
 
-    fn spawn_test_aircraft(app: &mut App, spatial: SpatialComponent) -> Entity {
-        app.world_mut().spawn((spatial, AirData::default())).id()
+    #[test]
+    fn test_stationary_no_wind() {
+        // Scenario: Aircraft stationary, no wind
+        let velocity_inertial = Vector3::zeros();
+        let attitude = UnitQuaternion::identity();
+        let wind_inertial = Vector3::zeros();
+        let density = STD_DENSITY;
+
+        let result = calculate_air_data(
+            &velocity_inertial,
+            &attitude,
+            &wind_inertial,
+            density,
+            MIN_AIRSPEED_THRESHOLD,
+        );
+
+        assert_relative_eq!(result.true_airspeed, 0.0, epsilon = TEST_EPSILON);
+        assert_relative_eq!(result.alpha, 0.0, epsilon = TEST_EPSILON); // Below threshold defaults to 0
+        assert_relative_eq!(result.beta, 0.0, epsilon = TEST_EPSILON); // Below threshold defaults to 0
+        assert_relative_eq!(result.density, density, epsilon = TEST_EPSILON);
+        assert_relative_eq!(result.dynamic_pressure, 0.0, epsilon = TEST_EPSILON);
+        assert_relative_eq!(
+            result.relative_velocity_body,
+            Vector3::zeros(),
+            epsilon = TEST_EPSILON
+        );
     }
 
     #[test]
-    fn test_stationary_aircraft() {
-        // Create aircraft with zero velocity
-        let spatial = SpatialComponent {
-            position: Vector3::new(0.0, 0.0, -1000.0), // 1000m altitude
-            velocity: Vector3::zeros(),
-            attitude: UnitQuaternion::identity(),
-            angular_velocity: Vector3::zeros(),
-        };
-
-        // Standard sea level conditions
-        let density = 1.225; // kg/m³
-        let wind = Vector3::zeros();
-        let min_airspeed_threshold = 0.5;
-
-        // Run the calculation directly
-        let result = AirDataCalculation::calculate(&spatial, wind, density, min_airspeed_threshold);
-
-        // For a stationary aircraft with no wind:
-        // - Airspeed should be 0
-        // - Alpha and beta should be 0 (or undefined, but we default to 0)
-        assert_relative_eq!(result.true_airspeed, 0.0);
-        assert_relative_eq!(result.alpha, 0.0);
-        assert_relative_eq!(result.beta, 0.0);
-        assert_relative_eq!(result.density, density);
-    }
-
-    #[test]
-    fn test_forward_flight() {
-        // Create aircraft with pure forward velocity
+    fn test_forward_flight_no_wind() {
+        // Scenario: Pure forward flight, no wind, level attitude
         let speed = 100.0;
-        let spatial = SpatialComponent {
-            position: Vector3::new(0.0, 0.0, -1000.0), // 1000m altitude
-            velocity: Vector3::new(speed, 0.0, 0.0),   // Pure forward
-            attitude: UnitQuaternion::identity(),
-            angular_velocity: Vector3::zeros(),
-        };
+        let velocity_inertial = Vector3::new(speed, 0.0, 0.0); // Forward in inertial frame
+        let attitude = UnitQuaternion::identity(); // Level flight
+        let wind_inertial = Vector3::zeros();
+        let density = STD_DENSITY;
 
-        // Standard sea level conditions
-        let density = 1.225; // kg/m³
-        let wind = Vector3::zeros();
-        let min_airspeed_threshold = 0.5;
+        let result = calculate_air_data(
+            &velocity_inertial,
+            &attitude,
+            &wind_inertial,
+            density,
+            MIN_AIRSPEED_THRESHOLD,
+        );
 
-        // Run the calculation directly
-        let result = AirDataCalculation::calculate(&spatial, wind, density, min_airspeed_threshold);
-
-        // For pure forward flight:
-        // - Airspeed should match velocity magnitude
-        // - Alpha and beta should be 0
-        assert_relative_eq!(result.true_airspeed, speed, epsilon = 1e-10);
-        assert_relative_eq!(result.alpha, 0.0, epsilon = 1e-10);
-        assert_relative_eq!(result.beta, 0.0, epsilon = 1e-10);
-
-        // Dynamic pressure should be calculated correctly
+        assert_relative_eq!(result.true_airspeed, speed, epsilon = TEST_EPSILON);
+        assert_relative_eq!(result.alpha, 0.0, epsilon = TEST_EPSILON);
+        assert_relative_eq!(result.beta, 0.0, epsilon = TEST_EPSILON);
+        assert_relative_eq!(result.density, density, epsilon = TEST_EPSILON);
         let expected_q = 0.5 * density * speed * speed;
-        assert_relative_eq!(result.dynamic_pressure, expected_q, epsilon = 1e-10);
+        assert_relative_eq!(result.dynamic_pressure, expected_q, epsilon = TEST_EPSILON);
+        assert_relative_eq!(
+            result.relative_velocity_body,
+            Vector3::new(speed, 0.0, 0.0), // Should be same as inertial velocity in body frame here
+            epsilon = TEST_EPSILON
+        );
     }
 
     #[test]
-    fn test_angle_of_attack() {
-        // Test several angles of attack
-        let test_angles = vec![0.0, 5.0, 10.0, -5.0, 15.0, 30.0, -10.0];
-
-        // Standard sea level conditions
-        let density = 1.225; // kg/m³
-        let wind = Vector3::zeros();
-        let min_airspeed_threshold = 0.5;
-
-        for degrees in test_angles {
-            let radians = degrees * PI / 180.0;
-            let speed = 100.0;
-
-            // Set velocity components to achieve desired alpha
-            // For alpha = arctan(-vz/vx), set vx and vz accordingly
-            let vx = speed * radians.cos();
-            let vz = -speed * radians.sin(); // Negative because Z is down
-
-            let spatial = SpatialComponent {
-                position: Vector3::new(0.0, 0.0, -1000.0),
-                velocity: Vector3::new(vx, 0.0, vz),
-                attitude: UnitQuaternion::identity(),
-                angular_velocity: Vector3::zeros(),
-            };
-
-            // Run the calculation directly
-            let result =
-                AirDataCalculation::calculate(&spatial, wind, density, min_airspeed_threshold);
-
-            // Verify airspeed is correct
-            assert_relative_eq!(
-                result.true_airspeed,
-                speed,
-                epsilon = 1e-8,
-                max_relative = 1e-8
-            );
-
-            // Verify alpha matches expected value (within small tolerance)
-            assert_relative_eq!(result.alpha, radians, epsilon = 1e-8, max_relative = 1e-8);
-
-            // Beta should still be 0
-            assert_relative_eq!(result.beta, 0.0, epsilon = 1e-10);
-        }
-    }
-
-    #[test]
-    fn test_with_wind() {
-        // Test different wind conditions
-        let wind_speed = 20.0;
-        let headwind = Vector3::new(-wind_speed, 0.0, 0.0); // Wind flowing against aircraft
-        let tailwind = Vector3::new(wind_speed, 0.0, 0.0); // Wind flowing with aircraft
-        let crosswind = Vector3::new(0.0, wind_speed, 0.0); // Wind from the side
-
-        // Standard sea level conditions
-        let _density = 1.225; // kg/m³
-        let _min_airspeed_threshold = 0.5;
-
-        // Test cases for different wind conditions
-        let test_cases = vec![
-            ("headwind", headwind),
-            ("tailwind", tailwind),
-            ("crosswind", crosswind),
-        ];
-
-        for (wind_name, wind) in test_cases {
-            // Create aircraft with forward velocity
-            let aircraft_speed = 100.0;
-            let spatial = SpatialComponent {
-                position: Vector3::new(0.0, 0.0, -1000.0),
-                velocity: Vector3::new(aircraft_speed, 0.0, 0.0), // Pure forward
-                attitude: UnitQuaternion::identity(),
-                angular_velocity: Vector3::zeros(),
-            };
-
-            // Manually calculate expected results
-            let relative_velocity = spatial.velocity - wind;
-            let expected_airspeed = relative_velocity.norm();
-
-            // For alpha and beta calculations
-            let expected_alpha = if expected_airspeed > 0.5 {
-                (-relative_velocity.z).atan2(relative_velocity.x)
-            } else {
-                0.0
-            };
-
-            let expected_beta = if expected_airspeed > 0.5 {
-                (relative_velocity.y / expected_airspeed)
-                    .clamp(-1.0, 1.0)
-                    .asin()
-            } else {
-                0.0
-            };
-
-            // Run the calculation code from AirDataCalculation directly
-            let calculation = AirDataCalculation::calculate(
-                &spatial, wind, 1.225, // Sea level density
-                0.5,   // Min airspeed threshold
-            );
-
-            // Verify results
-            assert_relative_eq!(
-                calculation.true_airspeed,
-                expected_airspeed,
-                epsilon = 1e-6,
-                max_relative = 1e-6
-            );
-
-            assert_relative_eq!(
-                calculation.alpha,
-                expected_alpha,
-                epsilon = 1e-6,
-                max_relative = 1e-6
-            );
-
-            assert_relative_eq!(
-                calculation.beta,
-                expected_beta,
-                epsilon = 1e-6,
-                max_relative = 1e-6
-            );
-
-            println!(
-                "Wind case '{}' passed: airspeed={}, alpha={}, beta={}",
-                wind_name, calculation.true_airspeed, calculation.alpha, calculation.beta
-            );
-        }
-    }
-
-    #[test]
-    fn test_altitude_effects() {
-        // Create basic spatial component
+    fn test_positive_alpha_no_wind() {
+        // Scenario: Velocity vector angled upwards relative to body X-axis (positive alpha)
+        // Body frame: +X fwd, +Y right, +Z down
+        // Alpha: atan2(Vz_rel, Vx_rel). Positive alpha means Vz_rel > 0 (velocity points "down" in body space relative to body X)
+        // OR: Aircraft nose is below the relative wind vector.
         let speed = 100.0;
-        let spatial = SpatialComponent {
-            position: Vector3::new(0.0, 0.0, -1000.0), // 1000m altitude
-            velocity: Vector3::new(speed, 0.0, 0.0),
-            attitude: UnitQuaternion::identity(),
-            angular_velocity: Vector3::zeros(),
-        };
+        let angle_deg = 10.0;
+        let angle_rad = angle_deg * PI / 180.0;
 
-        // Test different densities (representing different altitudes)
+        // To get +10 deg alpha (atan2(vz, vx)), need vz > 0, vx > 0.
+        // Let velocity in body frame be [cos(alpha), 0, sin(alpha)] * speed
+        let vx_body = speed * angle_rad.cos();
+        let vz_body = speed * angle_rad.sin();
+        let velocity_body = Vector3::new(vx_body, 0.0, vz_body);
+
+        // Assume level attitude for simplicity, so body velocity = inertial velocity
+        let velocity_inertial = velocity_body;
+        let attitude = UnitQuaternion::identity();
+        let wind_inertial = Vector3::zeros();
+        let density = STD_DENSITY;
+
+        let result = calculate_air_data(
+            &velocity_inertial,
+            &attitude,
+            &wind_inertial,
+            density,
+            MIN_AIRSPEED_THRESHOLD,
+        );
+
+        assert_relative_eq!(result.true_airspeed, speed, epsilon = TEST_EPSILON);
+        assert_relative_eq!(result.alpha, angle_rad, epsilon = TEST_EPSILON);
+        assert_relative_eq!(result.beta, 0.0, epsilon = TEST_EPSILON);
+        assert_relative_eq!(
+            result.relative_velocity_body,
+            velocity_body,
+            epsilon = TEST_EPSILON
+        );
+    }
+
+    #[test]
+    fn test_positive_beta_no_wind() {
+        // Scenario: Velocity vector angled right relative to body X-axis (positive beta)
+        // Body frame: +X fwd, +Y right, +Z down
+        // Beta: asin(Vy_rel / airspeed). Positive beta means Vy_rel > 0 (velocity points "right" in body space relative to body X).
+        // OR: Relative wind is coming from the left of the aircraft nose.
+        let speed = 100.0;
+        let angle_deg = 10.0;
+        let angle_rad = angle_deg * PI / 180.0;
+
+        // To get +10 deg beta (asin(vy / speed)), need vy > 0.
+        // Let velocity in body frame be [cos(beta), sin(beta), 0] * speed (approximation for small angles, safer to use components)
+        let vx_body = speed * angle_rad.cos(); // Component along X
+        let vy_body = speed * angle_rad.sin(); // Component along Y
+
+        let velocity_body = Vector3::new(vx_body, vy_body, 0.0);
+        // Ensure magnitude is correct (it is, due to trig identities)
+        assert_relative_eq!(velocity_body.norm(), speed, epsilon = TEST_EPSILON);
+
+        // Assume level attitude for simplicity, so body velocity = inertial velocity
+        let velocity_inertial = velocity_body;
+        let attitude = UnitQuaternion::identity();
+        let wind_inertial = Vector3::zeros();
+        let density = STD_DENSITY;
+
+        let result = calculate_air_data(
+            &velocity_inertial,
+            &attitude,
+            &wind_inertial,
+            density,
+            MIN_AIRSPEED_THRESHOLD,
+        );
+
+        assert_relative_eq!(result.true_airspeed, speed, epsilon = TEST_EPSILON);
+        assert_relative_eq!(result.alpha, 0.0, epsilon = TEST_EPSILON);
+        assert_relative_eq!(result.beta, angle_rad, epsilon = TEST_EPSILON);
+        assert_relative_eq!(
+            result.relative_velocity_body,
+            velocity_body,
+            epsilon = TEST_EPSILON
+        );
+    }
+
+    #[test]
+    fn test_wind_effects() {
+        let aircraft_speed_inertial = 100.0;
+        let wind_speed = 20.0;
+        let velocity_inertial = Vector3::new(aircraft_speed_inertial, 0.0, 0.0);
+        let attitude = UnitQuaternion::identity();
+        let density = STD_DENSITY;
+
+        // --- Headwind ---
+        let headwind = Vector3::new(-wind_speed, 0.0, 0.0); // Wind towards -X
+        let result_head = calculate_air_data(
+            &velocity_inertial,
+            &attitude,
+            &headwind,
+            density,
+            MIN_AIRSPEED_THRESHOLD,
+        );
+        // Vrel_body = Vair_body - Vwind_body = [100,0,0] - [-20,0,0] = [120,0,0]
+        assert_relative_eq!(result_head.true_airspeed, 120.0, epsilon = TEST_EPSILON);
+        assert_relative_eq!(result_head.alpha, 0.0, epsilon = TEST_EPSILON);
+        assert_relative_eq!(result_head.beta, 0.0, epsilon = TEST_EPSILON);
+        assert_relative_eq!(
+            result_head.relative_velocity_body,
+            Vector3::new(120.0, 0.0, 0.0),
+            epsilon = TEST_EPSILON
+        );
+
+        // --- Tailwind ---
+        let tailwind = Vector3::new(wind_speed, 0.0, 0.0); // Wind towards +X
+        let result_tail = calculate_air_data(
+            &velocity_inertial,
+            &attitude,
+            &tailwind,
+            density,
+            MIN_AIRSPEED_THRESHOLD,
+        );
+        // Vrel_body = Vair_body - Vwind_body = [100,0,0] - [20,0,0] = [80,0,0]
+        assert_relative_eq!(result_tail.true_airspeed, 80.0, epsilon = TEST_EPSILON);
+        assert_relative_eq!(result_tail.alpha, 0.0, epsilon = TEST_EPSILON);
+        assert_relative_eq!(result_tail.beta, 0.0, epsilon = TEST_EPSILON);
+        assert_relative_eq!(
+            result_tail.relative_velocity_body,
+            Vector3::new(80.0, 0.0, 0.0),
+            epsilon = TEST_EPSILON
+        );
+
+        // --- Crosswind (from Right) ---
+        let crosswind_right = Vector3::new(0.0, wind_speed, 0.0); // Wind towards +Y (from aircraft's left)
+        let result_cross_right = calculate_air_data(
+            &velocity_inertial,
+            &attitude,
+            &crosswind_right,
+            density,
+            MIN_AIRSPEED_THRESHOLD,
+        );
+        // Vrel_body = Vair_body - Vwind_body = [100,0,0] - [0,20,0] = [100, -20, 0]
+        let expected_airspeed_cr = (100.0f64.powi(2) + (-20.0f64).powi(2)).sqrt();
+        let expected_beta_cr = (-20.0 / expected_airspeed_cr).asin(); // Should be negative beta
+        assert_relative_eq!(
+            result_cross_right.true_airspeed,
+            expected_airspeed_cr,
+            epsilon = TEST_EPSILON
+        );
+        assert_relative_eq!(result_cross_right.alpha, 0.0, epsilon = TEST_EPSILON);
+        assert_relative_eq!(
+            result_cross_right.beta,
+            expected_beta_cr,
+            epsilon = TEST_EPSILON
+        );
+        assert_relative_eq!(
+            result_cross_right.relative_velocity_body,
+            Vector3::new(100.0, -20.0, 0.0),
+            epsilon = TEST_EPSILON
+        );
+
+        // --- Crosswind (from Left) ---
+        let crosswind_left = Vector3::new(0.0, -wind_speed, 0.0); // Wind towards -Y (from aircraft's right)
+        let result_cross_left = calculate_air_data(
+            &velocity_inertial,
+            &attitude,
+            &crosswind_left,
+            density,
+            MIN_AIRSPEED_THRESHOLD,
+        );
+        // Vrel_body = Vair_body - Vwind_body = [100,0,0] - [0,-20,0] = [100, 20, 0]
+        let expected_airspeed_cl = (100.0f64.powi(2) + 20.0f64.powi(2)).sqrt();
+        let expected_beta_cl = (20.0 / expected_airspeed_cl).asin(); // Should be positive beta
+        assert_relative_eq!(
+            result_cross_left.true_airspeed,
+            expected_airspeed_cl,
+            epsilon = TEST_EPSILON
+        );
+        assert_relative_eq!(result_cross_left.alpha, 0.0, epsilon = TEST_EPSILON);
+        assert_relative_eq!(
+            result_cross_left.beta,
+            expected_beta_cl,
+            epsilon = TEST_EPSILON
+        );
+        assert_relative_eq!(
+            result_cross_left.relative_velocity_body,
+            Vector3::new(100.0, 20.0, 0.0),
+            epsilon = TEST_EPSILON
+        );
+    }
+
+    #[test]
+    fn test_density_and_dynamic_pressure() {
+        // Scenario: Check density passthrough and dynamic pressure calculation at different densities
+        let speed = 100.0;
+        let velocity_inertial = Vector3::new(speed, 0.0, 0.0);
+        let attitude = UnitQuaternion::identity();
+        let wind_inertial = Vector3::zeros();
+
         let test_densities = vec![
             1.225,  // Sea level
             1.112,  // ~1000m
@@ -350,20 +396,229 @@ mod tests {
             0.4135, // ~10000m
         ];
 
-        let wind = Vector3::zeros();
-        let min_airspeed_threshold = 0.5;
-
         for density in test_densities {
-            // Run the calculation directly
-            let result =
-                AirDataCalculation::calculate(&spatial, wind, density, min_airspeed_threshold);
+            let result = calculate_air_data(
+                &velocity_inertial,
+                &attitude,
+                &wind_inertial,
+                density,
+                MIN_AIRSPEED_THRESHOLD,
+            );
 
-            // Verify density matches input
-            assert_relative_eq!(result.density, density, epsilon = 1e-10);
-
-            // Verify dynamic pressure is calculated correctly
+            assert_relative_eq!(result.density, density, epsilon = TEST_EPSILON);
             let expected_q = 0.5 * density * speed * speed;
-            assert_relative_eq!(result.dynamic_pressure, expected_q, epsilon = 1e-10);
+            assert_relative_eq!(result.dynamic_pressure, expected_q, epsilon = TEST_EPSILON);
+            // Airspeed, alpha, beta should be unaffected by density
+            assert_relative_eq!(result.true_airspeed, speed, epsilon = TEST_EPSILON);
+            assert_relative_eq!(result.alpha, 0.0, epsilon = TEST_EPSILON);
+            assert_relative_eq!(result.beta, 0.0, epsilon = TEST_EPSILON);
         }
+    }
+
+    #[test]
+    fn test_low_airspeed_threshold() {
+        let density = STD_DENSITY;
+        let attitude = UnitQuaternion::identity();
+        let wind_inertial = Vector3::zeros();
+
+        // Case 1: Airspeed exactly zero (below threshold)
+        let vel_zero = Vector3::zeros();
+        let result_zero = calculate_air_data(
+            &vel_zero,
+            &attitude,
+            &wind_inertial,
+            density,
+            MIN_AIRSPEED_THRESHOLD,
+        );
+        assert_relative_eq!(result_zero.true_airspeed, 0.0, epsilon = TEST_EPSILON);
+        assert_relative_eq!(result_zero.alpha, 0.0, epsilon = TEST_EPSILON); // Should be zero
+        assert_relative_eq!(result_zero.beta, 0.0, epsilon = TEST_EPSILON); // Should be zero
+
+        // Case 2: Airspeed slightly below threshold (e.g., 0.4)
+        let vel_below = Vector3::new(MIN_AIRSPEED_THRESHOLD * 0.8, 0.0, 0.0);
+        let result_below = calculate_air_data(
+            &vel_below,
+            &attitude,
+            &wind_inertial,
+            density,
+            MIN_AIRSPEED_THRESHOLD,
+        );
+        assert_relative_eq!(
+            result_below.true_airspeed,
+            MIN_AIRSPEED_THRESHOLD * 0.8,
+            epsilon = TEST_EPSILON
+        );
+        assert_relative_eq!(result_below.alpha, 0.0, epsilon = TEST_EPSILON); // Should be zero
+        assert_relative_eq!(result_below.beta, 0.0, epsilon = TEST_EPSILON); // Should be zero
+
+        // Case 3: Airspeed slightly above threshold (e.g., 0.6) with non-zero alpha/beta potential
+        let speed_above = MIN_AIRSPEED_THRESHOLD * 1.2;
+        let angle_rad = 10.0 * PI / 180.0;
+        // Velocity vector angled up (positive alpha) and right (positive beta)
+        let vx = speed_above * angle_rad.cos() * angle_rad.cos(); // Simplified components
+        let vy = speed_above * angle_rad.sin();
+        let vz = speed_above * angle_rad.cos() * angle_rad.sin();
+        let vel_above = Vector3::new(vx, vy, vz);
+        // Recalculate actual speed and angles for verification
+        let actual_speed_above = vel_above.norm();
+        let actual_alpha = (vz).atan2(vx);
+        let actual_beta = (vy / actual_speed_above).clamp(-1.0, 1.0).asin();
+
+        let result_above = calculate_air_data(
+            &vel_above,
+            &attitude,
+            &wind_inertial,
+            density,
+            MIN_AIRSPEED_THRESHOLD,
+        );
+        assert!(actual_speed_above > MIN_AIRSPEED_THRESHOLD); // Sanity check test setup
+        assert_relative_eq!(
+            result_above.true_airspeed,
+            actual_speed_above,
+            epsilon = TEST_EPSILON
+        );
+        // Alpha/beta should now be calculated (and potentially clamped)
+        assert_relative_eq!(
+            result_above.alpha,
+            actual_alpha.clamp(-30.0 * PI / 180.0, 30.0 * PI / 180.0),
+            epsilon = TEST_EPSILON
+        );
+        assert_relative_eq!(
+            result_above.beta,
+            actual_beta.clamp(-30.0 * PI / 180.0, 30.0 * PI / 180.0),
+            epsilon = TEST_EPSILON
+        );
+    }
+
+    #[test]
+    fn test_non_identity_attitude() {
+        // Scenario: Aircraft pitched up 10 degrees, flying level relative to world, no wind.
+        let pitch_deg = 10.0;
+        let pitch_rad = pitch_deg * PI / 180.0;
+        let speed = 100.0;
+
+        let velocity_inertial = Vector3::new(speed, 0.0, 0.0); // Level flight in world frame
+        let attitude = UnitQuaternion::from_axis_angle(&Vector3::y_axis(), pitch_rad); // Pitched up (+Y is right, rotation around Y is pitch)
+        let wind_inertial = Vector3::zeros();
+        let density = STD_DENSITY;
+
+        // Expected body velocity: rotate inertial velocity by inverse attitude
+        // Inverse attitude is pitch down (-10 deg)
+        // let expected_velocity_body = attitude.inverse() * velocity_inertial;
+        // Rotation matrix for -pitch_rad around Y: [[cos, 0, sin], [0, 1, 0], [-sin, 0, cos]]
+        // [Vx, Vy, Vz]_body = [speed*cos(-pitch), 0, speed*-sin(-pitch)] = [speed*cos(pitch), 0, speed*sin(pitch)]
+        let expected_vx_body = speed * pitch_rad.cos();
+        let expected_vz_body = speed * pitch_rad.sin();
+        let expected_vel_b = Vector3::new(expected_vx_body, 0.0, expected_vz_body);
+
+        // Expected alpha: atan2(Vz_body, Vx_body) = atan2(sin(pitch), cos(pitch)) = pitch_rad
+        let expected_alpha = pitch_rad;
+        let expected_beta = 0.0; // No sideslip expected
+
+        let result = calculate_air_data(
+            &velocity_inertial,
+            &attitude,
+            &wind_inertial,
+            density,
+            MIN_AIRSPEED_THRESHOLD,
+        );
+
+        assert_relative_eq!(result.true_airspeed, speed, epsilon = TEST_EPSILON); // Airspeed magnitude remains the same
+        assert_relative_eq!(result.alpha, expected_alpha, epsilon = TEST_EPSILON);
+        assert_relative_eq!(result.beta, expected_beta, epsilon = TEST_EPSILON);
+        assert_relative_eq!(result.density, density, epsilon = TEST_EPSILON);
+        assert_relative_eq!(
+            result.relative_velocity_body,
+            expected_vel_b,
+            epsilon = TEST_EPSILON
+        );
+    }
+
+    #[test]
+    fn test_alpha_beta_clamping() {
+        // Scenario: Input velocity results in angles outside the +/- 30 deg clamp range.
+        let speed = 100.0;
+        let density = STD_DENSITY;
+        let attitude = UnitQuaternion::identity();
+        let wind_inertial = Vector3::zeros();
+        let clamp_limit_rad = 30.0 * PI / 180.0;
+
+        // --- High Alpha Test ---
+        let high_alpha_deg = 45.0; // Exceeds 30 deg clamp
+        let high_alpha_rad = high_alpha_deg * PI / 180.0;
+        let vx_body_ha = speed * high_alpha_rad.cos();
+        let vz_body_ha = speed * high_alpha_rad.sin(); // Positive Vz for positive alpha
+        let vel_inertial_ha = Vector3::new(vx_body_ha, 0.0, vz_body_ha);
+
+        let result_ha = calculate_air_data(
+            &vel_inertial_ha,
+            &attitude,
+            &wind_inertial,
+            density,
+            MIN_AIRSPEED_THRESHOLD,
+        );
+        assert!(high_alpha_rad > clamp_limit_rad); // Verify test setup
+        assert_relative_eq!(result_ha.alpha, clamp_limit_rad, epsilon = TEST_EPSILON); // Should be clamped
+        assert_relative_eq!(result_ha.beta, 0.0, epsilon = TEST_EPSILON);
+
+        // --- High Beta Test ---
+        let high_beta_deg = 45.0; // Exceeds 30 deg clamp
+        let high_beta_rad = high_beta_deg * PI / 180.0;
+        let vx_body_hb = speed * high_beta_rad.cos();
+        let vy_body_hb = speed * high_beta_rad.sin(); // Positive Vy for positive beta
+        let vel_inertial_hb = Vector3::new(vx_body_hb, vy_body_hb, 0.0);
+        // Ensure speed is still roughly correct
+        assert_relative_eq!(vel_inertial_hb.norm(), speed, epsilon = TEST_EPSILON);
+
+        let result_hb = calculate_air_data(
+            &vel_inertial_hb,
+            &attitude,
+            &wind_inertial,
+            density,
+            MIN_AIRSPEED_THRESHOLD,
+        );
+        // Actual beta before clamp: asin(vy/speed) = asin(sin(45)) = 45 deg
+        assert!(high_beta_rad > clamp_limit_rad); // Verify test setup
+        assert_relative_eq!(result_hb.beta, clamp_limit_rad, epsilon = TEST_EPSILON); // Should be clamped
+        assert_relative_eq!(result_hb.alpha, 0.0, epsilon = TEST_EPSILON);
+
+        // --- Negative High Alpha Test ---
+        let neg_high_alpha_deg = -45.0; // Exceeds -30 deg clamp
+        let neg_high_alpha_rad = neg_high_alpha_deg * PI / 180.0;
+        let vx_body_nha = speed * neg_high_alpha_rad.cos(); // Still positive
+        let vz_body_nha = speed * neg_high_alpha_rad.sin(); // Negative Vz for negative alpha
+        let vel_inertial_nha = Vector3::new(vx_body_nha, 0.0, vz_body_nha);
+
+        let result_nha = calculate_air_data(
+            &vel_inertial_nha,
+            &attitude,
+            &wind_inertial,
+            density,
+            MIN_AIRSPEED_THRESHOLD,
+        );
+        assert!(neg_high_alpha_rad < -clamp_limit_rad); // Verify test setup
+        assert_relative_eq!(result_nha.alpha, -clamp_limit_rad, epsilon = TEST_EPSILON); // Should be clamped
+        assert_relative_eq!(result_nha.beta, 0.0, epsilon = TEST_EPSILON);
+
+        // --- Negative High Beta Test ---
+        let neg_high_beta_deg = -45.0; // Exceeds -30 deg clamp
+        let neg_high_beta_rad = neg_high_beta_deg * PI / 180.0;
+        let vx_body_nhb = speed * neg_high_beta_rad.cos(); // Still positive
+        let vy_body_nhb = speed * neg_high_beta_rad.sin(); // Negative Vy for negative beta
+        let vel_inertial_nhb = Vector3::new(vx_body_nhb, vy_body_nhb, 0.0);
+        // Ensure speed is still roughly correct
+        assert_relative_eq!(vel_inertial_nhb.norm(), speed, epsilon = TEST_EPSILON);
+
+        let result_nhb = calculate_air_data(
+            &vel_inertial_nhb,
+            &attitude,
+            &wind_inertial,
+            density,
+            MIN_AIRSPEED_THRESHOLD,
+        );
+        // Actual beta before clamp: asin(vy/speed) = asin(sin(-45)) = -45 deg
+        assert!(neg_high_beta_rad < -clamp_limit_rad); // Verify test setup
+        assert_relative_eq!(result_nhb.beta, -clamp_limit_rad, epsilon = TEST_EPSILON); // Should be clamped
+        assert_relative_eq!(result_nhb.alpha, 0.0, epsilon = TEST_EPSILON);
     }
 }

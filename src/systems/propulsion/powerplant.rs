@@ -23,17 +23,6 @@ use crate::{
     resources::PhysicsConfig,
 };
 
-// Placeholder for AirDataValues if not imported from elsewhere
-#[derive(Debug, Clone, Default)]
-pub struct AirDataValues {
-    pub true_airspeed: f64,
-    pub alpha: f64,
-    pub beta: f64,
-    pub density: f64,
-    pub dynamic_pressure: f64,
-    pub relative_velocity_body: Vector3<f64>,
-}
-
 // --- Helper Functions (Keep or move to calculate.rs) ---
 
 /// Updates the engine state based on throttle setting and time constants.

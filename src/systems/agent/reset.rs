@@ -5,7 +5,7 @@ use crate::{
     components::{
         AirData, AircraftConfig, AircraftControlSurfaces, AircraftState, DubinsAircraftConfig,
         DubinsAircraftState, FullAircraftConfig, FullAircraftState, PhysicsComponent,
-        PlayerController, PowerplantState, SpatialComponent,
+        PlayerController, PropulsionState, SpatialComponent,
     },
     plugins::{Id, Identifier, ResetCompleteEvent, ResetRequestEvent, SimState},
     resources::AgentState,
@@ -14,65 +14,68 @@ use crate::{
 
 pub fn handle_reset_response(
     mut reset_complete: EventReader<ResetCompleteEvent>,
-    agent_state: Res<AgentState>,
+    // agent_state: Res<AgentState>, // REMOVE - No longer read buffer here
     mut server: ResMut<ServerState>,
 ) {
-    let observation_spaces = &server.config.observation_spaces.clone();
     let conn = server.conn.clone();
     info!("Handling Reset Response");
-    for _ in reset_complete.read() {
-        if let (Ok(state_buffer), Ok(termination_buffer), Ok(reward_buffer)) = (
-            agent_state.state_buffer.lock(),
-            agent_state.termination_buffer.lock(),
-            agent_state.reward_buffer.lock(),
-        ) {
-            let mut all_observations = HashMap::new();
-            let mut all_terminations = HashMap::new();
-            let mut all_rewards = HashMap::new();
 
-            // Collect initial observations
-            for (id, state) in state_buffer.iter() {
-                info!("reset_response, id: {:?}, state: {:?}", id, state);
-                let id_str = match id {
-                    Id::Named(name) => name.clone(),
-                    Id::Entity(entity) => entity.to_string(),
+    // Process the event payload directly
+    for event in reset_complete.read() {
+        info!("Processing ResetCompleteEvent received from reset_env");
+
+        // Use observations directly from the event
+        let all_observations = event.initial_observations.clone();
+
+        // Initial reward and termination are typically zero/false after reset
+        // Create empty maps for these for the response structure
+        let all_rewards: HashMap<String, f64> = HashMap::new();
+        let all_terminations: HashMap<String, bool> = HashMap::new();
+
+        // Log detailed observation info for debugging
+        info!("Observations received via event: {:?}", all_observations);
+
+        // Send reset response
+        if let Ok(guard) = conn.lock() {
+            if let Ok(mut stream) = guard.try_clone() {
+                let response = Response {
+                    obs: all_observations,        // Use observations from event
+                    reward: all_rewards,          // Empty map for initial reset
+                    terminated: all_terminations, // Empty map for initial reset
+                    truncated: false,             // Reset never truncates initially
+                    info: serde_json::json!({}),  // Empty info dict for now
                 };
 
-                if let Some(obs_space) = observation_spaces.get(&id_str) {
-                    let obs = obs_space.to_observation(state);
-                    all_observations.insert(id_str.clone(), obs);
-                }
-
-                if let Some(&terminated) = termination_buffer.get(id) {
-                    all_terminations.insert(id_str.clone(), terminated);
-                }
-
-                // Should be reset to 0 after reset
-                if let Some(&reward) = reward_buffer.get(id) {
-                    all_rewards.insert(id_str.clone(), reward);
-                }
-            }
-
-            // Send reset response
-            if let Ok(guard) = conn.lock() {
-                if let Ok(mut stream) = guard.try_clone() {
-                    let response = Response {
-                        obs: all_observations,
-                        reward: all_rewards,
-                        terminated: all_terminations,
-                        truncated: false,
-                        info: serde_json::json!({}),
-                    };
-
-                    if let Ok(response_str) = serde_json::to_string(&response) {
+                match serde_json::to_string(&response) {
+                    Ok(response_str) => {
+                        info!("Sending reset response: {}", response_str);
                         if stream.write_all((response_str + "\n").as_bytes()).is_ok() {
-                            stream.flush().ok();
-                            // Transition back to waiting state
+                            if let Err(e) = stream.flush() {
+                                error!(
+                                    "Failed to flush stream after sending reset response: {}",
+                                    e
+                                );
+                            }
+                            // Transition back to waiting state ONLY after successful send+flush
+                            info!("Reset successful, transitioning to WaitingForAction");
                             server.sim_state = SimState::WaitingForAction;
+                        } else {
+                            error!("Failed to write reset response to stream");
+                            // Consider what state to be in if writing fails - maybe retry? Stay Resetting?
                         }
                     }
+                    Err(e) => {
+                        error!("Failed to serialize reset response: {}", e);
+                        // Consider state transition on serialization failure
+                    }
                 }
+            } else {
+                error!("Failed to clone stream for reset response");
+                // Consider state transition on clone failure
             }
+        } else {
+            error!("Failed to lock connection for reset response");
+            // Consider state transition on lock failure
         }
     }
 }
@@ -84,7 +87,7 @@ pub fn reset_env(
     mut dubins_query: Query<
         (
             &Identifier,
-            &mut DubinsAircraftConfig,
+            &mut DubinsAircraftConfig, // Keep config for potential updates
             &mut DubinsAircraftState,
         ),
         With<PlayerController>,
@@ -92,71 +95,165 @@ pub fn reset_env(
     mut full_query: Query<
         (
             &Identifier,
-            &mut FullAircraftConfig,
-            &AirData,
-            &AircraftControlSurfaces,
-            &SpatialComponent,
-            &PhysicsComponent,
-            &PowerplantState,
+            &mut FullAircraftConfig, // Keep config for potential updates
+            &mut AirData,
+            &mut AircraftControlSurfaces,
+            &mut SpatialComponent,
+            &mut PhysicsComponent,
+            &mut PropulsionState,
         ),
         With<PlayerController>,
     >,
     mut agent_state: ResMut<AgentState>,
-    mut server: ResMut<ServerState>,
+    mut server: ResMut<ServerState>, // Needs to be mutable to update config
 ) {
-    for event in reset_events.read() {
-        // Reset the agent state
-        agent_state.reset();
+    info!("Resetting agent state");
 
-        // If seed provided, rebuild entire configuration
+    for event in reset_events.read() {
+        // Reset the agent state buffers (except action queue)
+        agent_state.reset(); // Make sure all buffers are cleared
+
+        // 1. Rebuild config if seed is provided
         if let Some(seed) = event.seed {
             match server.config.rebuild_with_seed(seed) {
                 Ok(new_config) => {
                     server.config = new_config;
+                    info!("Successfully rebuilt EnvConfig with seed: {}", seed);
+                    // Log success
                 }
                 Err(e) => {
                     error!("Failed to rebuild config with seed {}: {}", seed, e);
-                    continue;
+                    continue; // Skip this reset event if rebuild fails
                 }
             }
         }
 
-        // Reset Dubins aircraft using the potentially updated config
-        for (identifier, _, mut state) in dubins_query.iter_mut() {
+        // --- Start Modification ---
+        let mut initial_observations = HashMap::new(); // Map to store initial obs
+        let observation_spaces = &server.config.observation_spaces; // Borrow reference to avoid cloning inside loop
+
+        // 2. Populate state_buffer directly from the potentially updated config AND generate initial obs
+        if let Ok(mut state_buffer) = agent_state.state_buffer.lock() {
+            state_buffer.clear(); // Ensure it's empty before populating
+
+            for (id_str, config) in &server.config.aircraft_configs {
+                let initial_state = match config {
+                    AircraftConfig::Dubins(dubins_conf) => {
+                        info!("Generating initial Dubins state for {} from config", id_str);
+                        AircraftState::Dubins(DubinsAircraftState::from_config(
+                            &dubins_conf.start_config,
+                        ))
+                    }
+                    AircraftConfig::Full(full_conf) => {
+                        info!("Generating initial Full state for {} from config", id_str);
+                        AircraftState::Full(FullAircraftState::from_config(full_conf))
+                    }
+                };
+                let id = Id::Named(id_str.clone()); // Assuming IDs are strings for now
+
+                // Populate buffer for subsequent steps' state collection
+                state_buffer.insert(id, initial_state.clone());
+                info!("Populated state buffer for {}", id_str);
+
+                // ---> Generate the initial observation for the reset response <---
+                if let Some(obs_space) = observation_spaces.get(id_str) {
+                    let obs = obs_space.to_observation(&initial_state);
+                    info!("Generated initial observation for {}: {:?}", id_str, obs);
+                    initial_observations.insert(id_str.clone(), obs);
+                } else {
+                    error!(
+                        "No observation space found for {} during reset generation!",
+                        id_str
+                    );
+                    // Insert empty map to prevent potential downstream issues if key is expected
+                    initial_observations.insert(id_str.clone(), HashMap::new());
+                }
+                // ---> End observation generation <---
+            }
+
+            info!(
+                "State buffer populated with {} aircraft",
+                state_buffer.len()
+            );
+            let keys: Vec<_> = state_buffer.keys().cloned().collect(); // Clone keys for logging
+            info!("Populated state buffer contains keys: {:?}", keys);
+        } else {
+            error!("Failed to lock state buffer for reset population.");
+            continue; // Skip if lock fails
+        }
+
+        // Check if observations were generated (important if configs exist)
+        if initial_observations.is_empty() && !server.config.aircraft_configs.is_empty() {
+            error!("Failed to generate any initial observations despite having aircraft configs!");
+            // Depending on requirements, you might want to `continue;` here
+        }
+        // --- End Modification ---
+
+        // 3. Update actual entities in the ECS world (if they exist yet)
+        // (Keep existing logic for updating Dubins/Full entities)
+        // Reset Dubins aircraft entities
+        for (identifier, mut dubins_config_comp, mut state_comp) in dubins_query.iter_mut() {
             if let Some(config) = server.config.aircraft_configs.get(&identifier.to_string()) {
                 match config {
-                    AircraftConfig::Dubins(config) => {
-                        *state = DubinsAircraftState::from_config(&config.start_config);
-
-                        // Update state buffer
-                        if let Ok(mut state_buffer) = agent_state.state_buffer.lock() {
-                            state_buffer.insert(
-                                identifier.id.clone(),
-                                AircraftState::Dubins(state.clone()),
-                            );
-                        }
+                    AircraftConfig::Dubins(ref new_dubins_config) => {
+                        info!("Resetting Dubins entity: {}", identifier.to_string());
+                        *dubins_config_comp = new_dubins_config.clone();
+                        *state_comp =
+                            DubinsAircraftState::from_config(&new_dubins_config.start_config);
                     }
-                    _ => error!("Mismatched aircraft type for {}", identifier.to_string()),
+                    _ => error!(
+                        "Mismatched config type for Dubins entity {}",
+                        identifier.to_string()
+                    ),
                 }
+            } else {
+                warn!(
+                    "Config not found for Dubins entity during reset: {}",
+                    identifier.to_string()
+                );
             }
         }
 
-        // Reset Full aircraft using the potentially updated config
-        for (identifier, _, _, _, _, _, _) in full_query.iter_mut() {
+        // Reset Full aircraft entities
+        for (
+            identifier,
+            mut full_config_comp,
+            mut air_data,
+            mut control_surfaces,
+            mut spatial,
+            mut physics,
+            mut propulsion_state,
+        ) in full_query.iter_mut()
+        {
             if let Some(config) = server.config.aircraft_configs.get(&identifier.to_string()) {
                 match config {
-                    AircraftConfig::Full(config) => {
-                        let state = FullAircraftState::from_config(&config);
-                        if let Ok(mut state_buffer) = agent_state.state_buffer.lock() {
-                            state_buffer.insert(identifier.id.clone(), AircraftState::Full(state));
-                        }
+                    AircraftConfig::Full(ref new_full_config) => {
+                        info!("Resetting Full entity: {}", identifier.to_string());
+                        *full_config_comp = new_full_config.clone();
+                        let new_state = FullAircraftState::from_config(new_full_config);
+                        *spatial = new_state.spatial;
+                        *physics = new_state.physics;
+                        *air_data = new_state.air_data;
+                        *control_surfaces = new_state.control_surfaces;
+                        *propulsion_state = new_state.propulsion;
                     }
-                    _ => error!("Mismatched aircraft type for {}", identifier.to_string()),
+                    _ => error!(
+                        "Mismatched config type for Full entity {}",
+                        identifier.to_string()
+                    ),
                 }
+            } else {
+                warn!(
+                    "Config not found for Full entity during reset: {}",
+                    identifier.to_string()
+                );
             }
         }
 
-        // Send reset complete event
-        reset_complete.send(ResetCompleteEvent);
+        // 4. Send reset complete event WITH initial observations
+        info!("Sending ResetCompleteEvent with initial observations");
+        reset_complete.send(ResetCompleteEvent {
+            initial_observations,
+        }); // <-- Pass the generated map
     }
 }

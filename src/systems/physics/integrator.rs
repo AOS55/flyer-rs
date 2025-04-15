@@ -55,9 +55,9 @@ struct StateDerivatives {
 /// Calculate derivatives for the current state
 fn calculate_derivatives(
     physics: &PhysicsComponent,
-    position: &nalgebra::Vector3<f64>,
+    _position: &nalgebra::Vector3<f64>,
     velocity: &nalgebra::Vector3<f64>,
-    attitude: &UnitQuaternion<f64>,
+    _attitude: &UnitQuaternion<f64>,
     angular_velocity: &nalgebra::Vector3<f64>,
 ) -> StateDerivatives {
     // Linear acceleration
@@ -82,7 +82,7 @@ fn integrate_state_rk45(
     physics: &PhysicsComponent,
     spatial: &mut SpatialComponent,
     dt: f64,
-    config: &PhysicsConfig,
+    _config: &PhysicsConfig,
 ) {
     // Store initial state
     let initial_position = spatial.position;
@@ -327,7 +327,7 @@ mod tests {
         let total_time = 1.0; // seconds
         let steps = (total_time / config.timestep) as usize;
         let expected_roll = roll_rate * total_time;
-        let expected_attitude = UnitQuaternion::from_euler_angles(expected_roll, 0.0, 0.0);
+        // let expected_attitude = UnitQuaternion::from_euler_angles(expected_roll, 0.0, 0.0);
 
         // Run simulation
         for _ in 0..steps {
