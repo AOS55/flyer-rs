@@ -19,14 +19,13 @@ use crate::{
     },
 };
 use argmin::{
-    core::{Executor, State},
+    core::Executor,
     solver::{linesearch::MoreThuenteLineSearch, quasinewton::LBFGS},
 };
 use bevy::prelude::*;
 
 /// System that performs aircraft trimming using argmin Executor and pure functions.
 pub fn trim_aircraft_system(
-    mut commands: Commands,
     mut query: Query<(
         Entity,
         &mut AircraftControlSurfaces,
@@ -46,7 +45,7 @@ pub fn trim_aircraft_system(
         mut controls,
         mut spatial,
         mut air_data,
-        physics,
+        _physics,
         mut propulsion_state,
         aircraft_config,
         mut needs_trim,

@@ -6,21 +6,19 @@ use crate::{
         FullAircraftConfig,
         LongitudinalBounds, // Need bounds struct
         Moment,
-        PowerplantState,
         PropulsionState, // Added missing import
         ReferenceFrame,
         SpatialComponent,
         TrimCondition,
         TrimSolverConfig, // Added missing import
     },
-    resources::{EnvironmentModel, PhysicsConfig},
+    resources::PhysicsConfig,
     systems::{
         calculate_aerodynamic_forces_moments, calculate_air_data, calculate_engine_outputs,
-        calculate_net_forces_moments, AirDataValues, EngineOutputs,
-   },
+        calculate_net_forces_moments, EngineOutputs,
+    },
 };
 use argmin::core::{CostFunction, Error as ArgminError, Gradient};
-use bevy::prelude::*;
 use nalgebra::{UnitQuaternion, Vector3}; // For logging inside cost/gradient if needed with debug level
 
 #[derive(Clone)] // Needed for argmin Executor
@@ -247,7 +245,7 @@ impl Gradient for TrimProblem<'_> {
     fn gradient(&self, param: &Self::Param) -> Result<Self::Gradient, ArgminError> {
         let epsilon = 1e-7; // Step size for finite difference
         let mut grad = vec![0.0; param.len()];
-        let cost_center = self.cost(param)?; // Calculate cost at the center point once
+        // let cost_center = self.cost(param)?; // Calculate cost at the center point once
 
         for i in 0..param.len() {
             let mut param_plus = param.clone();
