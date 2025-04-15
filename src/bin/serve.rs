@@ -15,7 +15,7 @@ use flyer::{
     },
     server::{setup_app, Command, EnvConfig, ServerState},
     systems::{
-        aero_force_system, air_data_system, calculate_reward, determine_terminated,
+        aero_force_system, air_data_system, calculate_reward, collect_state, determine_terminated,
         dubins_aircraft_system, force_calculator_system, handle_render_response,
         handle_reset_response, physics_integrator_system, render_frame, reset_env, running_physics,
         sending_response, waiting_for_action,
@@ -23,9 +23,6 @@ use flyer::{
 };
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // Initialize logging
-    // setup_logging();
-
     println!("Starting Bevy server...");
 
     // Start TCP server
@@ -133,6 +130,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     .run_if(running_state),
                 calculate_reward.run_if(running_state),
                 determine_terminated.run_if(running_state),
+                collect_state.run_if(sending_state),
                 sending_response.run_if(sending_state),
             )
                 .chain(),
@@ -151,10 +149,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .add_event::<ResetCompleteEvent>()
         .add_event::<RenderRequestEvent>()
         .add_event::<RenderCompleteEvent>()
-        // Reset handling
-        .add_systems(FixedUpdate, reset_env);
+        .add_systems(FixedUpdate, reset_env.run_if(resetting_state));
 
-    // Add event for handling reset requests
+    // Reset handling
     app.add_systems(
         FixedPostUpdate,
         handle_reset_response.run_if(resetting_state),

@@ -2,7 +2,7 @@ use bevy::prelude::*;
 use serde::{Deserialize, Serialize};
 
 use crate::components::{
-    AirData, FullAircraftConfig, PhysicsComponent, PowerplantState, SpatialComponent, StartConfig,
+    AirData, FullAircraftConfig, PhysicsComponent, PropulsionState, SpatialComponent, StartConfig,
 };
 
 /// Represents the overall state of an aircraft (just a convenience method NOT a component)
@@ -17,7 +17,7 @@ pub struct FullAircraftState {
     /// Physical properties like mass and inertia.
     pub physics: PhysicsComponent,
     /// State of the propulsion system
-    pub propulsion: PowerplantState,
+    pub propulsion: PropulsionState,
 }
 
 // impl Default for FullAircraftState {
@@ -59,7 +59,7 @@ impl FullAircraftState {
             control_surfaces: AircraftControlSurfaces::default(),
             spatial: SpatialComponent::at_position_and_airspeed(position, speed, heading),
             physics: PhysicsComponent::new(config.mass.mass, config.mass.inertia),
-            propulsion: PowerplantState::default(),
+            propulsion: PropulsionState::default(),
         }
     }
 }

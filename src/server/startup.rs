@@ -6,7 +6,10 @@ use crate::{
     resources::{RenderMode, UpdateControlPlugin},
     server::EnvConfig,
 };
-use bevy::prelude::*;
+use bevy::{
+    log::{tracing_subscriber, LogPlugin},
+    prelude::*, utils::tracing,
+};
 
 pub fn setup_app(mut app: App, config: EnvConfig, asset_path: String) -> App {
     app.add_plugins(StartupSequencePlugin);
@@ -23,29 +26,47 @@ pub fn setup_app(mut app: App, config: EnvConfig, asset_path: String) -> App {
     }
 
     println!("mode: {:?}", config.agent_config.mode);
+
     // TODO: sort out camera and render setup
     match config.agent_config.mode {
         RenderMode::Human => {
             println!("Running Human Mode");
-            app.add_plugins(
-                DefaultPlugins
-                    .set(WindowPlugin {
-                        primary_window: Some(Window {
-                            title: "FlyerEnv".into(),
-                            resolution: (
-                                config.agent_config.render_width,
-                                config.agent_config.render_height,
-                            )
-                                .into(),
-                            ..default()
-                        }),
-                        ..default()
-                    })
-                    .set(AssetPlugin {
-                        file_path: asset_path,
+            
+            // Create a special logger just for human mode
+            // This must happen before any other logging setup
+            let subscriber = tracing_subscriber::FmtSubscriber::builder()
+                .with_max_level(tracing::Level::INFO)
+                .with_writer(|| std::io::stderr())
+                .finish();
+                
+            // Attempt to set the global subscriber
+            match tracing::subscriber::set_global_default(subscriber) {
+                Ok(_) => println!("Successfully set human mode custom logger"),
+                Err(e) => println!("Failed to set custom logger: {}", e),
+            }
+
+            // Then add DefaultPlugins without LogPlugin
+            let default_plugins = DefaultPlugins
+                .build()
+                .disable::<bevy::log::LogPlugin>()
+                .set(WindowPlugin {
+                    primary_window: Some(Window {
+                        title: "FlyerEnv".into(),
+                        resolution: (
+                            config.agent_config.render_width,
+                            config.agent_config.render_height,
+                        )
+                            .into(),
                         ..default()
                     }),
-            );
+                    ..default()
+                })
+                .set(AssetPlugin {
+                    file_path: asset_path.clone(),
+                    ..default()
+                });
+
+            app.add_plugins(default_plugins);
             app.add_plugins(CameraPlugin);
             app.insert_resource(Time::<Fixed>::from_seconds(1.0 / 60.0));
         }

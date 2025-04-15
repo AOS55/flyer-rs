@@ -57,7 +57,7 @@ impl FullAircraftPlugin {
                 ),
                 CollisionComponent::from_geometry(&config.geometry),
                 PhysicsComponent::new(config.mass.mass, config.mass.inertia),
-                PropulsionState::new(2), // Hardcoded to 2 engines for now
+                PropulsionState::new(config.propulsion.engines.len()), // Hardcoded to 2 engines for now
                 Name::new(config.name.to_string()),
                 Identifier {
                     id: Id::Named(config.name.to_string()), // Id name

@@ -17,7 +17,9 @@ pub struct ResetRequestEvent {
 }
 
 #[derive(Event)]
-pub struct ResetCompleteEvent;
+pub struct ResetCompleteEvent {
+    pub initial_observations: HashMap<String, HashMap<String, f64>>,
+}
 
 #[derive(Event)]
 pub struct RenderRequestEvent;

@@ -64,11 +64,31 @@ impl ToObservation for ContinuousObservationSpace {
                 // Convert FullAircraftState to simplified observation vector for RL
                 let mut obs = HashMap::new();
 
+                // Position components (x, y, z)
+                obs.insert("x".to_string(), full_state.spatial.position.x);
+                obs.insert("y".to_string(), full_state.spatial.position.y);
+                obs.insert("z".to_string(), full_state.spatial.position.z);
+                
+                // Calculate altitude (negative of z in NED frame)
+                let altitude = -full_state.spatial.position.z;
+                obs.insert("altitude".to_string(), altitude);
+
+                // Velocity components (u, v, w)
+                obs.insert("u".to_string(), full_state.spatial.velocity.x);
+                obs.insert("v".to_string(), full_state.spatial.velocity.y);
+                obs.insert("w".to_string(), full_state.spatial.velocity.z);
+                
+                // Calculate airspeed from velocity magnitude (for compatibility)
+                let airspeed = full_state.spatial.velocity.magnitude();
+                obs.insert("airspeed".to_string(), airspeed);
+
                 // Attitude (roll, pitch, yaw)
                 let euler = full_state.spatial.attitude.euler_angles();
                 obs.insert("roll".to_string(), euler.0);
                 obs.insert("pitch".to_string(), euler.1);
                 obs.insert("yaw".to_string(), euler.2);
+                // Add heading as an alias for yaw (for compatibility)
+                obs.insert("heading".to_string(), euler.2);
 
                 // Angular rates (p, q, r)
                 obs.insert("p".to_string(), full_state.spatial.angular_velocity.x);
