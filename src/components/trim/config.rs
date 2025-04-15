@@ -78,7 +78,7 @@ impl Default for TrimSolverConfig {
             use_gradient_refinement: true,
             lateral_bounds: LateralBounds::default(),
             longitudinal_bounds: LongitudinalBounds::default(),
-            debug_level: 1, // Default to minimal debug output
+            debug_level: 0, // Default to minimal debug output
         }
     }
 }
