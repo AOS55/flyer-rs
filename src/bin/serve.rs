@@ -17,8 +17,8 @@ use flyer::{
     systems::{
         aero_force_system, air_data_system, calculate_reward, collect_state, determine_terminated,
         dubins_aircraft_system, force_calculator_system, handle_render_response,
-        handle_reset_response, physics_integrator_system, render_frame, reset_env, running_physics,
-        sending_response, waiting_for_action,
+        handle_reset_response, physics_integrator_system, propulsion_system, render_frame, reset_env, running_physics,
+        sending_response, waiting_for_action, handle_trim_requests, trim_aircraft_system,
     },
 };
 
@@ -107,7 +107,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     app
         // Command handling in PreUpdate
         // .add_systems(FixedFirst, debug_state)
-        .add_systems(FixedPreUpdate, handle_commands.run_if(waiting_state))
+        .add_systems(
+            FixedPreUpdate,
+            (
+                handle_commands.run_if(waiting_state),
+                handle_trim_requests,
+            ),
+        )
         // Action handling and Physics in Update
         .add_systems(
             FixedUpdate,
@@ -123,11 +129,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 (
                     air_data_system,
                     aero_force_system,
+                    propulsion_system,
                     force_calculator_system,
                     physics_integrator_system,
                 )
                     .chain()
                     .run_if(running_state),
+                // Add trim solver system here, after physics integration
+                trim_aircraft_system.run_if(running_state),
+                // --- End Add Trim System ---
                 calculate_reward.run_if(running_state),
                 determine_terminated.run_if(running_state),
                 collect_state.run_if(sending_state),
