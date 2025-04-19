@@ -6,7 +6,7 @@ use std::path::{Path, PathBuf};
 use crate::components::aircraft::config::{ConfigError, RawAircraftConfig};
 use crate::components::{
     AircraftAeroCoefficients, AircraftGeometry, MassModel, PowerplantConfig, PropulsionConfig,
-    StartConfig, TaskType,
+    StartConfig, TaskType, TrimCondition,
 };
 
 /// The full aircraft configuration, including mass, geometry, and aerodynamic coefficients
@@ -28,6 +28,8 @@ pub struct FullAircraftConfig {
     pub start_config: StartConfig,
     /// Configuration for the aircrafts reward scheme
     pub task_config: TaskType,
+    /// Optional trim condition to apply during initialization
+    pub trim_condition: Option<TrimCondition>,
 }
 
 impl Default for FullAircraftConfig {
@@ -42,6 +44,7 @@ impl Default for FullAircraftConfig {
             propulsion: PropulsionConfig::twin_otter(),
             start_config: StartConfig::default(),
             task_config: TaskType::default(),
+            trim_condition: None,
         }
     }
 }
@@ -80,6 +83,7 @@ impl FullAircraftConfig {
                 propulsion: PropulsionConfig::twin_otter(),
                 start_config: StartConfig::default(),
                 task_config: TaskType::default(),
+                trim_condition: None,
             },
             AircraftType::F4Phantom => Self {
                 name: "F4Phantom".to_string(),
@@ -90,6 +94,7 @@ impl FullAircraftConfig {
                 propulsion: PropulsionConfig::f4_phantom(),
                 start_config: StartConfig::default(),
                 task_config: TaskType::default(),
+                trim_condition: None,
             },
             AircraftType::GenericTransport => Self {
                 name: "GenericTransport".to_string(),
@@ -100,6 +105,7 @@ impl FullAircraftConfig {
                 propulsion: PropulsionConfig::single_engine(PowerplantConfig::default()),
                 start_config: StartConfig::default(),
                 task_config: TaskType::default(),
+                trim_condition: None,
             },
             AircraftType::Cessna172 => Self {
                 name: "Cessna172".to_string(),
@@ -110,6 +116,18 @@ impl FullAircraftConfig {
                 propulsion: PropulsionConfig::cessna_172(),
                 start_config: StartConfig::default(),
                 task_config: TaskType::default(),
+                trim_condition: None,
+            },
+            AircraftType::F16C => Self {
+                name: "F16C".to_string(),
+                ac_type: AircraftType::F16C,
+                mass: MassModel::f16c(),
+                geometry: AircraftGeometry::f16c(),
+                aero_coef: AircraftAeroCoefficients::f16c(),
+                propulsion: PropulsionConfig::f16c(),
+                start_config: StartConfig::default(),
+                task_config: TaskType::default(),
+                trim_condition: None,
             },
             AircraftType::Custom(string) => Self {
                 name: string.clone(),
@@ -120,6 +138,7 @@ impl FullAircraftConfig {
                 propulsion: PropulsionConfig::twin_otter(),
                 start_config: StartConfig::default(),
                 task_config: TaskType::default(),
+                trim_condition: None,
             },
         }
     }
@@ -156,6 +175,7 @@ impl FullAircraftConfig {
             propulsion: PropulsionConfig::twin_otter(), // TODO: Add engine config to raw config
             start_config: StartConfig::default(),
             task_config: TaskType::default(),
+            trim_condition: None,
         })
     }
 
@@ -174,6 +194,10 @@ impl FullAircraftConfig {
     pub fn cessna172() -> Self {
         Self::from_programmed(AircraftType::Cessna172)
     }
+
+    pub fn f16c() -> Self {
+        Self::from_programmed(AircraftType::F16C)
+    }
 }
 
 /// Source for aircraft configuration.
@@ -191,6 +215,7 @@ pub enum AircraftType {
     F4Phantom,
     GenericTransport,
     Cessna172,
+    F16C,
     Custom(String),
 }
 
@@ -205,6 +230,7 @@ impl AircraftType {
             AircraftType::F4Phantom => "aircraft/f4_phantom.png",
             AircraftType::GenericTransport => "aircraft/generic_transport.png",
             AircraftType::Cessna172 => "aircraft/generic_transport.png", // Reuse generic texture for now
+            AircraftType::F16C => "aircraft/generic_transport.png", // Reuse generic transport for now
             AircraftType::Custom(path) => path,
         }
     }
