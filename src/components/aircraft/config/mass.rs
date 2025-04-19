@@ -55,19 +55,19 @@ impl MassModel {
         Self::new(22.5, 67.2, 5.77, 7.39, 0.163)
     }
 
+    pub fn f16c() -> Self {
+        Self::new(9301.0, 12875.0, 75682.0, 85572.0, 1331.0)
+    }
+
     pub fn cessna_172() -> Self {
-        let inertia = Matrix3::new(
-            1285.0, 0.0, 0.0,
-            0.0, 1825.0, 0.0,
-            0.0, 0.0, 2666.0
-        );
+        let inertia = Matrix3::new(1285.0, 0.0, 0.0, 0.0, 1825.0, 0.0, 0.0, 0.0, 2666.0);
         let inertia_inv = inertia.try_inverse().unwrap_or_else(|| {
             error!("Warning: Inertia matrix is uninvertable, defaulting to zero matrix.");
             Matrix3::zeros() // Default to a zero matrix if uninvertable
         });
 
         Self {
-            mass: 1100.0,  // kg
+            mass: 1100.0, // kg
             inertia,
             inertia_inv,
         }

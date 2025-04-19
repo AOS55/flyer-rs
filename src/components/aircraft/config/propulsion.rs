@@ -100,17 +100,39 @@ impl PropulsionConfig {
         };
         Self::twin_engine(base_engine, 1.0, -1.0, 0.0)
     }
-    
+
+    pub fn f16c() -> Self {
+        let engine = PowerplantConfig {
+            name: "General Electric F110-GE-129".to_string(),
+            // Max afterburning thrust (~29,500 lbf converted to N)
+            max_thrust: 131200.0,
+            // Estimated idle thrust (N)
+            min_thrust: 5000.0,
+            // Estimated position relative to CG (m): centerline, aft
+            position: Vector3::new(-5.0, 0.0, 0.0),
+            // Standard forward orientation
+            orientation: Vector3::new(1.0, 0.0, 0.0),
+            // Estimated TSFC based on F100 intermediate (0.76 lb/(lbf·h) converted to kg/N/s)
+            tsfc: 0.76 / 3600.0,
+            // Estimated spool-up time (s)
+            spool_up_time: 3.0,
+            // Estimated spool-down time (s)
+            spool_down_time: 2.0,
+        };
+        // F-16 is single-engine
+        Self::single_engine(engine)
+    }
+
     pub fn cessna_172() -> Self {
         let engine = PowerplantConfig {
             name: "Lycoming O-320".to_string(),
-            max_thrust: 3000.0,      // N - Simplified single value
-            min_thrust: 0.0,         // N
-            tsfc: 0.3 / 3600.0,      // kg/(N·s)
-            spool_up_time: 1.0,      // s
-            spool_down_time: 1.0,    // s
+            max_thrust: 3000.0,   // N - Simplified single value
+            min_thrust: 0.0,      // N
+            tsfc: 0.3 / 3600.0,   // kg/(N·s)
+            spool_up_time: 1.0,   // s
+            spool_down_time: 1.0, // s
             ..Default::default()
         };
-        Self::single_engine(engine)  // Single engine config
+        Self::single_engine(engine) // Single engine config
     }
 }

@@ -41,8 +41,12 @@ impl AircraftGeometry {
     pub fn generic_transport() -> Self {
         Self::new(0.548, 2.08, 0.279)
     }
-    
+
+    pub fn f16c() -> Self {
+        Self::new(27.87, 3.45, 9.14)
+    }
+
     pub fn cessna_172() -> Self {
-        Self::new(16.2, 11.0, 1.6)  // 16.2 m² wing area, 11.0 m wingspan, 1.6 m MAC
+        Self::new(16.2, 11.0, 1.6) // 16.2 m² wing area, 11.0 m wingspan, 1.6 m MAC
     }
 }
