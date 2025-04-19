@@ -62,6 +62,7 @@ pub fn create_test_full_config() -> FullAircraftConfig {
             heading: 0.0,
         }),
         task_config: TaskType::default(),
+        trim_condition: None,
     }
 }
 
