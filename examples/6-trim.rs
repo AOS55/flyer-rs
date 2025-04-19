@@ -1,5 +1,3 @@
-// examples/11-trim_test_no_plugin.rs
-
 use bevy::{app::AppExit, prelude::*};
 use flyer::{
     components::{
@@ -141,9 +139,9 @@ fn main() {
     ));
 
     // --- Aircraft Configuration ---
-    let aircraft_config_data = FullAircraftConfig::twin_otter();
-    let initial_speed = 80.0;
-    let initial_altitude_m = 1000.0;
+    let aircraft_config_data = FullAircraftConfig::f16c();
+    let initial_speed = 150.0;
+    let initial_altitude_m = 500.0;
     let start_config = StartConfig::Fixed(FixedStartConfig {
         position: Vector3::new(0.0, 0.0, -initial_altitude_m),
         speed: initial_speed,
@@ -352,7 +350,7 @@ fn track_aircraft_state(
         // Optional: Print status periodically
         let log_interval_steps = (2.0 / physics_config.timestep).round() as usize;
         if log_interval_steps > 0 && tracker.time_steps % log_interval_steps == 0 {
-            info!( "t={:.1}s | Alt={:.1}m | V={:.1}m/s | Pitch={:.1}deg | Alpha={:.1}deg | Elev={:.3} | Pwr={:.3}", time.elapsed_secs_f64(), -spatial.position.z, spatial.velocity.norm(), attitude_deg.1, air_data.alpha.to_degrees(), controls.elevator, controls.power_lever );
+            println!( "t={:.1}s | Alt={:.1}m | V={:.1}m/s | Pitch={:.1}deg | Alpha={:.1}deg | Elev={:.9} | Pwr={:.9}", time.elapsed_secs_f64(), -spatial.position.z, spatial.velocity.norm(), attitude_deg.1, air_data.alpha.to_degrees(), controls.elevator, controls.power_lever );
         }
     }
 }
