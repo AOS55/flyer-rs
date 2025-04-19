@@ -162,6 +162,7 @@ fn create_aircraft_config(index: usize) -> FullAircraftConfig {
         aero_coef: AircraftAeroCoefficients::twin_otter(),
         propulsion: PropulsionConfig::twin_otter(),
         task_config: Default::default(),
+        trim_condition: None,
     }
 }
 
