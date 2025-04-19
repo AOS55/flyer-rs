@@ -193,6 +193,17 @@ impl AircraftAeroCoefficients {
             YawCoefficients::cessna_172(),
         )
     }
+
+    pub fn f16c() -> AircraftAeroCoefficients {
+        AircraftAeroCoefficients::new(
+            DragCoefficients::f16c(),
+            LiftCoefficients::f16c(),
+            SideForceCoefficients::f16c(),
+            RollCoefficients::f16c(),
+            PitchCoefficients::f16c(),
+            YawCoefficients::f16c(),
+        )
+    }
 }
 
 impl DragCoefficients {
@@ -255,6 +266,21 @@ impl DragCoefficients {
             c_d_alpha4: 0.0,
         }
     }
+
+    pub fn f16c() -> DragCoefficients {
+        DragCoefficients {
+            c_d_0: 0.034,
+            c_d_alpha: -0.005,
+            c_d_alpha_q: 20.77,
+            c_d_alpha_deltae: 0.177,
+            c_d_alpha2: 1.285,
+            c_d_alpha2_q: -19.97,
+            c_d_alpha2_deltae: 0.756,
+            c_d_alpha3: 5.887,
+            c_d_alpha3_q: 55.59,
+            c_d_alpha4: -5.155,
+        }
+    }
 }
 
 impl LiftCoefficients {
@@ -309,6 +335,19 @@ impl LiftCoefficients {
             c_l_alpha4: 0.0,
         }
     }
+
+    pub fn f16c() -> LiftCoefficients {
+        LiftCoefficients {
+            c_l_0: 0.074,
+            c_l_alpha: 4.458,
+            c_l_q: 29.90,
+            c_l_deltae: 0.412,
+            c_l_alpha_q: -5.538,
+            c_l_alpha2: -2.477,
+            c_l_alpha3: -1.101,
+            c_l_alpha4: 1.906,
+        }
+    }
 }
 
 impl SideForceCoefficients {
@@ -351,6 +390,16 @@ impl SideForceCoefficients {
             c_y_deltar: 0.0,
         }
     }
+
+    pub fn f16c() -> SideForceCoefficients {
+        SideForceCoefficients {
+            c_y_beta: -1.146,
+            c_y_p: -0.188,
+            c_y_r: 0.876,
+            c_y_deltaa: 0.060,
+            c_y_deltar: 0.164,
+        }
+    }
 }
 
 impl RollCoefficients {
@@ -391,6 +440,16 @@ impl RollCoefficients {
             c_l_r: 0.0,
             c_l_deltaa: 0.2,
             c_l_deltar: 0.0,
+        }
+    }
+
+    pub fn f16c() -> RollCoefficients {
+        RollCoefficients {
+            c_l_beta: -0.071,
+            c_l_p: -0.445,
+            c_l_r: 0.058,
+            c_l_deltaa: -0.143,
+            c_l_deltar: 0.023,
         }
     }
 }
@@ -455,6 +514,21 @@ impl PitchCoefficients {
             c_m_alpha4: 0.0,
         }
     }
+
+    pub fn f16c() -> PitchCoefficients {
+        PitchCoefficients {
+            c_m_0: -0.024,
+            c_m_alpha: -0.288,
+            c_m_q: -8.267,
+            c_m_deltae: -0.174,
+            c_m_alpha_q: -4.315,
+            c_m_alpha2_q: 15.47,
+            c_m_alpha2_deltae: -1.057,
+            c_m_alpha3_q: -18.25,
+            c_m_alpha3_deltae: 0.848,
+            c_m_alpha4: 0.581,
+        }
+    }
 }
 
 impl YawCoefficients {
@@ -503,6 +577,18 @@ impl YawCoefficients {
             c_n_deltar: 0.0,
             c_n_beta2: 0.0,
             c_n_beta3: 0.0,
+        }
+    }
+
+    pub fn f16c() -> YawCoefficients {
+        YawCoefficients {
+            c_n_beta: 0.102,
+            c_n_p: 0.056,
+            c_n_r: -0.282,
+            c_n_deltaa: -0.014,
+            c_n_deltar: -0.046,
+            c_n_beta2: 0.086,
+            c_n_beta3: -0.140,
         }
     }
 }
