@@ -6,7 +6,7 @@ use crate::{
     components::{
         AircraftAeroCoefficients, AircraftConfig, AircraftGeometry, AircraftType,
         DubinsAircraftConfig, FullAircraftConfig, MassModel, PowerplantConfig, PropulsionConfig,
-        StartConfig, TaskType,
+        StartConfig, TaskType, TrimCondition,
     },
     server::{
         config::{
@@ -20,6 +20,55 @@ use crate::{
         ActionSpace, ObservationSpace,
     },
 };
+
+/// Configuration for trim conditions that can be applied to aircraft
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TrimConditionConfig {
+    /// Airspeed for the trim condition in m/s
+    pub airspeed: f64,
+    /// Type of trim condition
+    pub condition_type: String,
+    /// Climb angle in radians (for steady climb condition)
+    pub gamma: Option<f64>,
+    /// Bank angle in radians (for coordinated turn condition)
+    pub bank_angle: Option<f64>,
+}
+
+impl Default for TrimConditionConfig {
+    fn default() -> Self {
+        Self {
+            airspeed: 70.0, // Default to 70 m/s cruising airspeed
+            condition_type: "StraightAndLevel".to_string(),
+            gamma: None,
+            bank_angle: None,
+        }
+    }
+}
+
+impl TrimConditionConfig {
+    pub fn to_trim_condition(&self) -> TrimCondition {
+        match self.condition_type.as_str() {
+            "SteadyClimb" => {
+                let gamma = self.gamma.unwrap_or(0.05); // Default ~3 degrees climb
+                TrimCondition::SteadyClimb { 
+                    airspeed: self.airspeed,
+                    gamma 
+                }
+            }
+            "CoordinatedTurn" => {
+                let bank_angle = self.bank_angle.unwrap_or(0.26); // Default ~15 degrees bank
+                TrimCondition::CoordinatedTurn { 
+                    airspeed: self.airspeed,
+                    bank_angle 
+                }
+            }
+            _ => {
+                // Default to straight and level if not specified or unknown
+                TrimCondition::StraightAndLevel { airspeed: self.airspeed }
+            }
+        }
+    }
+}
 
 pub struct AircraftAgentBuilder {
     pub aircraft_builder: AircraftBuilderEnum,
@@ -73,6 +122,8 @@ pub struct FullAircraftConfigBuilder {
     pub start_config: Option<StartConfigBuilder>,
     pub task_config: Option<TaskConfigBuilder>,
     pub seed: Option<u64>,
+    /// Optional trim condition to apply during initialization
+    pub trim_condition: Option<TrimConditionConfig>,
 }
 
 impl DubinsAircraftConfigBuilder {
@@ -190,6 +241,33 @@ impl FullAircraftConfigBuilder {
         let mut builder = Self::new();
 
         builder.name = value.get("name").and_then(|v| v.as_str()).map(String::from);
+        
+        // Parse trim configuration if present
+        if let Some(trim_config) = value.get("trim_condition") {
+            let mut trim_condition = TrimConditionConfig::default();
+            
+            // Parse airspeed
+            if let Some(airspeed) = trim_config.get("airspeed").and_then(|v| v.as_f64()) {
+                trim_condition.airspeed = airspeed;
+            }
+            
+            // Parse condition type
+            if let Some(condition_type) = trim_config.get("condition_type").and_then(|v| v.as_str()) {
+                trim_condition.condition_type = condition_type.to_string();
+            }
+            
+            // Parse gamma for climb
+            if let Some(gamma) = trim_config.get("gamma").and_then(|v| v.as_f64()) {
+                trim_condition.gamma = Some(gamma);
+            }
+            
+            // Parse bank angle for turn
+            if let Some(bank_angle) = trim_config.get("bank_angle").and_then(|v| v.as_f64()) {
+                trim_condition.bank_angle = Some(bank_angle);
+            }
+            
+            builder.trim_condition = Some(trim_condition);
+        }
 
         if let Some(config) = value.get("config") {
             // Aircraft type
@@ -343,6 +421,7 @@ impl AircraftBuilder for FullAircraftConfigBuilder {
                 }),
             start_config: start_config.unwrap_or_default(),
             task_config,
+            trim_condition: self.trim_condition.as_ref().map(|tc| tc.to_trim_condition()),
         }))
     }
 }

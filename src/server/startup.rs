@@ -1,16 +1,12 @@
 use crate::{
     plugins::{
         add_aircraft_plugin, AgentPlugin, CameraPlugin, EnvironmentPlugin, HeadlessPlugin,
-        PhysicsPlugin, StartupSequencePlugin, TerrainPlugin, TransformationPlugin,
+        PhysicsPlugin, StartupSequencePlugin, TerrainPlugin, TransformationPlugin, TrimPlugin,
     },
     resources::{RenderMode, UpdateControlPlugin},
     server::EnvConfig,
 };
-use bevy::{
-    log::{tracing_subscriber, LogPlugin},
-    prelude::*, utils::tracing,
-};
-
+use bevy::{log::tracing_subscriber, prelude::*, utils::tracing};
 pub fn setup_app(mut app: App, config: EnvConfig, asset_path: String) -> App {
     app.add_plugins(StartupSequencePlugin);
     app.add_plugins((
@@ -20,6 +16,8 @@ pub fn setup_app(mut app: App, config: EnvConfig, asset_path: String) -> App {
         EnvironmentPlugin::with_config(config.environment_config),
         PhysicsPlugin::with_config(config.physics_config),
     ));
+
+    app.add_plugins(TrimPlugin);
 
     for aircraft_config in config.aircraft_configs.iter() {
         add_aircraft_plugin(&mut app, aircraft_config.1.clone());
@@ -31,14 +29,14 @@ pub fn setup_app(mut app: App, config: EnvConfig, asset_path: String) -> App {
     match config.agent_config.mode {
         RenderMode::Human => {
             println!("Running Human Mode");
-            
+
             // Create a special logger just for human mode
             // This must happen before any other logging setup
             let subscriber = tracing_subscriber::FmtSubscriber::builder()
                 .with_max_level(tracing::Level::INFO)
                 .with_writer(|| std::io::stderr())
                 .finish();
-                
+
             // Attempt to set the global subscriber
             match tracing::subscriber::set_global_default(subscriber) {
                 Ok(_) => println!("Successfully set human mode custom logger"),
