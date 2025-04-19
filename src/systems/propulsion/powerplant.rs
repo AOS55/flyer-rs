@@ -254,7 +254,10 @@ pub fn propulsion_system(
             //    }
             // }
         }
+
+    info!("Propulsion system updated: {:?}", propulsion_state);
     }
+
 }
 
 #[cfg(test)]

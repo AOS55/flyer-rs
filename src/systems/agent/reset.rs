@@ -220,9 +220,9 @@ pub fn reset_env(
             mut full_config_comp,
             mut air_data,
             mut control_surfaces,
-            mut spatial,
-            mut physics,
-            mut propulsion_state,
+            mut spatial_comp,
+            mut physics_comp,
+            mut propulsion_comp,
         ) in full_query.iter_mut()
         {
             if let Some(config) = server.config.aircraft_configs.get(&identifier.to_string()) {
@@ -231,11 +231,17 @@ pub fn reset_env(
                         info!("Resetting Full entity: {}", identifier.to_string());
                         *full_config_comp = new_full_config.clone();
                         let new_state = FullAircraftState::from_config(new_full_config);
-                        *spatial = new_state.spatial;
-                        *physics = new_state.physics;
+                        *spatial_comp = new_state.spatial;
+                        *physics_comp = new_state.physics;
                         *air_data = new_state.air_data;
                         *control_surfaces = new_state.control_surfaces;
-                        *propulsion_state = new_state.propulsion;
+                        // Reset propulsion state based on the actual number of engines
+                        *propulsion_comp = PropulsionState::new(new_full_config.propulsion.engines.len());
+
+                        info!(
+                            "Reset Full entity {} complete. Components updated.",
+                            identifier.to_string()
+                        );
                     }
                     _ => error!(
                         "Mismatched config type for Full entity {}",

@@ -1,6 +1,6 @@
-mod handle_events;
+pub mod handle_events;
 mod problem;
-mod solver;
+pub mod solver;
 
 pub use handle_events::handle_trim_requests;
 pub use problem::{params_to_state_inputs, TrimProblem};

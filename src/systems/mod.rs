@@ -9,7 +9,7 @@ mod propulsion;
 mod render;
 mod termination;
 pub mod terrain;
-mod trim;
+pub mod trim;
 
 pub use aerodynamics::{
     aero_force_system, air_data_system, calculate_aerodynamic_forces_moments, calculate_air_data,
