@@ -1,9 +1,9 @@
 use nalgebra::{UnitQuaternion, Vector3};
-
+use serde::{Deserialize, Serialize};
 use crate::components::{AirData, AircraftControlSurfaces, SpatialComponent};
 
 /// Represents different types of trim conditions
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub enum TrimCondition {
     /// Straight and Level flight at specific airspeed
     StraightAndLevel { airspeed: f64 },
