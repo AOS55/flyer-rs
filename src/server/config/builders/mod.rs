@@ -8,6 +8,7 @@ mod aircraft;
 mod environment;
 mod obs;
 mod physics;
+mod runway;
 mod start;
 mod task;
 mod terrain;
@@ -27,6 +28,7 @@ pub use aircraft::{
 use environment::EnvironmentConfigBuilder;
 pub use obs::ObservationSpaceBuilder;
 pub use physics::PhysicsConfigBuilder;
+pub use runway::RunwayConfigBuilder;
 pub use start::{
     FixedStartConfigBuilder, RandomHeadingConfigBuilder, RandomPosConfigBuilder,
     RandomSpeedConfigBuilder, RandomStartConfigBuilder, StartConfigBuilder,
@@ -52,6 +54,8 @@ pub struct EnvConfigBuilder {
     environment_builder: EnvironmentConfigBuilder,
     #[serde(skip)]
     pub terrain_builder: TerrainConfigBuilder,
+    #[serde(skip)]
+    pub runway_builder: Option<RunwayConfigBuilder>,
     pub agent_config: Option<AgentConfig>,
 }
 
@@ -68,6 +72,7 @@ impl Default for EnvConfigBuilder {
             physics_builder: PhysicsConfigBuilder::default(),
             environment_builder: EnvironmentConfigBuilder::default(),
             terrain_builder: TerrainConfigBuilder::default(),
+            runway_builder: None,
             agent_config: None,
         }
     }
@@ -100,6 +105,11 @@ impl EnvConfigBuilder {
 
     pub fn terrain_config(mut self, builder: TerrainConfigBuilder) -> Self {
         self.terrain_builder = builder;
+        self
+    }
+
+    pub fn runway_config(mut self, builder: RunwayConfigBuilder) -> Self {
+        self.runway_builder = Some(builder);
         self
     }
 
@@ -161,6 +171,11 @@ impl EnvConfigBuilder {
             builder = builder.terrain_config(config);
         }
 
+        // Parse runway configuration
+        if let Some(runway_config_json) = json_value.get("runway_config") {
+            builder = builder.runway_config(RunwayConfigBuilder::from_json(runway_config_json)?);
+        }
+
         if let Some(physics_config) = json_value.get("physics_config") {
             builder.physics_builder = PhysicsConfigBuilder::from_json(physics_config)?;
         }
@@ -218,6 +233,8 @@ impl EnvConfigBuilder {
             observation_spaces.insert(id.clone(), builder.build()?);
         }
 
+        let runway_config = self.runway_builder.map(|b| b.build()).transpose()?;
+
         Ok(EnvConfig {
             seed,
             update_mode: UpdateMode::Gym,
@@ -231,6 +248,7 @@ impl EnvConfigBuilder {
             environment_config: self.environment_builder.build()?,
             terrain_config: self.terrain_builder.build()?,
             agent_config: self.agent_config.unwrap_or_default(),
+            runway_config,
         })
     }
 }

@@ -3,6 +3,7 @@ pub mod camera;
 mod collision;
 pub mod controller;
 pub mod physics;
+pub mod runway;
 pub mod spatial;
 pub mod tasks;
 pub mod terrain;
@@ -21,6 +22,7 @@ pub use camera::CameraComponent;
 pub use collision::{CollisionComponent, CollisionEvent};
 pub use controller::PlayerController;
 pub use physics::{Force, ForceCategory, Moment, PhysicsComponent, ReferenceFrame};
+pub use runway::RunwayComponent;
 pub use spatial::SpatialComponent;
 pub use tasks::{TaskComponent, TaskType};
 pub use trim::{

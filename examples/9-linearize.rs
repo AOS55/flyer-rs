@@ -1,45 +1,27 @@
 use flyer::{
-    components::{FullAircraftConfig, AircraftControlSurfaces, AircraftGeometry, AircraftAeroCoefficients, PowerplantConfig, PowerplantState},
-    resources::{PhysicsConfig, EnvironmentConfig, AerodynamicsConfig},
+    components::{AircraftControlSurfaces, FullAircraftConfig, PowerplantState},
+    resources::{AerodynamicsConfig, PhysicsConfig},
     systems::{calculate_aerodynamic_forces_moments, calculate_engine_outputs, AirDataValues},
 };
-use nalgebra::{Vector3, UnitQuaternion, Matrix3, DMatrix, DVector};
-use std::f64::consts::PI;
+use nalgebra::{DMatrix, DVector, Matrix3, UnitQuaternion, Vector3};
 use std::fs::File;
 use std::io::{BufWriter, Write};
-use std::path::Path;
 use std::time::Duration;
 
 // --- Bevy/Flyer Imports for Trimming ---
 use bevy::prelude::*;
-use bevy::app::AppExit;
 use flyer::{
     components::{
-        AirData,
-        FixedStartConfig,
-        NeedsTrim,
-        PhysicsComponent,
-        SpatialComponent,
-        StartConfig,
-        TrimCondition,
-        TrimRequest,
+        FixedStartConfig, NeedsTrim, SpatialComponent, StartConfig, TrimCondition, TrimRequest,
         TrimSolverConfig,
     },
     plugins::{
-        EnvironmentPlugin,
-        FullAircraftPlugin,
-        PhysicsPlugin,
-        StartupSequencePlugin,
+        EnvironmentPlugin, FullAircraftPlugin, PhysicsPlugin, StartupSequencePlugin,
         TransformationPlugin,
     },
     systems::{
-        aero_force_system,
-        air_data_system,
-        force_calculator_system,
-        handle_trim_requests,
-        physics_integrator_system,
-        propulsion_system,
-        trim_aircraft_system,
+        aero_force_system, air_data_system, force_calculator_system, handle_trim_requests,
+        physics_integrator_system, propulsion_system, trim_aircraft_system,
     },
 };
 
@@ -117,13 +99,7 @@ fn body_to_inertial_velocity(
     attitude * Vector3::new(u, v, w)
 }
 
-fn calculate_euler_rates(
-    p: f64,
-    q: f64,
-    r: f64,
-    phi: f64,
-    theta: f64,
-) -> (f64, f64, f64) {
+fn calculate_euler_rates(p: f64, q: f64, r: f64, phi: f64, theta: f64) -> (f64, f64, f64) {
     let sin_phi = phi.sin();
     let cos_phi = phi.cos();
     let tan_theta = theta.tan();
@@ -165,8 +141,6 @@ fn calculate_state_derivatives(
     state: &AircraftState,
     controls: &ControlInputs,
     ac_config: &FullAircraftConfig,
-    phys_config: &PhysicsConfig,
-    env_config: &EnvironmentConfig,
     _aero_config: &AerodynamicsConfig,
 ) -> StateDerivativesOutput {
     let attitude = euler_to_quaternion(state.phi, state.theta, state.psi);
@@ -187,7 +161,6 @@ fn calculate_state_derivatives(
     };
 
     let wind_velocity = Vector3::zeros();
-    let altitude = -state.pos_z;
     let rho = 1.225;
     let airspeed_vector_inertial = spatial.2 - wind_velocity;
     let airspeed_vector_body = spatial.1.inverse() * airspeed_vector_inertial;
@@ -222,18 +195,17 @@ fn calculate_state_derivatives(
         temp_state.thrust_fraction = controls.throttle;
         temp_state.running = true;
 
-        let engine_outputs = calculate_engine_outputs(
-            engine_config,
-            &temp_state,
-            rho,
-            true_airspeed,
-        );
+        let engine_outputs =
+            calculate_engine_outputs(engine_config, &temp_state, rho, true_airspeed);
 
         let force_comp = engine_outputs.force_component;
 
         net_force_inertial += spatial.1 * force_comp.vector;
 
-        net_moment_body += force_comp.point.unwrap_or_default().cross(&force_comp.vector);
+        net_moment_body += force_comp
+            .point
+            .unwrap_or_default()
+            .cross(&force_comp.vector);
     }
 
     let (aero_forces_body, aero_moments_body) = calculate_aerodynamic_forces_moments(
@@ -250,11 +222,26 @@ fn calculate_state_derivatives(
     let accel_inertial = net_force_inertial / ac_config.mass.mass;
     let omega = spatial.0;
     let gyro_term = omega.cross(&(ac_config.mass.inertia * omega));
-    let angular_accel_body = ac_config.mass.inertia.try_inverse().unwrap_or_else(Matrix3::zeros) * (net_moment_body - gyro_term);
+    let angular_accel_body = ac_config
+        .mass
+        .inertia
+        .try_inverse()
+        .unwrap_or_else(Matrix3::zeros)
+        * (net_moment_body - gyro_term);
 
-    let (phi_dot, theta_dot, psi_dot) = calculate_euler_rates(state.p, state.q, state.r, state.phi, state.theta);
+    let (phi_dot, theta_dot, psi_dot) =
+        calculate_euler_rates(state.p, state.q, state.r, state.phi, state.theta);
     let pos_dot = spatial.2;
-    let (u_dot, v_dot, w_dot) = calculate_body_accel(&accel_inertial, &spatial.1, state.u, state.v, state.w, state.p, state.q, state.r);
+    let (u_dot, v_dot, w_dot) = calculate_body_accel(
+        &accel_inertial,
+        &spatial.1,
+        state.u,
+        state.v,
+        state.w,
+        state.p,
+        state.q,
+        state.r,
+    );
 
     StateDerivativesOutput {
         u_dot,
@@ -299,9 +286,11 @@ fn check_trim_completion(
         (Entity, &SpatialComponent, &AircraftControlSurfaces),
         (With<FullAircraftConfig>, Without<NeedsTrim>),
     >,
-    needs_trim_query: Query<(), (With<FullAircraftConfig>, With<NeedsTrim>)>
+    needs_trim_query: Query<(), (With<FullAircraftConfig>, With<NeedsTrim>)>,
 ) {
-    if result.completed { return; }
+    if result.completed {
+        return;
+    }
 
     if !query.is_empty() && needs_trim_query.is_empty() {
         if let Some((entity, spatial, controls)) = query.iter().next() {
@@ -338,7 +327,6 @@ fn find_trim_condition(
     // Configure FixedUpdate schedule
     app.insert_resource(Time::<Fixed>::from_hz(physics_hz));
 
-
     // --- Flyer Library Setup ---
     app.insert_resource(TrimSolverConfig::default());
     app.add_event::<TrimRequest>(); // Manually add Trim Event
@@ -349,7 +337,7 @@ fn find_trim_condition(
             timestep: 1.0 / physics_hz,
             ..default()
         }),
-        StartupSequencePlugin, // Needed for initial setup
+        StartupSequencePlugin,           // Needed for initial setup
         TransformationPlugin::default(), // Needed for spatial transforms
     ));
 
@@ -390,7 +378,6 @@ fn find_trim_condition(
     // Manually add trim event handler
     app.add_systems(Update, handle_trim_requests);
 
-
     // --- Run Trim Simulation Loop ---
     let max_steps = (max_duration_secs * physics_hz).ceil() as usize;
     println!("Max trim steps: {}", max_steps);
@@ -401,7 +388,9 @@ fn find_trim_condition(
 
     loop {
         // 1. Advance the fixed timestep clock
-        app.world_mut().resource_mut::<Time<Fixed>>().advance_by(Duration::from_secs_f64(1.0 / physics_hz));
+        app.world_mut()
+            .resource_mut::<Time<Fixed>>()
+            .advance_by(Duration::from_secs_f64(1.0 / physics_hz));
 
         // 2. Run all due schedules (including FixedUpdate if time threshold met, and Update)
         app.update();
@@ -472,9 +461,9 @@ fn main() {
 
     // --- 1. Load Configuration ---
     let ac_config = FullAircraftConfig::default(); // Use default Twin Otter for now
-    let phys_config = PhysicsConfig::default();
-    let env_config = EnvironmentConfig::default();
-    let aero_config = AerodynamicsConfig { min_airspeed_threshold: 0.1 };
+    let aero_config = AerodynamicsConfig {
+        min_airspeed_threshold: 0.1,
+    };
 
     // --- 2. Find Trim Condition ---
     let initial_speed_ms = 80.0; // Example: Target speed for trim
@@ -529,23 +518,28 @@ fn main() {
     let mut b_matrix = DMatrix::<f64>::zeros(n_states, n_inputs);
 
     // Calculate derivatives at the trim point
-    let f0 = calculate_state_derivatives(
-        &x_trim,
-        &u_trim,
-        &ac_config,
-        &phys_config,
-        &env_config,
-        &aero_config,
-    );
+    let f0 = calculate_state_derivatives(&x_trim, &u_trim, &ac_config, &aero_config);
     let f0_vec = f0.to_vector();
 
-     // Check if derivatives are near zero at trim (should be for forces/moments)
+    // Check if derivatives are near zero at trim (should be for forces/moments)
     println!("Derivatives at Trim (f0):");
-    println!("  Vel Rates (u_dot,v_dot,w_dot): {:.4e}, {:.4e}, {:.4e}", f0.u_dot, f0.v_dot, f0.w_dot);
-    println!("  Ang Rates (p_dot,q_dot,r_dot): {:.4e}, {:.4e}, {:.4e}", f0.p_dot, f0.q_dot, f0.r_dot);
+    println!(
+        "  Vel Rates (u_dot,v_dot,w_dot): {:.4e}, {:.4e}, {:.4e}",
+        f0.u_dot, f0.v_dot, f0.w_dot
+    );
+    println!(
+        "  Ang Rates (p_dot,q_dot,r_dot): {:.4e}, {:.4e}, {:.4e}",
+        f0.p_dot, f0.q_dot, f0.r_dot
+    );
     // Kinematic rates won't necessarily be zero
-    println!("  Eul Rates (phi_dot,theta_dot,psi_dot): {:.4e}, {:.4e}, {:.4e}", f0.phi_dot, f0.theta_dot, f0.psi_dot);
-    println!("  Pos Rates (x_dot,y_dot,z_dot): {:.4e}, {:.4e}, {:.4e}\n", f0.pos_x_dot, f0.pos_y_dot, f0.pos_z_dot);
+    println!(
+        "  Eul Rates (phi_dot,theta_dot,psi_dot): {:.4e}, {:.4e}, {:.4e}",
+        f0.phi_dot, f0.theta_dot, f0.psi_dot
+    );
+    println!(
+        "  Pos Rates (x_dot,y_dot,z_dot): {:.4e}, {:.4e}, {:.4e}\n",
+        f0.pos_x_dot, f0.pos_y_dot, f0.pos_z_dot
+    );
 
     // --- 4. Calculate A Matrix (Jacobian wrt State) ---
     println!("Calculating A Matrix...");
@@ -567,14 +561,7 @@ fn main() {
             _ => unreachable!(),
         }
 
-        let fi = calculate_state_derivatives(
-            &x_perturbed,
-            &u_trim,
-            &ac_config,
-            &phys_config,
-            &env_config,
-            &aero_config,
-        );
+        let fi = calculate_state_derivatives(&x_perturbed, &u_trim, &ac_config, &aero_config);
         let fi_vec = fi.to_vector();
 
         let a_column = (fi_vec - &f0_vec) / delta;
@@ -593,14 +580,7 @@ fn main() {
             _ => unreachable!(),
         }
 
-        let fj = calculate_state_derivatives(
-            &x_trim,
-            &u_perturbed,
-            &ac_config,
-            &phys_config,
-            &env_config,
-            &aero_config,
-        );
+        let fj = calculate_state_derivatives(&x_trim, &u_perturbed, &ac_config, &aero_config);
         let fj_vec = fj.to_vector();
 
         let b_column = (fj_vec - &f0_vec) / delta;
@@ -619,7 +599,12 @@ fn main() {
 }
 
 // --- Helper Functions (write_matrix_csv, save_matrices_to_csv) ---
-fn write_matrix_csv<W: Write, R: nalgebra::Dim, C: nalgebra::Dim, S: nalgebra::Storage<f64, R, C>>(
+fn write_matrix_csv<
+    W: Write,
+    R: nalgebra::Dim,
+    C: nalgebra::Dim,
+    S: nalgebra::Storage<f64, R, C>,
+>(
     writer: &mut BufWriter<W>,
     matrix: &nalgebra::Matrix<f64, R, C, S>,
     title: &str,
@@ -644,15 +629,20 @@ fn write_matrix_csv<W: Write, R: nalgebra::Dim, C: nalgebra::Dim, S: nalgebra::S
     Ok(())
 }
 
-fn save_matrices_to_csv(
-    a_matrix: &DMatrix<f64>,
-    b_matrix: &DMatrix<f64>,
-) -> std::io::Result<()> {
+fn save_matrices_to_csv(a_matrix: &DMatrix<f64>, b_matrix: &DMatrix<f64>) -> std::io::Result<()> {
     let state_labels = [
-        "u (m/s)", "v (m/s)", "w (m/s)",
-        "p (rad/s)", "q (rad/s)", "r (rad/s)",
-        "phi (rad)", "theta (rad)", "psi (rad)",
-        "pos_x (m)", "pos_y (m)", "pos_z (m)",
+        "u (m/s)",
+        "v (m/s)",
+        "w (m/s)",
+        "p (rad/s)",
+        "q (rad/s)",
+        "r (rad/s)",
+        "phi (rad)",
+        "theta (rad)",
+        "psi (rad)",
+        "pos_x (m)",
+        "pos_y (m)",
+        "pos_z (m)",
     ];
     let input_labels = ["elevator", "aileron", "rudder", "throttle"];
 

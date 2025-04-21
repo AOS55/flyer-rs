@@ -121,15 +121,6 @@ fn euler_to_quaternion(roll: f64, pitch: f64, yaw: f64) -> UnitQuaternion<f64> {
     UnitQuaternion::from_euler_angles(roll, pitch, yaw)
 }
 
-fn body_to_inertial_velocity(
-    u: f64,
-    v: f64,
-    w: f64,
-    attitude: &UnitQuaternion<f64>,
-) -> Vector3<f64> {
-    attitude * Vector3::new(u, v, w)
-}
-
 fn calculate_euler_rates(p: f64, q: f64, r: f64, phi: f64, theta: f64) -> (f64, f64, f64) {
     let sin_phi = phi.sin();
     let cos_phi = phi.cos();
@@ -405,7 +396,6 @@ fn setup_tracking_and_trigger_trim(
 
 // System that runs AFTER trim_aircraft_system
 fn check_trim_completion_and_linearize(
-    mut commands: Commands,
     mut linearization_result: ResMut<LinearizationResult>,
     query: Query<
         (

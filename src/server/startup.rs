@@ -1,7 +1,8 @@
 use crate::{
     plugins::{
         add_aircraft_plugin, AgentPlugin, CameraPlugin, EnvironmentPlugin, HeadlessPlugin,
-        PhysicsPlugin, StartupSequencePlugin, TerrainPlugin, TransformationPlugin, TrimPlugin,
+        PhysicsPlugin, RunwayPlugin, StartupSequencePlugin, TerrainPlugin, TransformationPlugin,
+        TrimPlugin,
     },
     resources::{RenderMode, UpdateControlPlugin},
     server::EnvConfig,
@@ -66,6 +67,7 @@ pub fn setup_app(mut app: App, config: EnvConfig, asset_path: String) -> App {
 
             app.add_plugins(default_plugins);
             app.add_plugins(CameraPlugin);
+            app.add_plugins(RunwayPlugin::new(config.runway_config));
             app.insert_resource(Time::<Fixed>::from_seconds(1.0 / 60.0));
         }
         RenderMode::RGBArray => {
@@ -78,7 +80,6 @@ pub fn setup_app(mut app: App, config: EnvConfig, asset_path: String) -> App {
             .add_plugins(CameraPlugin);
             app.insert_resource(Time::<Fixed>::from_seconds(1.0 / 10000.0));
             // .add_systems(FixedUpdate, camera_follow_system);
-            // .insert_resource(Time::<Fixed>::from_seconds(1.0 / 60.0));
         }
     }
 

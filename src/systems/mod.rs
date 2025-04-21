@@ -30,6 +30,6 @@ pub use physics::{
 pub use propulsion::{
     calculate_engine_outputs, propulsion_system, update_powerplant_state, EngineOutputs,
 };
-pub use render::{aircraft_render_system, spawn_aircraft_sprite};
+pub use render::{aircraft_render_system, spawn_aircraft_sprite, spawn_runway_sprite};
 pub use terrain::{ChunkManagerPlugin, TerrainGeneratorSystem};
 pub use trim::{handle_trim_requests, params_to_state_inputs, trim_aircraft_system, TrimProblem};
