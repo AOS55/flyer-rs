@@ -3,14 +3,14 @@ use serde_json::Value;
 use std::collections::HashMap;
 
 use crate::{
-    components::{AircraftConfig, StartConfig},
+    components::{AircraftConfig, RunwayComponent, StartConfig},
     resources::{AgentConfig, EnvironmentConfig, PhysicsConfig, TerrainConfig, UpdateMode},
     server::{
         config::builders::{
             DubinsAircraftConfigBuilder, FullAircraftConfigBuilder, HeightNoiseConfigBuilder,
             NoiseConfigBuilder, PhysicsConfigBuilder, RandomHeadingConfigBuilder,
             RandomPosConfigBuilder, RandomSpeedConfigBuilder, RandomStartConfigBuilder,
-            TerrainConfigBuilder,
+            RunwayConfigBuilder, TerrainConfigBuilder,
         },
         ActionSpace, ObservationSpace,
     },
@@ -46,6 +46,8 @@ pub struct EnvConfig {
 
     // Terrain Configuration
     pub terrain_config: TerrainConfig,
+
+    pub runway_config: Option<RunwayComponent>,
 
     // Agent Configuration
     pub agent_config: AgentConfig,
@@ -237,6 +239,17 @@ impl EnvConfig {
         let noise_builder = NoiseConfigBuilder::new().height_noise(final_height_builder);
 
         builder = builder.terrain_config(terrain_builder.noise_config(noise_builder));
+
+        // Rebuild runway config if it exists
+        if let Some(runway_conf) = &self.runway_config {
+            let runway_builder = RunwayConfigBuilder {
+                position: Some(runway_conf.position),
+                heading: Some(runway_conf.heading),
+                width: Some(runway_conf.width),
+                length: Some(runway_conf.length),
+            };
+            builder = builder.runway_config(runway_builder);
+        }
 
         // Build the final config
         builder.build()

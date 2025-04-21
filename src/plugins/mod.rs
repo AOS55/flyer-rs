@@ -7,6 +7,7 @@ mod events;
 mod full_aircraft;
 mod headless;
 mod physics;
+mod runway;
 mod staging;
 pub mod terrain;
 mod transformation;
@@ -26,6 +27,7 @@ pub use events::{
 pub use full_aircraft::FullAircraftPlugin;
 pub use headless::{FrameState, HeadlessPlugin, HeadlessRenderTarget};
 pub use physics::PhysicsPlugin;
+pub use runway::RunwayPlugin;
 pub use staging::{SimState, StartupSequencePlugin, StartupStage};
 pub use terrain::TerrainPlugin;
 pub use transformation::TransformationPlugin;

@@ -48,7 +48,6 @@ fn integrate_state(
 struct StateDerivatives {
     velocity: nalgebra::Vector3<f64>,
     acceleration: nalgebra::Vector3<f64>,
-    angular_velocity: nalgebra::Vector3<f64>,
     angular_acceleration: nalgebra::Vector3<f64>,
 }
 
@@ -72,7 +71,6 @@ fn calculate_derivatives(
     StateDerivatives {
         velocity: *velocity,
         acceleration,
-        angular_velocity: *angular_velocity,
         angular_acceleration,
     }
 }

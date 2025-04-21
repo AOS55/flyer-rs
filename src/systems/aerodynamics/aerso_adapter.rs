@@ -22,6 +22,7 @@ impl AersoAdapter {
     /// # Arguments
     /// * `geometry` - The physical properties of the aircraft.
     /// * `coefficients` - The aerodynamic coefficients for the aircraft model.
+    #[allow(dead_code)]
     pub fn new(geometry: AircraftGeometry, coefficients: AircraftAeroCoefficients) -> Self {
         Self {
             coefficients,
