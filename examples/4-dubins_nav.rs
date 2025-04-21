@@ -1,6 +1,6 @@
 use bevy::prelude::*;
 use flyer::{
-    components::{DubinsAircraftConfig, DubinsAircraftControls, StartConfig},
+    components::{DubinsAircraftConfig, DubinsAircraftState, StartConfig},
     plugins::{
         CameraPlugin, DubinsAircraftPlugin, PhysicsPlugin, StartupSequencePlugin, TerrainPlugin,
         TransformationPlugin,
@@ -75,9 +75,10 @@ fn main() {
 fn keyboard_control(
     keyboard: Res<ButtonInput<KeyCode>>,
     time: Res<Time>,
-    mut query: Query<&mut DubinsAircraftControls>,
+    mut query: Query<&mut DubinsAircraftState>,
 ) {
-    if let Ok(mut controls) = query.get_single_mut() {
+    if let Ok(mut state) = query.get_single_mut() {
+        let controls = &mut state.controls;
         // Acceleration control
         if keyboard.pressed(KeyCode::ArrowUp) {
             controls.acceleration = 10.0;
