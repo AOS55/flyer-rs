@@ -7,7 +7,6 @@ use flyer::{
         AircraftConfig,
         AircraftControlSurfaces,
         AircraftRenderState, // Needed for aircraft_render_system logging
-        CameraComponent, // Needed for camera_follow_system logging (if CameraPlugin doesn't expose it)
         FullAircraftConfig,
         PlayerController,
         // Import components needed for logging systems if they aren't public
@@ -20,14 +19,11 @@ use flyer::{
         PhysicsPlugin, RunwayPlugin, StartupSequencePlugin, TerrainPlugin, TransformationPlugin,
         TrimPlugin,
     },
-    resources::{
-        AircraftAssets, PhysicsConfig, TransformationResource, /* Keep if used directly */
-    }, // Adjusted resources
+    resources::{PhysicsConfig /* Keep if used directly */}, // Adjusted resources
     systems::{
         aero_force_system, air_data_system,
         aircraft_render_system, /* camera_follow_system is added by CameraPlugin */
-        collision_detection_system, force_calculator_system, handle_trim_requests,
-        physics_integrator_system, propulsion_system, spawn_aircraft_sprite, trim_aircraft_system,
+        force_calculator_system, physics_integrator_system, propulsion_system,
     },
 };
 use nalgebra::Vector3;

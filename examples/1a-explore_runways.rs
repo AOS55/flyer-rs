@@ -2,7 +2,6 @@ use bevy::prelude::*;
 use flyer::{
     components::RunwayComponent,
     plugins::{RunwayPlugin, StartupSequencePlugin, TransformationPlugin},
-    systems::spawn_runway_sprite,
 };
 use nalgebra::Vector3;
 use std::f64::consts::PI;
