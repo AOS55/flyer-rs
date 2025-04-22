@@ -4,7 +4,7 @@ mod chunk;
 mod feature;
 mod tile;
 
-pub use chunk::TerrainChunkComponent;
+pub use chunk::{TerrainChunkComponent, TerrainChunkFeatureLayer};
 pub use feature::{
     BushVariant, FeatureType, FlowerVariant, RockVariant, SnowVariant, TerrainFeatureComponent,
     TreeVariant,

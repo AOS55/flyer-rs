@@ -4,7 +4,11 @@ use bevy::tasks::{AsyncComputeTaskPool, Task};
 use std::collections::HashMap;
 use std::time::{Duration, Instant};
 
-use crate::components::terrain::*;
+// Import necessary items from bevy_ecs_tilemap
+use bevy_ecs_tilemap::prelude::*;
+
+// Your existing project imports (ensure paths are correct)
+use crate::components::terrain::TerrainChunkComponent;
 use crate::resources::terrain::{TerrainAssets, TerrainConfig, TerrainState};
 use crate::systems::terrain::generator::TerrainGeneratorSystem;
 
@@ -12,45 +16,35 @@ use crate::systems::terrain::generator::TerrainGeneratorSystem;
 #[derive(Component)]
 pub struct ChunkGenerationTask {
     /// The asynchronous task generating the terrain chunk.
-    pub task: Task<TerrainChunkComponent>,
+    pub task: Task<TerrainChunkComponent>, // Expecting direct component
     /// The position of the chunk being generated in chunk coordinates.
     pub position: IVec2,
 }
 
-/// Represents tile data for individual terrain tiles.
+// --- ChunkState Enum, ChunkManager Struct, ChunkManager impl, ViewportArea struct ---
+// --- (Keep these as they were in the previous version) ---
 #[derive(Clone, Debug)]
-pub struct TileData {
-    /// The position of the tile in local space.
-    pub position: Vec2,
-    /// The biome type of the tile.
-    pub biome_type: BiomeType,
-}
-
-/// Enum representing the various states a chunk can be in.
-// Chunk Management
-#[allow(dead_code)] // States are used internally, but not explicitly called, mainly for debugging
-#[derive(Clone)]
-enum ChunkState {
-    /// The chunk is currently being loaded.
-    Loading { entity: Entity, started_at: Instant },
-    /// The chunk is active and visible.
+pub enum ChunkState {
+    PendingLoad,
+    Loading {
+        entity: Entity,
+        started_at: Instant,
+    },
     Active {
         entity: Entity,
         last_accessed: Instant,
     },
-    /// The chunk is marked for unloading.
-    PendingUnload { entity: Entity, marked_at: Instant },
+    PendingUnload {
+        entity: Entity,
+        marked_at: Instant,
+    },
+    Error,
 }
-
-/// Manages terrain chunks, their states, and visibility.
-#[derive(Resource)]
-struct ChunkManager {
-    /// A map of chunk positions to their respective states.
+#[derive(Resource, Debug)]
+pub struct ChunkManager {
     chunks: HashMap<IVec2, ChunkState>,
-    /// The visible area represented by the camera viewport.
     visible_area: ViewportArea,
 }
-
 impl Default for ChunkManager {
     fn default() -> Self {
         Self {
@@ -62,47 +56,7 @@ impl Default for ChunkManager {
         }
     }
 }
-
-/// Represents the visible area in chunk coordinates.
-#[derive(Clone)]
-struct ViewportArea {
-    /// Center of the visible area (in chunk coordinates).
-    center: IVec2,
-    /// Radius around the center that defines the visible chunks.
-    radius: i32,
-}
-
-impl ViewportArea {
-    /// Computes the visible area based on the camera's position and zoom.
-    fn from_camera(
-        transform: &Transform,
-        projection: &OrthographicProjection,
-        state: &TerrainState,
-    ) -> Self {
-        let pos = transform.translation.truncate();
-        let chunk_pos = state.world_to_chunk(pos);
-        let chunk_world_size = state.chunk_world_size();
-        let visible_width = projection.area.width() * projection.scale;
-        let visible_height = projection.area.height() * projection.scale;
-
-        // Calculate view radius based on zoom and window size
-        let radius = (((visible_width.max(visible_height) / chunk_world_size) / 2.0) + 1.0) as i32;
-
-        Self {
-            center: chunk_pos,
-            radius,
-        }
-    }
-
-    /// Determines if a chunk position is within the visible area.
-    fn contains(&self, pos: IVec2) -> bool {
-        let diff = pos - self.center;
-        diff.x.abs() <= self.radius && diff.y.abs() <= self.radius
-    }
-}
-
 impl ChunkManager {
-    /// Updates the visible area based on the camera's position.
     fn update_visible_area(
         &mut self,
         camera_transform: &Transform,
@@ -110,47 +64,42 @@ impl ChunkManager {
         state: &TerrainState,
     ) {
         let new_area = ViewportArea::from_camera(camera_transform, camera_projection, state);
-
-        // Mark chunks outside the visible area for unloading
-        for (pos, state) in self.chunks.iter_mut() {
-            match state {
+        if new_area == self.visible_area {
+            return;
+        }
+        for (pos, chunk_state) in self.chunks.iter_mut() {
+            match chunk_state {
                 ChunkState::Active { entity, .. } if !new_area.contains(*pos) => {
-                    *state = ChunkState::PendingUnload {
+                    *chunk_state = ChunkState::PendingUnload {
                         entity: *entity,
                         marked_at: Instant::now(),
+                    };
+                }
+                ChunkState::PendingUnload { entity, .. } if new_area.contains(*pos) => {
+                    *chunk_state = ChunkState::Active {
+                        entity: *entity,
+                        last_accessed: Instant::now(),
                     };
                 }
                 _ => {}
             }
         }
-
-        // Mark new chunks for loading
         for x in -new_area.radius..=new_area.radius {
             for y in -new_area.radius..=new_area.radius {
                 let pos = new_area.center + IVec2::new(x, y);
                 if !self.chunks.contains_key(&pos) {
-                    self.chunks.insert(
-                        pos,
-                        ChunkState::Loading {
-                            entity: Entity::PLACEHOLDER,
-                            started_at: Instant::now(),
-                        },
-                    );
+                    self.chunks.insert(pos, ChunkState::PendingLoad);
                 }
             }
         }
-
         self.visible_area = new_area;
     }
-
-    /// Returns a list of chunk positions that need to be loaded.
     fn get_chunks_to_load(&self) -> Vec<IVec2> {
         self.chunks
             .iter()
-            .filter_map(|(pos, state)| matches!(state, ChunkState::Loading { .. }).then_some(*pos))
+            .filter_map(|(pos, state)| matches!(state, ChunkState::PendingLoad).then_some(*pos))
             .collect()
     }
-
     fn get_chunks_to_unload(&self) -> Vec<(IVec2, Entity)> {
         self.chunks
             .iter()
@@ -163,221 +112,326 @@ impl ChunkManager {
             })
             .collect()
     }
-
-    fn set_loading(&mut self, pos: IVec2, entity: Entity) {
-        self.chunks.insert(
-            pos,
-            ChunkState::Loading {
-                entity,
-                started_at: Instant::now(),
-            },
-        );
+    fn set_chunk_state(&mut self, pos: IVec2, state: ChunkState) {
+        self.chunks.insert(pos, state);
     }
-
-    /// Marks a chunk as active once it has been successfully loaded.
-    fn activate_chunk(&mut self, pos: IVec2, entity: Entity) {
-        if let Some(ChunkState::Loading { .. }) = self.chunks.get(&pos) {
-            self.chunks.insert(
-                pos,
-                ChunkState::Active {
-                    entity,
-                    last_accessed: Instant::now(),
-                },
-            );
-        }
-    }
-
     fn is_task_stale(&self, pos: IVec2, timeout: Duration) -> bool {
-        match self.chunks.get(&pos) {
-            Some(ChunkState::Loading { started_at, .. }) => started_at.elapsed() > timeout,
-            _ => false,
-        }
+        matches!(self.chunks.get(&pos), Some(ChunkState::Loading { started_at, .. }) if started_at.elapsed() > timeout)
     }
-
-    /// Removes a chunk from the manager.
     fn remove_chunk(&mut self, pos: IVec2) {
         self.chunks.remove(&pos);
     }
 }
+#[derive(Clone, Debug, PartialEq)]
+struct ViewportArea {
+    center: IVec2,
+    radius: i32,
+}
+impl ViewportArea {
+    fn from_camera(
+        transform: &Transform,
+        _projection: &OrthographicProjection,
+        state: &TerrainState,
+    ) -> Self {
+        let pos = transform.translation.truncate();
+        let chunk_pos = state.world_to_chunk(pos);
+        let radius = state.loading_radius;
+        Self {
+            center: chunk_pos,
+            radius,
+        }
+    }
+    fn contains(&self, pos: IVec2) -> bool {
+        let diff = pos - self.center;
+        diff.x.abs() <= self.radius && diff.y.abs() <= self.radius
+    }
+}
+// --- End unchanged sections ---
 
-// System to update the visible chunks based on the camera's position.
+/// System to update the visible chunks based on the camera's position.
 fn update_chunks(
-    camera: Query<(&Transform, &OrthographicProjection), With<Camera2d>>,
+    camera_query: Query<(&Transform, &OrthographicProjection), With<Camera2d>>,
     state: Res<TerrainState>,
     mut chunk_manager: ResMut<ChunkManager>,
 ) {
-    // chunk_manager.update_visible_area(camera, &state);
-    if let Some((camera_transform, camera_projection)) = camera.iter().next() {
+    if let Ok((camera_transform, camera_projection)) = camera_query.get_single() {
         chunk_manager.update_visible_area(camera_transform, camera_projection, &state);
     }
 }
 
-/// System to clean up chunks marked for unloading.
+/// System to spawn generation tasks for chunks marked as PendingLoad.
 fn handle_chunk_loading(
     mut commands: Commands,
     mut chunk_manager: ResMut<ChunkManager>,
     generator: Res<TerrainGeneratorSystem>,
     config: Res<TerrainConfig>,
     state: Res<TerrainState>,
+    assets: Res<TerrainAssets>,
 ) {
     let thread_pool = AsyncComputeTaskPool::get();
+    let chunks_to_load = chunk_manager.get_chunks_to_load();
 
-    for pos in chunk_manager.get_chunks_to_load() {
-        let entity = commands.spawn_empty().id();
+    // --- Access state fields *before* the loop/move ---
+    let current_chunk_size = state.chunk_size; // usize
+    let current_tile_size = state.tile_size; // f32
+                                             // --- End access before loop ---
 
-        let mut generator = generator.clone();
-        let config = config.clone();
-        let state = state.clone();
+    for pos in chunks_to_load {
+        let mut generator_clone = generator.clone(); // Clone for the task
+        let config_clone = config.clone(); // Clone for the task
+        let state_clone = state.clone(); // Clone specifically for the task
 
-        let task = thread_pool.spawn(async move { generator.generate_chunk(pos, &state, &config) });
-
-        commands.entity(entity).insert(ChunkGenerationTask {
-            task,
-            position: pos,
+        // Task now directly returns TerrainChunkComponent
+        let task = thread_pool.spawn(async move {
+            // Use the cloned versions inside the async block
+            generator_clone.generate_chunk(pos, &state_clone, &config_clone)
         });
-        chunk_manager.set_loading(pos, entity);
+
+        // Use the values accessed *before* the loop
+        let chunk_world_pos = state.chunk_to_world(pos); // Can still use original state Res here
+        let chunk_transform = Transform::from_xyz(chunk_world_pos.x, chunk_world_pos.y, 0.0);
+
+        let tile_size_map = TilemapTileSize {
+            x: current_tile_size,
+            y: current_tile_size,
+        };
+        let grid_size_map = TilemapGridSize {
+            x: current_tile_size,
+            y: current_tile_size,
+        };
+        let map_size = TilemapSize {
+            x: current_chunk_size as u32,
+            y: current_chunk_size as u32,
+        };
+
+        let chunk_entity_id = commands
+            .spawn((
+                TilemapBundle {
+                    grid_size: grid_size_map,
+                    size: map_size,
+                    storage: TileStorage::empty(map_size),
+                    texture: TilemapTexture::Single(assets.tile_texture.clone()),
+                    tile_size: tile_size_map,
+                    transform: chunk_transform,
+                    map_type: TilemapType::Square,
+                    visibility: Visibility::Hidden,
+                    ..Default::default()
+                },
+                ChunkGenerationTask {
+                    task,
+                    position: pos,
+                },
+            ))
+            .id();
+
+        chunk_manager.set_chunk_state(
+            pos,
+            ChunkState::Loading {
+                entity: chunk_entity_id,
+                started_at: Instant::now(),
+            },
+        );
     }
 }
 
+/// System to handle completed chunk generation tasks.
 fn handle_chunk_tasks(
     mut commands: Commands,
     mut chunk_manager: ResMut<ChunkManager>,
-    mut tasks: Query<(Entity, &mut ChunkGenerationTask)>,
     terrain_assets: Res<TerrainAssets>,
     terrain_config: Res<TerrainConfig>,
     terrain_state: Res<TerrainState>,
+    mut tasks_query: Query<(Entity, &mut ChunkGenerationTask)>,
+    mut tile_storage_query: Query<&mut TileStorage>,
 ) {
-    for (entity, mut task) in &mut tasks {
-        if let Some(generation_result) = block_on(poll_once(&mut task.task)) {
-            let chunk_world_pos = terrain_state.chunk_to_world(task.position);
-            commands.entity(entity).insert((
-                Transform::from_translation(chunk_world_pos.extend(0.0)),
-                GlobalTransform::default(),
-                Visibility::default(),
-                InheritedVisibility::default(),
-                ViewVisibility::default(),
-            ));
-            spawn_chunk_entities(
-                &mut commands,
-                entity,
-                generation_result,
-                &terrain_state,
-                &terrain_assets,
-                &terrain_config,
-            );
-            chunk_manager.activate_chunk(task.position, entity);
+    for (entity, mut task) in tasks_query.iter_mut() {
+        if let Some(chunk_data) = block_on(poll_once(&mut task.task)) {
+            // Direct component
+            let chunk_coordinate = task.position;
+
+            if let Ok(mut tile_storage) = tile_storage_query.get_mut(entity) {
+                spawn_chunk_entities(
+                    &mut commands,
+                    entity,
+                    chunk_data, // Pass directly
+                    &terrain_assets,
+                    &terrain_config,
+                    &terrain_state,
+                    &mut tile_storage,
+                );
+                commands.entity(entity).insert(Visibility::Visible);
+                chunk_manager.set_chunk_state(
+                    chunk_coordinate,
+                    ChunkState::Active {
+                        entity,
+                        last_accessed: Instant::now(),
+                    },
+                );
+            } else {
+                error!(
+                    "TileStorage not found for chunk entity {:?} at {:?} during task handling.",
+                    entity, chunk_coordinate
+                );
+                chunk_manager.set_chunk_state(chunk_coordinate, ChunkState::Error);
+                commands.entity(entity).despawn_recursive();
+            }
             commands.entity(entity).remove::<ChunkGenerationTask>();
         }
     }
 }
 
+/// Spawns tile entities using bevy_ecs_tilemap and feature entities using Sprites.
 fn spawn_chunk_entities(
     commands: &mut Commands,
     chunk_entity: Entity,
-    chunk: TerrainChunkComponent,
-    state: &TerrainState,
-    assets: &TerrainAssets,
-    config: &TerrainConfig,
+    chunk_data: TerrainChunkComponent, // Receive owned data
+    terrain_assets: &Res<TerrainAssets>,
+    terrain_config: &Res<TerrainConfig>,
+    terrain_state: &Res<TerrainState>,
+    tile_storage: &mut TileStorage, // Still need this for tiles
 ) {
-    // Spawn terrain tiles
-    for y in 0..state.chunk_size {
-        for x in 0..state.chunk_size {
-            let idx = (y * state.chunk_size + x) as usize;
-            // let world_pos = state.get_tile_world_pos(chunk.position, x as usize, y as usize);
-            let local_pos = Vec2::new(x as f32 * state.tile_size, y as f32 * state.tile_size);
-            let biome_type = chunk.biome_map[idx];
-            // info!("Biome type: {:?}", biome_type);
-            if let Some(&sprite_index) = assets.tile_mappings.get(&biome_type) {
-                commands
-                    .spawn((
-                        Sprite::from_atlas_image(
-                            assets.tile_texture.clone(),
-                            TextureAtlas {
-                                layout: assets.tile_layout.clone(),
-                                index: sprite_index,
-                            },
-                        ),
-                        Transform::from_translation(local_pos.extend(0.0)),
-                        GlobalTransform::default(),
-                        Visibility::default(),
-                        InheritedVisibility::default(),
-                        ViewVisibility::default(),
-                        TerrainTileComponent {
-                            biome_type,
-                            position: local_pos,
-                            sprite_index,
-                        },
-                    ))
-                    .set_parent(chunk_entity);
+    let current_chunk_size = terrain_state.chunk_size;
+    let current_tile_size = terrain_state.tile_size;
+    let map_grid_size = TilemapGridSize {
+        x: current_tile_size,
+        y: current_tile_size,
+    };
+    let map_type = TilemapType::Square;
+
+    commands.entity(chunk_entity).with_children(|parent| {
+        // --- Spawn Tile Entities (using bevy_ecs_tilemap - KEEP THIS) ---
+        for y in 0..current_chunk_size {
+            for x in 0..current_chunk_size {
+                let tile_index = y * current_chunk_size + x;
+                if tile_index >= chunk_data.biome_map.len() {
+                    continue;
+                } // Bounds check
+
+                let biome = chunk_data.biome_map[tile_index];
+                if let Some(texture_index) = terrain_assets.tile_mappings.get(&biome).copied() {
+                    let tile_pos = TilePos {
+                        x: x as u32,
+                        y: y as u32,
+                    };
+                    // Spawn the tile entity as a child
+                    let tile_entity = parent
+                        .spawn(TileBundle {
+                            position: tile_pos,
+                            tilemap_id: TilemapId(chunk_entity), // Link to parent tilemap
+                            texture_index: TileTextureIndex(texture_index as u32),
+                            ..Default::default()
+                        })
+                        .id();
+                    // Set the tile in the TileStorage component (on the parent chunk_entity)
+                    tile_storage.checked_set(&tile_pos, tile_entity);
+                }
             }
         }
-    }
 
-    // Spawn features
-    for (idx, feature) in &chunk.features {
-        if let Some(&sprite_index) = assets.feature_mappings.get(&feature.feature_type) {
-            let world_pos = state.tile_index_to_chunk(*idx);
-            commands
-                .spawn((
-                    feature.clone(),
+        // --- Spawn Feature Entities ---
+        for (pos_index, feature) in chunk_data.features.iter() {
+            let index_val = *pos_index;
+            let x_coord = index_val % current_chunk_size;
+            let y_coord = index_val / current_chunk_size;
+            if x_coord >= current_chunk_size || y_coord >= current_chunk_size {
+                continue;
+            } // Bounds check
+
+            let feature_tile_pos = TilePos {
+                x: x_coord as u32,
+                y: y_coord as u32,
+            };
+
+            if let Some(feature_atlas_index) = terrain_assets
+                .feature_mappings
+                .get(&feature.feature_type)
+                .copied()
+            {
+                let tile_center_world_offset =
+                    feature_tile_pos.center_in_world(&map_grid_size, &map_type);
+
+                // MODIFIED: Use the pattern from the old code that worked
+                parent.spawn((
+                    // Custom data component
+                    feature.clone(), // TerrainFeatureComponent
+                    // Configured Sprite component instance
                     Sprite::from_atlas_image(
-                        assets.feature_texture.clone(),
+                        terrain_assets.feature_texture.clone(),
                         TextureAtlas {
-                            layout: assets.feature_layout.clone(),
-                            index: sprite_index,
+                            layout: terrain_assets.feature_layout.clone(),
+                            index: feature_atlas_index,
                         },
                     ),
+                    // Transform component
                     Transform::from_translation(
-                        world_pos.extend(config.render.feature_layer_offset),
+                        tile_center_world_offset.extend(terrain_config.render.feature_layer_offset),
                     )
                     .with_rotation(Quat::from_rotation_z(feature.rotation))
                     .with_scale(Vec3::splat(feature.scale)),
+                    // Other necessary components often added with Transform
                     GlobalTransform::default(),
-                    Visibility::default(),
+                    Visibility::Visible, // Make explicitly visible
                     InheritedVisibility::default(),
                     ViewVisibility::default(),
-                ))
-                .set_parent(chunk_entity);
+                ));
+            }
         }
-    }
+    }); // End with_children
 }
 
-fn handle_chunk_unloading(
-    mut commands: Commands,
-    mut chunk_manager: ResMut<ChunkManager>,
-    chunks_query: Query<Entity>,
-) {
+// --- handle_chunk_unloading and cleanup_stale_tasks remain the same ---
+fn handle_chunk_unloading(mut commands: Commands, mut chunk_manager: ResMut<ChunkManager>) {
     let chunks_to_unload = chunk_manager.get_chunks_to_unload();
+    let mut unloaded_count = 0;
+
+    // Keep track of positions successfully despawned THIS frame
+    let mut despawned_positions = Vec::new();
 
     for (pos, entity) in chunks_to_unload {
-        // Verify entity exists before attempting to despawn
-        if chunks_query.get(entity).is_ok() {
-            commands.entity(entity).despawn_recursive();
-            chunk_manager.remove_chunk(pos);
-        } else {
-            // If entity doesn't exist but is still in manager, clean it up
-            warn!("Chunk at {:?} had invalid entity reference", pos);
-            chunk_manager.remove_chunk(pos);
+        // Iterate over potentially many pending chunks
+        if unloaded_count >= 2 {
+            break; // Stop despawning more this frame
         }
+
+        if let Some(entity_commands) = commands.get_entity(entity) {
+            entity_commands.despawn_recursive();
+            // Mark this position as processed for removal from chunk_manager state later
+            despawned_positions.push(pos);
+            unloaded_count += 1;
+        } else {
+            // Entity might already be gone for some reason, ensure we remove state too
+            despawned_positions.push(pos);
+        }
+    }
+
+    // Update the chunk manager state only for the chunks actually despawned
+    for pos in despawned_positions {
+        chunk_manager.remove_chunk(pos); // Removes from the HashMap
     }
 }
 
 fn cleanup_stale_tasks(
     mut commands: Commands,
     mut chunk_manager: ResMut<ChunkManager>,
-    tasks: Query<(Entity, &ChunkGenerationTask)>,
+    tasks_query: Query<(Entity, &ChunkGenerationTask)>,
 ) {
-    const TASK_TIMEOUT: Duration = Duration::from_secs(5);
-
-    for (entity, task) in &tasks {
+    const TASK_TIMEOUT: Duration = Duration::from_secs(15);
+    let mut stale_tasks = Vec::new();
+    for (entity, task) in tasks_query.iter() {
         if chunk_manager.is_task_stale(task.position, TASK_TIMEOUT) {
-            commands.entity(entity).despawn();
-            chunk_manager.remove_chunk(task.position);
+            warn!("Chunk generation task for {:?} timed out.", task.position);
+            stale_tasks.push((entity, task.position));
         }
+    }
+    for (entity, pos) in stale_tasks {
+        if let Some(entity_commands) = commands.get_entity(entity) {
+            entity_commands.despawn_recursive();
+        }
+        chunk_manager.remove_chunk(pos);
     }
 }
 
-/// Plugin to manage terrain chunks.
+/// Plugin to manage terrain chunks using bevy_ecs_tilemap.
 pub struct ChunkManagerPlugin;
 
 impl Plugin for ChunkManagerPlugin {
@@ -387,8 +441,11 @@ impl Plugin for ChunkManagerPlugin {
                 Update,
                 (
                     update_chunks,
+                    apply_deferred,
                     handle_chunk_loading,
+                    apply_deferred,
                     handle_chunk_tasks,
+                    apply_deferred,
                     handle_chunk_unloading,
                 )
                     .chain(),

@@ -62,3 +62,6 @@ impl TerrainChunkComponent {
         }
     }
 }
+
+#[derive(Component, Debug, Clone)]
+pub struct TerrainChunkFeatureLayer(pub Entity);

@@ -74,7 +74,7 @@ impl TerrainPlugin {
                 chunks_to_unload: Default::default(),
 
                 // Loading parameters
-                loading_radius: 5,
+                loading_radius: 8,
                 max_chunks_per_frame: 8,
             };
 

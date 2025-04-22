@@ -8,6 +8,7 @@ use crate::{
     server::EnvConfig,
 };
 use bevy::{log::tracing_subscriber, prelude::*, utils::tracing};
+use bevy_ecs_tilemap::prelude::*;
 pub fn setup_app(mut app: App, config: EnvConfig, asset_path: String) -> App {
     app.add_plugins(StartupSequencePlugin);
     app.add_plugins((
@@ -83,8 +84,9 @@ pub fn setup_app(mut app: App, config: EnvConfig, asset_path: String) -> App {
         }
     }
 
-    // app.add_plugins(CameraPlugin);
     app.add_plugins(TerrainPlugin::new());
+    app.add_plugins(TilemapPlugin);
+    // app.add_plugins(CameraPlugin);
 
     app
 }
