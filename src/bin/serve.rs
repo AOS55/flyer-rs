@@ -24,25 +24,25 @@ use flyer::{
 };
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    info!("Starting Bevy server...");
+    println!("Starting Bevy server...");
 
     // Start TCP server
     let listener = TcpListener::bind("127.0.0.1:0").unwrap();
-    info!("PORT={}", listener.local_addr().unwrap().port());
+    println!("PORT={}", listener.local_addr().unwrap().port());
 
     // Accept one connection
     let (stream, _addr) = listener.accept().unwrap();
     let stream = Arc::new(Mutex::new(stream));
 
     // Wait for initial config
-    info!("Waiting for initial config...");
+    println!("Waiting for initial config...");
     let config = receive_initial_config(&stream)?;
-    info!("Initial config received successfully");
+    println!("Initial config received successfully");
 
     // Convert config to EnvConfig
-    info!("Converting config to EnvConfig...");
+    println!("Converting config to EnvConfig...");
     let env_config = EnvConfig::from_json(&config)?;
-    info!("Config converted successfully");
+    println!("Config converted successfully");
 
     // Send ready signal
     {
