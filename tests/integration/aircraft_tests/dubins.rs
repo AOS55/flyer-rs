@@ -79,14 +79,14 @@ fn test_climb() {
     // Set vertical speed for climbing
     if let Some(mut state) = app.query_single_mut::<DubinsAircraftState>() {
         state.controls.vertical_speed = 5.0; // 5 m/s climb rate
-        println!("initial state: {:?}", state);
+        info!("initial state: {:?}", state);
     }
 
     // Run for 1 second of simulation time
     app.run_steps(120);
 
     if let Some(state) = app.query_single::<DubinsAircraftState>() {
-        println!("post state: {:?}", state);
+        info!("post state: {:?}", state);
 
         assert_dubins_state_valid(state);
 
@@ -167,7 +167,7 @@ fn test_deceleration() {
     app.run_frame();
 
     let initial_speed = if let Some(state) = app.query_single::<DubinsAircraftState>() {
-        println!("initial speed: {:?}", state);
+        info!("initial speed: {:?}", state);
         state.spatial.velocity.norm()
     } else {
         panic!("Aircraft state not found");
@@ -187,7 +187,7 @@ fn test_deceleration() {
         panic!("Aircraft state not found");
     };
 
-    println!(
+    info!(
         "initial speed: {}, final speed: {}",
         initial_speed, final_speed
     );
@@ -264,7 +264,7 @@ fn test_control_limits() {
 
     if let Some(state) = app.query_single::<DubinsAircraftState>() {
         assert_dubins_state_valid(state);
-        println!(
+        info!(
             "bank_angle: {:?}, lim: {:?}",
             state.controls.bank_angle.abs(),
             aircraft_config.max_bank_angle,

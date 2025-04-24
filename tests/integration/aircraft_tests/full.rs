@@ -1,3 +1,4 @@
+use bevy::prelude::*;
 use flyer::{
     components::{
         AirData, AircraftControlSurfaces, PhysicsComponent, PropulsionState, SpatialComponent,
@@ -8,7 +9,7 @@ use nalgebra::Vector3;
 
 use crate::common::{create_test_full_config, TestAppBuilder};
 
-#[test]
+// #[test]
 // fn test_straight_level_flight() {
 //     let aircraft_config = create_test_full_config();
 //     let mut app = TestAppBuilder::new()
@@ -116,13 +117,13 @@ fn test_elevator_control() {
     let aircraft_config = create_test_full_config();
 
     // Print the aerodynamic coefficients we're using
-    println!("Aircraft config:");
-    println!(
+    info!("Aircraft config:");
+    info!(
         "  Pitch coefficients: {:?}",
         aircraft_config.aero_coef.pitch
     );
-    println!("  Lift coefficients: {:?}", aircraft_config.aero_coef.lift);
-    println!("  Geometry: {:?}", aircraft_config.geometry);
+    info!("  Lift coefficients: {:?}", aircraft_config.aero_coef.lift);
+    info!("  Geometry: {:?}", aircraft_config.geometry);
 
     let mut app = TestAppBuilder::new()
         .with_full_aircraft(aircraft_config)
@@ -142,8 +143,8 @@ fn test_elevator_control() {
         spatial.velocity = Vector3::new(50.0, 0.0, 0.0);
 
         // Print initial forces and moments
-        println!("Initial forces: {:?}", physics.forces);
-        println!("Initial moments: {:?}", physics.moments);
+        info!("Initial forces: {:?}", physics.forces);
+        info!("Initial moments: {:?}", physics.moments);
 
         // Set trim conditions
         control_surfaces.elevator = 0.0;
@@ -160,12 +161,12 @@ fn test_elevator_control() {
         app.query_tuple3_single_mut::<SpatialComponent, AirData, PhysicsComponent>()
     {
         let (_roll, pitch, _yaw) = spatial.attitude.euler_angles();
-        println!("Initial state:");
-        println!("  pitch: {}", pitch);
-        println!("  alpha: {}", air_data.alpha);
-        println!("  q: {}", spatial.angular_velocity.y);
-        println!("  forces: {:?}", physics.forces);
-        println!("  moments: {:?}", physics.moments);
+        info!("Initial state:");
+        info!("  pitch: {}", pitch);
+        info!("  alpha: {}", air_data.alpha);
+        info!("  q: {}", spatial.angular_velocity.y);
+        info!("  forces: {:?}", physics.forces);
+        info!("  moments: {:?}", physics.moments);
         pitch
     } else {
         panic!("Aircraft state not found");
@@ -174,7 +175,7 @@ fn test_elevator_control() {
     // Apply elevator deflection
     if let Some(mut control_surfaces) = app.query_single_mut::<AircraftControlSurfaces>() {
         control_surfaces.elevator = 0.1;
-        println!("Applied elevator deflection: {}", control_surfaces.elevator);
+        info!("Applied elevator deflection: {}", control_surfaces.elevator);
     }
 
     // Run simulation
@@ -184,12 +185,12 @@ fn test_elevator_control() {
         app.query_tuple3_single_mut::<SpatialComponent, AirData, PhysicsComponent>()
     {
         let (_roll, final_pitch, _yaw) = spatial.attitude.euler_angles();
-        println!("Final state:");
-        println!("  pitch: {}", final_pitch);
-        println!("  alpha: {}", air_data.alpha);
-        println!("  q: {}", spatial.angular_velocity.y);
-        println!("  forces: {:?}", physics.forces);
-        println!("  moments: {:?}", physics.moments);
+        info!("Final state:");
+        info!("  pitch: {}", final_pitch);
+        info!("  alpha: {}", air_data.alpha);
+        info!("  q: {}", spatial.angular_velocity.y);
+        info!("  forces: {:?}", physics.forces);
+        info!("  moments: {:?}", physics.moments);
 
         // Verify pitch response
         assert!(
@@ -238,8 +239,8 @@ fn test_aileron_control() {
         spatial.velocity = Vector3::new(50.0, 0.0, 0.0);
 
         // Print initial forces and moments
-        println!("Initial forces: {:?}", physics.forces);
-        println!("Initial moments: {:?}", physics.moments);
+        info!("Initial forces: {:?}", physics.forces);
+        info!("Initial moments: {:?}", physics.moments);
 
         // Set trim conditions
         control_surfaces.elevator = 0.0;
@@ -256,12 +257,12 @@ fn test_aileron_control() {
         app.query_tuple3_single_mut::<SpatialComponent, AirData, PhysicsComponent>()
     {
         let (roll, _pitch, _yaw) = spatial.attitude.euler_angles();
-        println!("Initial state:");
-        println!("  roll: {}", roll);
-        println!("  alpha: {}", air_data.alpha);
-        println!("  p: {}", spatial.angular_velocity.x);
-        println!("  forces: {:?}", physics.forces);
-        println!("  moments: {:?}", physics.moments);
+        info!("Initial state:");
+        info!("  roll: {}", roll);
+        info!("  alpha: {}", air_data.alpha);
+        info!("  p: {}", spatial.angular_velocity.x);
+        info!("  forces: {:?}", physics.forces);
+        info!("  moments: {:?}", physics.moments);
         roll
     } else {
         panic!("Aircraft state not found");
@@ -312,8 +313,8 @@ fn test_rudder_control() {
         spatial.velocity = Vector3::new(50.0, 0.0, 0.0);
 
         // Print initial forces and moments
-        println!("Initial forces: {:?}", physics.forces);
-        println!("Initial moments: {:?}", physics.moments);
+        info!("Initial forces: {:?}", physics.forces);
+        info!("Initial moments: {:?}", physics.moments);
 
         // Set trim conditions
         control_surfaces.elevator = 0.0;
@@ -329,12 +330,12 @@ fn test_rudder_control() {
         app.query_tuple3_single_mut::<SpatialComponent, AirData, PhysicsComponent>()
     {
         let (_roll, _pitch, yaw) = spatial.attitude.euler_angles();
-        println!("Initial state:");
-        println!("  yaw: {}", yaw);
-        println!("  alpha: {}", air_data.alpha);
-        println!("  r: {}", spatial.angular_velocity.z);
-        println!("  forces: {:?}", physics.forces);
-        println!("  moments: {:?}", physics.moments);
+        info!("Initial state:");
+        info!("  yaw: {}", yaw);
+        info!("  alpha: {}", air_data.alpha);
+        info!("  r: {}", spatial.angular_velocity.z);
+        info!("  forces: {:?}", physics.forces);
+        info!("  moments: {:?}", physics.moments);
         yaw
     } else {
         panic!("Aircraft state not found");
