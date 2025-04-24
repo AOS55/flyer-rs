@@ -202,6 +202,7 @@ impl AeroEffect<Vec<f64>> for AersoAdapter {
 mod tests {
     use super::*;
     use approx::assert_relative_eq;
+    use bevy::prelude::*;
     use std::f64::consts::PI;
 
     fn create_test_geometry() -> AircraftGeometry {
@@ -320,11 +321,11 @@ mod tests {
         let expected_cm = adapter.coefficients.pitch.c_m_0
             + adapter.coefficients.pitch.c_m_deltae * controls.elevator;
 
-        println!("Debug elevator effects:");
-        println!("  elevator: {}", controls.elevator);
-        println!("  c_m_deltae: {}", adapter.coefficients.pitch.c_m_deltae);
-        println!("  expected_cm: {}", expected_cm);
-        println!("  actual_cm: {}", actual_cm);
+        info!("Debug elevator effects:");
+        info!("  elevator: {}", controls.elevator);
+        info!("  c_m_deltae: {}", adapter.coefficients.pitch.c_m_deltae);
+        info!("  expected_cm: {}", expected_cm);
+        info!("  actual_cm: {}", actual_cm);
 
         assert_relative_eq!(actual_cm, expected_cm, epsilon = 1e-6);
     }
@@ -376,12 +377,12 @@ mod tests {
         let actual_cm =
             moments.y / (air_state.q * adapter.geometry.wing_area * adapter.geometry.mac);
 
-        println!("Debug rate effects:");
-        println!("  q_hat: {}", q_hat);
-        println!("  c_m_q: {}", adapter.coefficients.pitch.c_m_q);
-        println!("  c_m_0: {}", adapter.coefficients.pitch.c_m_0);
-        println!("  expected_cm: {}", expected_cm);
-        println!("  actual_cm: {}", actual_cm);
+        info!("Debug rate effects:");
+        info!("  q_hat: {}", q_hat);
+        info!("  c_m_q: {}", adapter.coefficients.pitch.c_m_q);
+        info!("  c_m_0: {}", adapter.coefficients.pitch.c_m_0);
+        info!("  expected_cm: {}", expected_cm);
+        info!("  actual_cm: {}", actual_cm);
 
         assert_relative_eq!(actual_cm, expected_cm, epsilon = 1e-6);
     }

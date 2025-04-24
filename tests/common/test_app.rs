@@ -115,17 +115,17 @@ impl TestAppBuilder {
         app.add_systems(
             Update,
             (
-                (|| println!("Before air_data_system")),
+                (|| info!("Before air_data_system")),
                 air_data_system,
-                (|| println!("After air_data_system")),
+                (|| info!("After air_data_system")),
                 aero_force_system,
-                (|| println!("After aero_force_system")),
+                (|| info!("After aero_force_system")),
                 propulsion_system,
-                (|| println!("After propulsion_system")),
+                (|| info!("After propulsion_system")),
                 force_calculator_system,
-                (|| println!("After force_calculator_system")),
+                (|| info!("After force_calculator_system")),
                 physics_integrator_system,
-                (|| println!("After physics_integrator_system")),
+                (|| info!("After physics_integrator_system")),
             )
                 .chain(),
         );
@@ -162,7 +162,7 @@ pub struct TestApp {
 
 impl TestApp {
     pub fn run_steps(&mut self, steps: usize) {
-        println!("Running {} steps", steps);
+        info!("Running {} steps", steps);
         for _ in 0..steps {
             self.app.update();
         }
@@ -204,10 +204,8 @@ impl TestApp {
         let mut query = world.query::<(&mut A, &mut B, &mut C)>();
         query.get_single_mut(world).ok()
     }
-    
-    pub fn query_tuple3_single<A, B, C>(
-        &mut self,
-    ) -> Option<(&A, &B, &C)>
+
+    pub fn query_tuple3_single<A, B, C>(&mut self) -> Option<(&A, &B, &C)>
     where
         A: Component,
         B: Component,

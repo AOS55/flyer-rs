@@ -19,6 +19,7 @@ use crate::{
     },
 };
 use argmin::core::{CostFunction, Error as ArgminError, Gradient};
+use bevy::prelude::*;
 use nalgebra::{UnitQuaternion, Vector3}; // For logging inside cost/gradient if needed with debug level
 
 #[derive(Clone)] // Needed for argmin Executor
@@ -154,38 +155,38 @@ impl CostFunction for TrimProblem<'_> {
 
         if self.solver_config.debug_level > 0 {
             // Use debug level 1 for basic checks
-            println!("\n--- Trim Cost Calculation ---");
-            println!(
+            info!("\n--- Trim Cost Calculation ---");
+            info!(
                 "  Input Param (alpha, elev, pwr): [{:.4}, {:.4}, {:.4}]",
                 param[0], param[1], param[2]
             );
-            println!(
+            info!(
                 "  Clamped Input (alpha, elev, pwr): [{:.4}, {:.4}, {:.4}]",
                 alpha, elevator, power_lever
             );
-            println!("  Hypothetical State:");
-            println!("    Target Airspeed: {:.2}", target_airspeed);
-            println!("    Target Gamma: {:.2}", target_gamma.to_degrees());
-            println!("    Theta (alpha+gamma): {:.2}", theta.to_degrees());
-            println!(
+            info!("  Hypothetical State:");
+            info!("    Target Airspeed: {:.2}", target_airspeed);
+            info!("    Target Gamma: {:.2}", target_gamma.to_degrees());
+            info!("    Theta (alpha+gamma): {:.2}", theta.to_degrees());
+            info!(
                 "    Velocity (World): [{:.2}, {:.2}, {:.2}]",
                 velocity.x, velocity.y, velocity.z
             );
-            println!("    Attitude (Quat): {:?}", attitude);
-            println!("  Air Data Values:");
-            println!("    TAS: {:.2}", air_data_values.true_airspeed);
-            println!("    Alpha: {:.2} deg", air_data_values.alpha.to_degrees());
-            println!("    Beta: {:.2} deg", air_data_values.beta.to_degrees());
-            println!(
+            info!("    Attitude (Quat): {:?}", attitude);
+            info!("  Air Data Values:");
+            info!("    TAS: {:.2}", air_data_values.true_airspeed);
+            info!("    Alpha: {:.2} deg", air_data_values.alpha.to_degrees());
+            info!("    Beta: {:.2} deg", air_data_values.beta.to_degrees());
+            info!(
                 "    Dyn Pressure (q): {:.2}",
                 air_data_values.dynamic_pressure
             );
-            println!("  Calculated Forces/Moments (Body Frame):");
-            println!(
+            info!("  Calculated Forces/Moments (Body Frame):");
+            info!(
                 "    Aero Force: [{:.2}, {:.2}, {:.2}]",
                 aero_f.x, aero_f.y, aero_f.z
             );
-            println!(
+            info!(
                 "    Aero Moment: [{:.2}, {:.2}, {:.2}]",
                 aero_m.x, aero_m.y, aero_m.z
             );
@@ -200,16 +201,16 @@ impl CostFunction for TrimProblem<'_> {
         );
 
         if self.solver_config.debug_level > 0 {
-            println!("  Net Forces/Moments:");
-            println!(
+            info!("  Net Forces/Moments:");
+            info!(
                 "    Net Force (Inertial): [{:.2}, {:.2}, {:.2}]",
                 net_force_inertial.x, net_force_inertial.y, net_force_inertial.z
             );
-            println!(
+            info!(
                 "    Net Moment (Body): [{:.2}, {:.2}, {:.2}]",
                 net_moment_body.x, net_moment_body.y, net_moment_body.z
             );
-            println!(
+            info!(
                 "    Gravity Vector (Body): [{:.2}, {:.2}, {:.2}]",
                 grav_body_vec.x, grav_body_vec.y, grav_body_vec.z
             );
@@ -225,12 +226,12 @@ impl CostFunction for TrimProblem<'_> {
 
         // Optional Debug Print
         if self.solver_config.debug_level > 0 {
-            println!("  Residuals:");
-            println!("    Pitch Moment: {:.4e}", pitch_moment_residual);
-            println!("    Vertical Force: {:.4e}", vertical_force_residual);
-            println!("    Horizontal Force: {:.4e}", horizontal_force_residual);
-            println!("  Calculated Cost: {:.6e}", cost);
-            println!("--- End Trim Cost Calculation ---\n");
+            info!("  Residuals:");
+            info!("    Pitch Moment: {:.4e}", pitch_moment_residual);
+            info!("    Vertical Force: {:.4e}", vertical_force_residual);
+            info!("    Horizontal Force: {:.4e}", horizontal_force_residual);
+            info!("  Calculated Cost: {:.6e}", cost);
+            info!("--- End Trim Cost Calculation ---\n");
         }
 
         Ok(cost)

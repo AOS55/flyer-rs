@@ -1,6 +1,7 @@
+use crate::components::{AirData, AircraftControlSurfaces, SpatialComponent};
+use bevy::prelude::*;
 use nalgebra::{UnitQuaternion, Vector3};
 use serde::{Deserialize, Serialize};
-use crate::components::{AirData, AircraftControlSurfaces, SpatialComponent};
 
 /// Represents different types of trim conditions
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
@@ -162,15 +163,15 @@ impl TrimState {
             || clamped_longitudinal.alpha != self.longitudinal.alpha
             || clamped_longitudinal.theta != self.longitudinal.theta
         {
-            println!("WARNING: Clamping extreme optimizer values:");
-            println!(
+            warn!("WARNING: Clamping extreme optimizer values:");
+            info!(
                 "  Original: elev={:.3}, pwr={:.3}, α={:.1}°, θ={:.1}°",
                 self.longitudinal.elevator,
                 self.longitudinal.power_lever,
                 self.longitudinal.alpha.to_degrees(),
                 self.longitudinal.theta.to_degrees()
             );
-            println!(
+            info!(
                 "  Clamped: elev={:.3}, pwr={:.3}, α={:.1}°, θ={:.1}°",
                 clamped_longitudinal.elevator,
                 clamped_longitudinal.power_lever,
@@ -228,11 +229,11 @@ impl TrimState {
         let calculated_alpha = (vel_body.z).atan2(vel_body.x);
 
         // Print debug info for verification
-        println!("DEBUG: Applying trim state - Target Alpha: {:.2}°, FPA: {:.2}°, Calculated Alpha: {:.2}°",
+        info!("DEBUG: Applying trim state - Target Alpha: {:.2}°, FPA: {:.2}°, Calculated Alpha: {:.2}°",
                  clamped_longitudinal.alpha.to_degrees(),
                  flight_path_angle.to_degrees(),
                  calculated_alpha.to_degrees());
-        println!(
+        info!(
             "DEBUG: Velocity: [{:.1}, {:.1}, {:.1}], Attitude Pitch: {:.2}°",
             spatial.velocity.x,
             spatial.velocity.y,

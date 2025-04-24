@@ -55,16 +55,6 @@ impl SpatialComponent {
 
     /// Create level position and airspeed
     pub fn at_position_and_airspeed(position: Vector3<f64>, speed: f64, heading: f64) -> Self {
-        println!(
-            "at_position_and_airspeed speed: {:?}, heading: {:?}",
-            speed, heading
-        );
-
-        println!(
-            "at_position_and_airspeed position: {:?}, velocity: {:?}",
-            position,
-            Vector3::new(speed * heading.cos(), speed * heading.sin(), 0.0)
-        );
         Self {
             position,
             velocity: Vector3::new(speed * heading.cos(), speed * heading.sin(), 0.0),

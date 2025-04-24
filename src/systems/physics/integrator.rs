@@ -443,7 +443,7 @@ mod tests {
                 assert_relative_eq!(quat_norm, 1.0, epsilon = 1e-10, max_relative = 1e-10);
             }
 
-            println!("Numerical stability test passed for timestep = {}", dt);
+            info!("Numerical stability test passed for timestep = {}", dt);
         }
     }
 

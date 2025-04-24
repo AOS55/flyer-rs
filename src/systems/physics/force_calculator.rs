@@ -58,7 +58,7 @@ pub fn calculate_net_forces_moments(
                 // TODO: Implement proper Wind frame to Inertial transformation if needed
                 // This requires knowledge of the wind vector and potentially airspeed.
                 // Placeholder: Treat like Body frame - this is likely incorrect for Wind frame.
-                eprintln!("Warning: Wind->Inertial force transformation not implemented.");
+                warn!("Warning: Wind->Inertial force transformation not implemented.");
                 attitude * force.vector
             }
         };
@@ -73,7 +73,7 @@ pub fn calculate_net_forces_moments(
                 ReferenceFrame::Inertial => attitude.inverse() * force.vector,
                 ReferenceFrame::Wind => {
                     // TODO: Implement proper Wind frame to Body transformation if needed
-                    eprintln!(
+                    warn!(
                         "Warning: Wind->Body force transformation not implemented for moment calc."
                     );
                     // Placeholder: Transform from inertial frame (calculated above) to body frame
@@ -98,7 +98,7 @@ pub fn calculate_net_forces_moments(
             ReferenceFrame::Inertial => attitude.inverse() * moment.vector,
             ReferenceFrame::Wind => {
                 // TODO: Implement proper Wind frame to Body moment transformation if needed
-                eprintln!("Warning: Wind->Body moment transformation not implemented.");
+                warn!("Warning: Wind->Body moment transformation not implemented.");
                 // Placeholder: Treat like Inertial frame
                 attitude.inverse() * moment.vector
             }
@@ -215,14 +215,14 @@ mod tests {
         let _entity = world.spawn((physics, spatial)).id();
 
         // Run system
-        println!("Attitude quaternion: {:?}", spatial.attitude);
+        info!("Attitude quaternion: {:?}", spatial.attitude);
 
         // Before running the system, manually calculate the transformation
         let body_force = Vector3::new(10.0, 0.0, 0.0);
         let rotated_force = spatial.attitude * body_force;
-        println!("Manual force transformation:");
-        println!("  Body force: {:?}", body_force);
-        println!("  Rotated force: {:?}", rotated_force);
+        info!("Manual force transformation:");
+        info!("  Body force: {:?}", body_force);
+        info!("  Rotated force: {:?}", rotated_force);
 
         // Run system and get results
         let mut schedule = Schedule::default();
@@ -231,16 +231,16 @@ mod tests {
 
         let physics = world.query::<&PhysicsComponent>().single(&world);
 
-        println!("\nFinal forces:");
-        println!(
+        info!("\nFinal forces:");
+        info!(
             "  Net force before gravity: {:?}",
             physics.net_force - physics_config.gravity * mass
         );
-        println!(
+        info!(
             "  Gravity contribution: {:?}",
             physics_config.gravity * mass
         );
-        println!("  Total net force: {:?}", physics.net_force);
+        info!("  Total net force: {:?}", physics.net_force);
 
         // For a 45-degree pitch up:
         let sqrt2_2 = (2.0_f64).sqrt() / 2.0; // cos(45°) = sin(45°) = 1/√2
@@ -252,11 +252,11 @@ mod tests {
         // Vertical force decomposition plus gravity
         let expected_force_z = -force_magnitude * sqrt2_2 + mass * physics_config.gravity.z;
 
-        println!("Forces:");
-        println!("  Expected X: {}", expected_force_x);
-        println!("  Actual X: {}", physics.net_force.x);
-        println!("  Expected Z: {}", expected_force_z);
-        println!("  Actual Z: {}", physics.net_force.z);
+        info!("Forces:");
+        info!("  Expected X: {}", expected_force_x);
+        info!("  Actual X: {}", physics.net_force.x);
+        info!("  Expected Z: {}", expected_force_z);
+        info!("  Actual Z: {}", physics.net_force.z);
 
         // Check forces with reasonable tolerance
         let tolerance = 1e-10;
@@ -378,9 +378,9 @@ mod tests {
             // Expected gravitational force
             let expected_gravity = physics_config.gravity * mass;
 
-            println!("Attitude: {:?}", attitude.euler_angles());
-            println!("Net force: {:?}", physics_result.net_force);
-            println!("Expected gravity: {:?}", expected_gravity);
+            info!("Attitude: {:?}", attitude.euler_angles());
+            info!("Net force: {:?}", physics_result.net_force);
+            info!("Expected gravity: {:?}", expected_gravity);
 
             // Validate the results
             let magnitude_difference =
@@ -466,18 +466,18 @@ mod tests {
                 spatial.attitude.inverse() * (physics_config.gravity * mass);
             let expected_gravity_inertial = physics_config.gravity * mass;
 
-            println!("\nTest case: {}", name);
-            println!("Attitude quaternion: {:?}", attitude);
-            println!("Euler angles: {:?} radians", attitude.euler_angles());
-            println!(
+            info!("\nTest case: {}", name);
+            info!("Attitude quaternion: {:?}", attitude);
+            info!("Euler angles: {:?} radians", attitude.euler_angles());
+            info!(
                 "Expected body->inertial force: {:?}",
                 expected_inertial_force
             );
-            println!(
+            info!(
                 "Actual force without gravity: {:?}",
                 physics_result.net_force - expected_gravity_inertial
             );
-            println!(
+            info!(
                 "Expected gravity in body frame: {:?}",
                 expected_gravity_body
             );

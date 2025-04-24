@@ -124,6 +124,12 @@ impl Default for RandomStartConfig {
 
 impl RandomStartConfig {
     pub fn generate(&self) -> (Vector3<f64>, f64, f64) {
+        // let hardcoded_position = Vector3::new(0.0, 0.0, -500.0); // Example position
+        // let hardcoded_speed = 80.0; // Example speed
+        // let hardcoded_heading = 0.0;
+
+        // (hardcoded_position, hardcoded_speed, hardcoded_heading)
+
         info!("Random seed: {:?}", self.seed);
         let mut rng = match self.seed {
             Some(seed) => ChaCha8Rng::seed_from_u64(seed),
@@ -155,8 +161,14 @@ impl RandomStartConfig {
             };
 
         // Generate random values
-        let u1: f64 = rng.gen();
+        let mut u1: f64 = rng.gen();
         let u2: f64 = rng.gen();
+
+        // Prevent ln(0) by replacing 0 with a very small positive number
+        if u1 == 0.0 {
+            warn!("Generated u1 = 0.0 in Box-Muller, adjusting slightly.");
+            u1 = f64::EPSILON; // Use machine epsilon or a small number like 1e-9
+        }
 
         // Convert uniform random variables to polar coordinates
         let radius = self.position.variance * (-2.0 * u1.ln()).sqrt();

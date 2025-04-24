@@ -25,12 +25,12 @@ pub fn setup_app(mut app: App, config: EnvConfig, asset_path: String) -> App {
         add_aircraft_plugin(&mut app, aircraft_config.1.clone());
     }
 
-    println!("mode: {:?}", config.agent_config.mode);
+    info!("mode: {:?}", config.agent_config.mode);
 
     // TODO: sort out camera and render setup
     match config.agent_config.mode {
         RenderMode::Human => {
-            println!("Running Human Mode");
+            info!("Running Human Mode");
 
             // Create a special logger just for human mode
             // This must happen before any other logging setup
@@ -41,8 +41,8 @@ pub fn setup_app(mut app: App, config: EnvConfig, asset_path: String) -> App {
 
             // Attempt to set the global subscriber
             match tracing::subscriber::set_global_default(subscriber) {
-                Ok(_) => println!("Successfully set human mode custom logger"),
-                Err(e) => println!("Failed to set custom logger: {}", e),
+                Ok(_) => info!("Successfully set human mode custom logger"),
+                Err(e) => warn!("Failed to set custom logger: {}", e),
             }
 
             // Then add DefaultPlugins without LogPlugin
@@ -72,7 +72,7 @@ pub fn setup_app(mut app: App, config: EnvConfig, asset_path: String) -> App {
             app.insert_resource(Time::<Fixed>::from_seconds(1.0 / 60.0));
         }
         RenderMode::RGBArray => {
-            println!("Running RGBArray Mode");
+            info!("Running RGBArray Mode");
             app.add_plugins(HeadlessPlugin::new(
                 config.agent_config.render_width as u32,
                 config.agent_config.render_height as u32,

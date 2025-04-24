@@ -991,7 +991,7 @@ mod tests {
                     "Negative Beta should yield positive Fy (assuming negative Cy_beta dominates)"
                 );
             } else {
-                println!("WARN: Side force sign check inconclusive due to combined effects.");
+                warn!("WARN: Side force sign check inconclusive due to combined effects.");
             }
         }
         assert!(
@@ -999,7 +999,7 @@ mod tests {
             "Positive Alpha yields Lift, which should dominate to make Fz negative"
         ); // Lift usually dominates Fz
 
-        println!("Combined effects forces: {:?}", forces);
-        println!("Combined effects moments: {:?}", moments);
+        info!("Combined effects forces: {:?}", forces);
+        info!("Combined effects moments: {:?}", moments);
     }
 }

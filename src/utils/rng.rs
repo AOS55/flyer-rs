@@ -36,6 +36,7 @@ pub trait WithRng {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use bevy::prelude::*;
     use rand::Rng;
 
     #[test]
@@ -61,8 +62,8 @@ mod tests {
             }
         }
 
-        println!("First sequence:  {:?}", first_sequence);
-        println!("Second sequence: {:?}", second_sequence);
+        info!("First sequence:  {:?}", first_sequence);
+        info!("Second sequence: {:?}", second_sequence);
 
         // This assertion will fail with current implementation
         assert_eq!(
@@ -89,8 +90,8 @@ mod tests {
             }
         }
 
-        println!("Component1 sequence: {:?}", sequence1);
-        println!("Component2 sequence: {:?}", sequence2);
+        info!("Component1 sequence: {:?}", sequence1);
+        info!("Component2 sequence: {:?}", sequence2);
 
         // Different components should get different sequences
         assert_ne!(
@@ -120,8 +121,8 @@ mod tests {
             (u1, u2)
         };
 
-        println!("First reset state:  {:?}", state1);
-        println!("Second reset state: {:?}", state2);
+        info!("First reset state:  {:?}", state1);
+        info!("Second reset state: {:?}", state2);
 
         assert_eq!(
             state1, state2,
@@ -141,8 +142,8 @@ mod tests {
         // Next set of calls to same RNG
         let state2 = (rng.gen::<f64>(), rng.gen::<f64>());
 
-        println!("First two values:  {:?}", state1);
-        println!("Next two values: {:?}", state2);
+        info!("First two values:  {:?}", state1);
+        info!("Next two values: {:?}", state2);
 
         // These should be different as we're advancing the RNG
         assert_ne!(

@@ -236,7 +236,8 @@ pub fn reset_env(
                         *air_data = new_state.air_data;
                         *control_surfaces = new_state.control_surfaces;
                         // Reset propulsion state based on the actual number of engines
-                        *propulsion_comp = PropulsionState::new(new_full_config.propulsion.engines.len());
+                        *propulsion_comp =
+                            PropulsionState::new(new_full_config.propulsion.engines.len());
 
                         info!(
                             "Reset Full entity {} complete. Components updated.",
