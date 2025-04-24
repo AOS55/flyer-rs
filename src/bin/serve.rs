@@ -17,31 +17,32 @@ use flyer::{
     systems::{
         aero_force_system, air_data_system, calculate_reward, collect_state, determine_terminated,
         dubins_aircraft_system, force_calculator_system, handle_render_response,
-        handle_reset_response, physics_integrator_system, propulsion_system, render_frame, reset_env, running_physics,
-        sending_response, waiting_for_action, handle_trim_requests, trim_aircraft_system,
+        handle_reset_response, handle_trim_requests, physics_integrator_system, propulsion_system,
+        render_frame, reset_env, running_physics, sending_response, trim_aircraft_system,
+        waiting_for_action,
     },
 };
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    println!("Starting Bevy server...");
+    info!("Starting Bevy server...");
 
     // Start TCP server
     let listener = TcpListener::bind("127.0.0.1:0").unwrap();
-    println!("PORT={}", listener.local_addr().unwrap().port());
+    info!("PORT={}", listener.local_addr().unwrap().port());
 
     // Accept one connection
     let (stream, _addr) = listener.accept().unwrap();
     let stream = Arc::new(Mutex::new(stream));
 
     // Wait for initial config
-    println!("Waiting for initial config...");
+    info!("Waiting for initial config...");
     let config = receive_initial_config(&stream)?;
-    println!("Initial config received successfully");
+    info!("Initial config received successfully");
 
     // Convert config to EnvConfig
-    println!("Converting config to EnvConfig...");
+    info!("Converting config to EnvConfig...");
     let env_config = EnvConfig::from_json(&config)?;
-    println!("Config converted successfully");
+    info!("Config converted successfully");
 
     // Send ready signal
     {
@@ -68,15 +69,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 if let Ok(mut clone) = guard.try_clone() {
                     clone.write_all(response_str.as_bytes())?;
                     clone.flush()?;
-                    println!("Ready signal sent successfully: {}", response_str.trim());
+                    info!("Ready signal sent successfully: {}", response_str.trim());
                 }
             }
-            Err(e) => eprintln!("Failed to acquire stream lock: {}", e),
+            Err(e) => warn!("Failed to acquire stream lock: {}", e),
         }
     }
 
     // Create and configure bevy app
-    println!("Initializing Bevy app...");
+    info!("Initializing Bevy app...");
     let mut app = App::new();
 
     // Add server state resource
@@ -89,7 +90,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Configure asset directory
     let asset_path = get_asset_path();
-    println!("Using asset path: {}", asset_path.display());
+    info!("Using asset path: {}", asset_path.display());
 
     app = setup_app(
         app,
@@ -109,10 +110,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         // .add_systems(FixedFirst, debug_state)
         .add_systems(
             FixedPreUpdate,
-            (
-                handle_commands.run_if(waiting_state),
-                handle_trim_requests,
-            ),
+            (handle_commands.run_if(waiting_state), handle_trim_requests),
         )
         // Action handling and Physics in Update
         .add_systems(
@@ -168,7 +166,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     );
 
     // Run app
-    println!("Starting Bevy app...");
+    info!("Starting Bevy app...");
     app.run();
 
     Ok(())
@@ -226,7 +224,7 @@ fn get_asset_path() -> PathBuf {
     }
 
     // If all else fails, return a reasonable fallback
-    eprintln!("Assets not found in any standard location");
+    warn!("Assets not found in any standard location");
     PathBuf::from("assets")
 }
 
@@ -242,7 +240,7 @@ fn receive_initial_config(stream: &Arc<Mutex<TcpStream>>) -> std::io::Result<ser
     let guard = match stream.lock() {
         Ok(guard) => guard,
         Err(e) => {
-            eprintln!("Failed to acquire stream lock: {}", e);
+            warn!("Failed to acquire stream lock: {}", e);
             return Err(std::io::Error::new(
                 std::io::ErrorKind::Other,
                 "Failed to acquire lock",
@@ -253,29 +251,29 @@ fn receive_initial_config(stream: &Arc<Mutex<TcpStream>>) -> std::io::Result<ser
     let mut reader = BufReader::new(guard.try_clone()?);
     let mut line = String::new();
 
-    println!("Reading line from stream...");
+    info!("Reading line from stream...");
     match reader.read_line(&mut line) {
-        Ok(n) => println!("Read {} bytes", n),
-        Err(e) => eprintln!("Error reading line: {}", e),
+        Ok(n) => info!("Read {} bytes", n),
+        Err(e) => warn!("Error reading line: {}", e),
     }
-    println!("Received raw line: '{}'", line);
+    info!("Received raw line: '{}'", line);
 
     let cmd: Command = match serde_json::from_str(&line) {
         Ok(cmd) => cmd,
         Err(e) => {
-            eprintln!("Failed to parse command: {}", e);
+            warn!("Failed to parse command: {}", e);
             return Err(std::io::Error::new(std::io::ErrorKind::InvalidData, e));
         }
     };
 
     match cmd {
         Command::Initialize { config } => {
-            println!("Got Initialize command with config");
+            info!("Got Initialize command with config");
             Ok(config)
         }
         _ => {
             let err = format!("Unexpected command received: {:?}", cmd);
-            eprintln!("{}", err);
+            warn!("{}", err);
             Err(std::io::Error::new(std::io::ErrorKind::InvalidData, err))
         }
     }
