@@ -17,9 +17,14 @@ pub fn dubins_aircraft_system(
 ) {
     let dt = physics.timestep;
 
-    for (mut aircraft, config) in query.iter_mut() {
+    query.par_iter_mut().for_each(|(mut aircraft, config)| {
+        // The update_aircraft logic remains the same
         update_aircraft(&mut aircraft, config, dt);
-    }
+    });
+
+    // for (mut aircraft, config) in query.iter_mut() {
+    //     update_aircraft(&mut aircraft, config, dt);
+    // }
 }
 
 /// Updates the state of a single Dubins aircraft.
@@ -29,7 +34,7 @@ pub fn dubins_aircraft_system(
 /// * `config` - The configuration parameters defining the aircraft's limits and capabilities.
 /// * `dt` - The time step (in seconds) over which to apply the update.
 fn update_aircraft(state: &mut DubinsAircraftState, config: &DubinsAircraftConfig, dt: f64) {
-    info!("Updating Aircraft State");
+    // info!("Updating Aircraft State");
 
     state.controls.bank_angle = state
         .controls
@@ -53,14 +58,14 @@ fn update_aircraft(state: &mut DubinsAircraftState, config: &DubinsAircraftConfi
     let acceleration = controls.acceleration;
     let speed = spatial.velocity.norm();
     let new_speed = (speed + acceleration * dt).clamp(config.min_speed, config.max_speed);
-    info!(
-        "Current speed: {}, acceleration: {}, new_speed: {}",
-        speed, acceleration, new_speed
-    );
-    info!(
-        "min_speed: {}, max_speed: {}",
-        config.min_speed, config.max_speed
-    );
+    // info!(
+    //     "Current speed: {}, acceleration: {}, new_speed: {}",
+    //     speed, acceleration, new_speed
+    // );
+    // info!(
+    //     "min_speed: {}, max_speed: {}",
+    //     config.min_speed, config.max_speed
+    // );
 
     // Extract the current heading (yaw) from the aircraft's attitude
     let (_roll, _pitch, yaw) = spatial.attitude.euler_angles();
@@ -79,15 +84,15 @@ fn update_aircraft(state: &mut DubinsAircraftState, config: &DubinsAircraftConfi
         0.0
     };
 
-    info!(
-        "position before update: {:?}, controls: {:?}",
-        spatial.position, controls
-    );
+    // info!(
+    //     "position before update: {:?}, controls: {:?}",
+    //     spatial.position, controls
+    // );
     // Update position based on speed, heading, and vertical speed
     spatial.position.x += new_speed * yaw.cos() * dt;
     spatial.position.y += new_speed * yaw.sin() * dt;
     spatial.position.z -= controls.vertical_speed * dt;
-    info!("position after update: {:?}", spatial.position);
+    // info!("position after update: {:?}", spatial.position);
 
     // Update heading: θ_t+1 = θ_t + c_φ*φ*dt
     let heading_change = turn_rate * dt;

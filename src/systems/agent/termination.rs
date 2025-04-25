@@ -27,14 +27,12 @@ pub fn determine_terminated(
         for (id, state, task, collision) in dubins_query.iter() {
             let terminated = task.is_dubins_terminated(state, collision);
             termination_buffer.insert(id.id.clone(), terminated);
-            info!("Termination for {:?} is {:?}", id, terminated);
         }
 
         // Calculate termination for full aircraft
         for (id, spatial, task, collision) in full_query.iter() {
             let terminated = task.is_full_terminated(spatial, collision);
             termination_buffer.insert(id.id.clone(), terminated);
-            info!("Termination for {:?} is {:?}", id, terminated);
         }
     }
 }

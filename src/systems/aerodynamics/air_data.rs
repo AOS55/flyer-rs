@@ -95,19 +95,20 @@ pub fn air_data_system(
     environment: Res<EnvironmentModel>,                  // Still need resources
     config: Res<AerodynamicsConfig>,
 ) {
+    let min_threshold = config.min_airspeed_threshold;
     // println!("Running air_data_system!");
-    for (mut air_data, spatial) in query.iter_mut() {
+    query.par_iter_mut().for_each(|(mut air_data, spatial)| {
         // 1. Get Inputs needed for the pure function
         let wind_inertial = environment.get_wind(&spatial.position);
         let density = environment.get_density(&spatial.position);
 
         // 2. Call the pure calculation function
         let calculated_values: AirDataValues = calculate_air_data(
-            &spatial.velocity,             // Pass inertial velocity from component
-            &spatial.attitude,             // Pass attitude from component
-            &wind_inertial,                // Pass world wind from environment
-            density,                       // Pass density from environment
-            config.min_airspeed_threshold, // Pass threshold from config
+            &spatial.velocity, // Pass inertial velocity from component
+            &spatial.attitude, // Pass attitude from component
+            &wind_inertial,    // Pass world wind from environment
+            density,           // Pass density from environment
+            min_threshold,     // Pass threshold from config
         );
 
         // 3. Update the AirData component with the results
@@ -120,7 +121,7 @@ pub fn air_data_system(
         air_data.relative_velocity = calculated_values.relative_velocity_body;
         // Store world wind (as before)
         air_data.wind_velocity = wind_inertial;
-    }
+    });
 }
 
 #[cfg(test)]

@@ -119,7 +119,7 @@ pub fn force_calculator_system(
     mut query: Query<(&mut PhysicsComponent, &SpatialComponent)>,
     config: Res<PhysicsConfig>, // Access global physics config (for gravity)
 ) {
-    for (mut physics, spatial) in query.iter_mut() {
+    query.par_iter_mut().for_each(|(mut physics, spatial)| {
         // 1. Prepare inputs for the pure function
         // Clone the force/moment lists added by other systems in this frame.
         // It's important that aero_force_system, propulsion_system, etc., run *before* this system.
@@ -165,7 +165,7 @@ pub fn force_calculator_system(
 
         // Resetting net forces *within* the PhysicsComponent was done in the pure function implicitly
         // by starting summations from zero. The component fields are overwritten here.
-    }
+    });
 }
 
 #[cfg(test)]

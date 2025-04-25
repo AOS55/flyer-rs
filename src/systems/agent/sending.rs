@@ -48,10 +48,10 @@ pub fn sending_response(agent_state: Res<AgentState>, mut server: ResMut<ServerS
             false
         };
 
-        info!(
-            "current_step: {:?}, max_episode_steps: {:?}, truncated: {:?}",
-            agent_state.current_step, server.config.max_episode_steps, truncated
-        );
+        // info!(
+        //     "current_step: {:?}, max_episode_steps: {:?}, truncated: {:?}",
+        //     agent_state.current_step, server.config.max_episode_steps, truncated
+        // );
 
         // Send response via TCP
         if !all_observations.is_empty() {
@@ -69,9 +69,9 @@ pub fn sending_response(agent_state: Res<AgentState>, mut server: ResMut<ServerS
 
                     if stream.write_all(response_str.as_bytes()).is_ok() {
                         stream.flush().ok();
-                        info!("Response sent successfully");
+                        // info!("Response sent successfully");
                     } else {
-                        error!("Failed to send response");
+                        // error!("Failed to send response");
                     }
                 }
             }

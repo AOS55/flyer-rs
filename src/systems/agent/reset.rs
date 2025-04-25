@@ -18,11 +18,11 @@ pub fn handle_reset_response(
     mut server: ResMut<ServerState>,
 ) {
     let conn = server.conn.clone();
-    info!("Handling Reset Response");
+    // info!("Handling Reset Response");
 
     // Process the event payload directly
     for event in reset_complete.read() {
-        info!("Processing ResetCompleteEvent received from reset_env");
+        // info!("Processing ResetCompleteEvent received from reset_env");
 
         // Use observations directly from the event
         let all_observations = event.initial_observations.clone();
@@ -33,7 +33,7 @@ pub fn handle_reset_response(
         let all_terminations: HashMap<String, bool> = HashMap::new();
 
         // Log detailed observation info for debugging
-        info!("Observations received via event: {:?}", all_observations);
+        // info!("Observations received via event: {:?}", all_observations);
 
         // Send reset response
         if let Ok(guard) = conn.lock() {
@@ -48,7 +48,7 @@ pub fn handle_reset_response(
 
                 match serde_json::to_string(&response) {
                     Ok(response_str) => {
-                        info!("Sending reset response: {}", response_str);
+                        // info!("Sending reset response: {}", response_str);
                         if stream.write_all((response_str + "\n").as_bytes()).is_ok() {
                             if let Err(e) = stream.flush() {
                                 error!(
@@ -57,7 +57,7 @@ pub fn handle_reset_response(
                                 );
                             }
                             // Transition back to waiting state ONLY after successful send+flush
-                            info!("Reset successful, transitioning to WaitingForAction");
+                            // info!("Reset successful, transitioning to WaitingForAction");
                             server.sim_state = SimState::WaitingForAction;
                         } else {
                             error!("Failed to write reset response to stream");
@@ -107,7 +107,7 @@ pub fn reset_env(
     mut agent_state: ResMut<AgentState>,
     mut server: ResMut<ServerState>, // Needs to be mutable to update config
 ) {
-    info!("Resetting agent state");
+    // info!("Resetting agent state");
 
     for event in reset_events.read() {
         // Reset the agent state buffers (except action queue)
@@ -118,7 +118,7 @@ pub fn reset_env(
             match server.config.rebuild_with_seed(seed) {
                 Ok(new_config) => {
                     server.config = new_config;
-                    info!("Successfully rebuilt EnvConfig with seed: {}", seed);
+                    // info!("Successfully rebuilt EnvConfig with seed: {}", seed);
                     // Log success
                 }
                 Err(e) => {
@@ -139,13 +139,13 @@ pub fn reset_env(
             for (id_str, config) in &server.config.aircraft_configs {
                 let initial_state = match config {
                     AircraftConfig::Dubins(dubins_conf) => {
-                        info!("Generating initial Dubins state for {} from config", id_str);
+                        // info!("Generating initial Dubins state for {} from config", id_str);
                         AircraftState::Dubins(DubinsAircraftState::from_config(
                             &dubins_conf.start_config,
                         ))
                     }
                     AircraftConfig::Full(full_conf) => {
-                        info!("Generating initial Full state for {} from config", id_str);
+                        // info!("Generating initial Full state for {} from config", id_str);
                         AircraftState::Full(FullAircraftState::from_config(full_conf))
                     }
                 };
@@ -153,12 +153,12 @@ pub fn reset_env(
 
                 // Populate buffer for subsequent steps' state collection
                 state_buffer.insert(id, initial_state.clone());
-                info!("Populated state buffer for {}", id_str);
+                // info!("Populated state buffer for {}", id_str);
 
                 // ---> Generate the initial observation for the reset response <---
                 if let Some(obs_space) = observation_spaces.get(id_str) {
                     let obs = obs_space.to_observation(&initial_state);
-                    info!("Generated initial observation for {}: {:?}", id_str, obs);
+                    // info!("Generated initial observation for {}: {:?}", id_str, obs);
                     initial_observations.insert(id_str.clone(), obs);
                 } else {
                     error!(
@@ -171,12 +171,12 @@ pub fn reset_env(
                 // ---> End observation generation <---
             }
 
-            info!(
-                "State buffer populated with {} aircraft",
-                state_buffer.len()
-            );
-            let keys: Vec<_> = state_buffer.keys().cloned().collect(); // Clone keys for logging
-            info!("Populated state buffer contains keys: {:?}", keys);
+            // info!(
+            //     "State buffer populated with {} aircraft",
+            //     state_buffer.len()
+            // );
+            // let keys: Vec<_> = state_buffer.keys().cloned().collect(); // Clone keys for logging
+            // info!("Populated state buffer contains keys: {:?}", keys);
         } else {
             error!("Failed to lock state buffer for reset population.");
             continue; // Skip if lock fails
@@ -196,7 +196,7 @@ pub fn reset_env(
             if let Some(config) = server.config.aircraft_configs.get(&identifier.to_string()) {
                 match config {
                     AircraftConfig::Dubins(ref new_dubins_config) => {
-                        info!("Resetting Dubins entity: {}", identifier.to_string());
+                        // info!("Resetting Dubins entity: {}", identifier.to_string());
                         *dubins_config_comp = new_dubins_config.clone();
                         *state_comp =
                             DubinsAircraftState::from_config(&new_dubins_config.start_config);
@@ -228,7 +228,7 @@ pub fn reset_env(
             if let Some(config) = server.config.aircraft_configs.get(&identifier.to_string()) {
                 match config {
                     AircraftConfig::Full(ref new_full_config) => {
-                        info!("Resetting Full entity: {}", identifier.to_string());
+                        // info!("Resetting Full entity: {}", identifier.to_string());
                         *full_config_comp = new_full_config.clone();
                         let new_state = FullAircraftState::from_config(new_full_config);
                         *spatial_comp = new_state.spatial;
@@ -239,10 +239,10 @@ pub fn reset_env(
                         *propulsion_comp =
                             PropulsionState::new(new_full_config.propulsion.engines.len());
 
-                        info!(
-                            "Reset Full entity {} complete. Components updated.",
-                            identifier.to_string()
-                        );
+                        // info!(
+                        // "Reset Full entity {} complete. Components updated.",
+                        // identifier.to_string()
+                        // );
                     }
                     _ => error!(
                         "Mismatched config type for Full entity {}",
@@ -258,7 +258,7 @@ pub fn reset_env(
         }
 
         // 4. Send reset complete event WITH initial observations
-        info!("Sending ResetCompleteEvent with initial observations");
+        // info!("Sending ResetCompleteEvent with initial observations");
         reset_complete.send(ResetCompleteEvent {
             initial_observations,
         }); // <-- Pass the generated map

@@ -29,10 +29,10 @@ pub fn collect_state(
     agent_state: ResMut<AgentState>,
 ) {
     // Access the shared state buffer in the `AgentState` resource
-    info!("Attempting to collect state..."); // Log entry
+    // info!("Attempting to collect state..."); // Log entry
     if let Ok(mut state_buffer) = agent_state.state_buffer.lock() {
         // Clear the buffer to prepare for fresh state data
-        info!("Acquired state buffer lock, clearing buffer."); // Log lock success
+        // info!("Acquired state buffer lock, clearing buffer."); // Log lock success
         state_buffer.clear();
 
         // Collect state from Dubins aircraft

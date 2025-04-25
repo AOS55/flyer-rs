@@ -29,10 +29,10 @@ pub fn running_physics(
                 if let Some(controls) = action_queue.get(&identifier.id) {
                     match controls {
                         AircraftControls::Dubins(dubins_controls) => {
-                            info!(
-                                "Applying controls to dubins aircraft {:?}: {:?}",
-                                identifier.id, dubins_controls
-                            );
+                            // info!(
+                            //     "Applying controls to dubins aircraft {:?}: {:?}",
+                            //     identifier.id, dubins_controls
+                            // );
                             aircraft.controls = *dubins_controls;
                         }
                         _ => warn!("Received non-Dubins controls for Dubins aircraft"),
@@ -44,10 +44,10 @@ pub fn running_physics(
                 if let Some(controls) = action_queue.get(&identifier.id) {
                     match controls {
                         AircraftControls::Full(full_controls) => {
-                            info!(
-                                "Applying controls to full aircraft {:?}: {:?}",
-                                identifier.id, full_controls
-                            );
+                            // info!(
+                            //     "Applying controls to full aircraft {:?}: {:?}",
+                            //     identifier.id, full_controls
+                            // );
                             control_surfaces.aileron = full_controls.aileron;
                             control_surfaces.elevator = full_controls.elevator;
                             control_surfaces.rudder = full_controls.rudder;
@@ -61,14 +61,14 @@ pub fn running_physics(
 
         // Consume one physics step
         update_control.consume_step();
-        info!(
-            "Physics step complete, {} steps remaining",
-            update_control.remaining_steps
-        );
+        // info!(
+        //     "Physics step complete, {} steps remaining",
+        //     update_control.remaining_steps
+        // );
 
         // If this was the last step, transition to response state
         if update_control.remaining_steps == 0 {
-            info!("Physics steps complete, transitioning to response state");
+            // info!("Physics steps complete, transitioning to response state");
             server.sim_state = SimState::SendingResponse;
             agent_state.current_step += 1; // Increment step counter
         }

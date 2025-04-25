@@ -59,8 +59,6 @@ pub fn trim_aircraft_system(
         let initial_altitude = -spatial.position.z;
         let initial_density = environment.get_density_at_altitude(-initial_altitude);
 
-        info!("Running Gradient-Based Trim for Entity: {:?}", entity);
-
         // --- 1. Setup Optimization Problem ---
         let problem = TrimProblem {
             aircraft_config: &aircraft_config,
@@ -85,12 +83,6 @@ pub fn trim_aircraft_system(
             &solver_config.longitudinal_bounds,
         );
         let init_param = vec![init_alpha, init_elevator, init_power_lever];
-        info!(
-            "Trim Initial Guess (Clamped): A={:.2}deg E={:.3} P={:.3}",
-            init_alpha.to_degrees(),
-            init_elevator,
-            init_power_lever
-        );
 
         // --- 3. Configure Solver (L-BFGS example) ---
         // Configure line search (optional, defaults are often okay)
@@ -127,15 +119,6 @@ pub fn trim_aircraft_system(
         match result {
             Ok(opt_result) => {
                 let final_state = opt_result.state();
-                info!(
-                    "Trim Optimization Finished: Terminated Reason: {:?}",
-                    final_state.termination_status.to_string() // Handle Option
-                );
-                info!(
-                    " Best Cost: {:.6e} (Target: {:.3e}), Iterations: {}",
-                    final_state.best_cost, target_cost, final_state.iter
-                );
-
                 // Use the best parameters found
                 if let Some(best_param) = final_state.best_param.as_ref() {
                     // Convert best parameters back to TrimState, clamping final values
@@ -163,14 +146,6 @@ pub fn trim_aircraft_system(
                         },
                         lateral: Default::default(), // Zero lateral state
                     };
-
-                    info!(
-                        "Applying Final Trim State: A={:.2}deg T={:.2}deg E={:.3} P={:.3}",
-                        final_alpha.to_degrees(),
-                        final_theta.to_degrees(),
-                        final_elevator,
-                        final_power_lever
-                    );
 
                     // Apply the final state to the actual aircraft components
                     final_trim_state.apply_trim_state(&mut controls, &mut air_data, &mut spatial);
@@ -214,7 +189,6 @@ pub fn trim_aircraft_system(
 
         // --- 6. Cleanup ---
         needs_trim.stage = TrimStage::Complete; // Mark as done
-        info!("Trim calculation complete for {:?}.", entity);
-        // commands.entity(entity).remove::<NeedsTrim>(); // Optionally remove component
+                                                // commands.entity(entity).remove::<NeedsTrim>(); // Optionally remove component
     }
 }

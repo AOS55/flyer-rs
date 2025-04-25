@@ -16,11 +16,17 @@ pub fn physics_integrator_system(
 ) {
     // Get the timestep duration in seconds
     let dt = config.timestep;
+    let max_vel = config.max_velocity;
+    let max_ang_vel = config.max_angular_velocity;
 
     // Iterate over all entities with physics and spatial components
-    for (physics, mut spatial) in query.iter_mut() {
-        integrate_state(&physics, &mut spatial, dt, &config);
-    }
+    query.par_iter_mut().for_each(|(physics, mut spatial)| {
+        integrate_state(physics, &mut spatial, dt);
+
+        // Apply velocity limits *after* integration
+        // Needs modification if apply_velocity_limits reads Res<PhysicsConfig>
+        apply_velocity_limits(&mut spatial, max_vel, max_ang_vel);
+    });
 }
 
 /// Core integration logic to update spatial state based on physics forces and moments.
@@ -29,19 +35,10 @@ pub fn physics_integrator_system(
 /// - `physics`: The `PhysicsComponent` containing forces, moments, and physical properties.
 /// - `spatial`: The `SpatialComponent` to update position, velocity, and orientation.
 /// - `dt`: The timestep duration (in seconds).
-/// - `config`: The physics configuration resource for constraints and limits.
 /// Core integration logic to update spatial state based on physics forces and moments using RK45.
-fn integrate_state(
-    physics: &PhysicsComponent,
-    spatial: &mut SpatialComponent,
-    dt: f64,
-    config: &PhysicsConfig,
-) {
+fn integrate_state(physics: &PhysicsComponent, spatial: &mut SpatialComponent, dt: f64) {
     // Use the RK45 integration method (with a fallback to RK4 if needed)
-    integrate_state_rk45(physics, spatial, dt, config);
-
-    // Apply velocity limits after integration
-    apply_velocity_limits(spatial, config);
+    integrate_state_rk45(physics, spatial, dt);
 }
 
 /// Structure to hold state derivatives for RK integration
@@ -76,12 +73,7 @@ fn calculate_derivatives(
 }
 
 /// RK45 (Runge-Kutta-Fehlberg) integration method with adaptive step size
-fn integrate_state_rk45(
-    physics: &PhysicsComponent,
-    spatial: &mut SpatialComponent,
-    dt: f64,
-    _config: &PhysicsConfig,
-) {
+fn integrate_state_rk45(physics: &PhysicsComponent, spatial: &mut SpatialComponent, dt: f64) {
     // Store initial state
     let initial_position = spatial.position;
     let initial_velocity = spatial.velocity;
@@ -198,17 +190,23 @@ fn integrate_state_rk45(
 /// # Arguments
 /// - `spatial`: The `SpatialComponent` containing velocity and angular velocity.
 /// - `config`: The physics configuration resource containing max limits.
-fn apply_velocity_limits(spatial: &mut SpatialComponent, config: &PhysicsConfig) {
+fn apply_velocity_limits(
+    spatial: &mut SpatialComponent,
+    max_velocity: f64,
+    max_angular_velocity: f64,
+) {
     // Limit linear velocity magnitude
     let velocity_norm = spatial.velocity.norm();
-    if velocity_norm > config.max_velocity {
-        spatial.velocity *= config.max_velocity / velocity_norm;
+    if velocity_norm > max_velocity {
+        // Use passed-in value
+        spatial.velocity *= max_velocity / velocity_norm;
     }
 
     // Limit angular velocity magnitude
     let angular_velocity_norm = spatial.angular_velocity.norm();
-    if angular_velocity_norm > config.max_angular_velocity {
-        spatial.angular_velocity *= config.max_angular_velocity / angular_velocity_norm;
+    if angular_velocity_norm > max_angular_velocity {
+        // Use passed-in value
+        spatial.angular_velocity *= max_angular_velocity / angular_velocity_norm;
     }
 }
 
@@ -268,7 +266,7 @@ mod tests {
             physics.net_force = mass * gravity;
 
             // Integrate physics
-            integrate_state(&physics, &mut spatial, config.timestep, &config);
+            integrate_state(&physics, &mut spatial, config.timestep);
 
             // Calculate current energy
             let current_height = -spatial.position.z;
@@ -329,7 +327,7 @@ mod tests {
 
         // Run simulation
         for _ in 0..steps {
-            integrate_state(&physics, &mut spatial, config.timestep, &config);
+            integrate_state(&physics, &mut spatial, config.timestep);
         }
 
         // Get Euler angles from the result
@@ -357,7 +355,7 @@ mod tests {
 
         // Run simulation
         for _ in 0..steps {
-            integrate_state(&physics, &mut spatial, config.timestep, &config);
+            integrate_state(&physics, &mut spatial, config.timestep);
         }
 
         // Compare result with expected
@@ -380,13 +378,6 @@ mod tests {
         let timesteps = vec![0.001, 0.01, 0.1];
 
         for dt in timesteps {
-            let config = PhysicsConfig {
-                timestep: dt,
-                gravity: Vector3::new(0.0, 0.0, 9.81),
-                max_velocity: 1000.0,
-                max_angular_velocity: 100.0,
-            };
-
             let mut physics = PhysicsComponent {
                 mass,
                 inertia,
@@ -414,7 +405,7 @@ mod tests {
             let steps = (total_time / dt) as usize;
 
             for _ in 0..steps {
-                integrate_state(&physics, &mut spatial, dt, &config);
+                integrate_state(&physics, &mut spatial, dt);
 
                 // Check that values remain finite (no NaN or Infinity)
                 assert!(
@@ -486,7 +477,7 @@ mod tests {
 
         // Run for several steps
         for _ in 0..100 {
-            integrate_state(&physics, &mut spatial, config.timestep, &config);
+            integrate_state(&physics, &mut spatial, config.timestep);
 
             // Verify velocity magnitude never exceeds limit
             assert!(
@@ -510,7 +501,7 @@ mod tests {
 
         // Run for several steps
         for _ in 0..100 {
-            integrate_state(&physics, &mut spatial, config.timestep, &config);
+            integrate_state(&physics, &mut spatial, config.timestep);
 
             // Verify angular velocity magnitude never exceeds limit
             assert!(

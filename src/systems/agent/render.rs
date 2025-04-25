@@ -17,10 +17,10 @@ pub fn render_frame(
         warn!("Waiting for render frame...");
         return;
     }
-    info!(
-        "Render frame available! Frame size = {}",
-        latest_frame.data.len()
-    );
+    // info!(
+    //     "Render frame available! Frame size = {}",
+    //     latest_frame.data.len()
+    // );
     complete_events.send(RenderCompleteEvent {
         frame: latest_frame.data.clone(),
     });
@@ -34,10 +34,10 @@ pub fn handle_render_response(
 ) {
     let conn = server.conn.clone();
     for event in complete_events.read() {
-        info!(
-            "Processing render event with frame size: {}",
-            event.frame.len()
-        );
+        // info!(
+        //     "Processing render event with frame size: {}",
+        //     event.frame.len()
+        // );
 
         if event.frame.is_empty() {
             error!("Empty frame data received");
@@ -84,7 +84,7 @@ pub fn handle_render_response(
                             continue;
                         }
 
-                        info!("Successfully sent response of size: {}", response_str.len());
+                        // info!("Successfully sent response of size: {}", response_str.len());
                         server.sim_state = SimState::WaitingForAction;
                     }
                     Err(e) => error!("Failed to serialize response: {}", e),
