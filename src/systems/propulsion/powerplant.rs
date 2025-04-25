@@ -184,77 +184,78 @@ pub fn propulsion_system(
 ) {
     let dt = physics_config.timestep;
 
-    for (controls, mut propulsion_state, mut physics, air_data, aircraft_config) in query.iter_mut()
-    {
-        // --- 1. Clear Previous Frame's Forces ---
-        physics
-            .forces
-            .retain(|force| force.category != ForceCategory::Propulsive);
-        physics
-            .moments
-            .retain(|moment| moment.category != ForceCategory::Propulsive);
+    query.par_iter_mut().for_each(
+        |(controls, mut propulsion_state, mut physics, air_data, aircraft_config)| {
+            // --- 1. Clear Previous Frame's Forces ---
+            physics
+                .forces
+                .retain(|force| force.category != ForceCategory::Propulsive);
+            physics
+                .moments
+                .retain(|moment| moment.category != ForceCategory::Propulsive);
 
-        // --- 2. Update Overall State (e.g., power lever for all engines) ---
-        // This assumes all engines respond to the same lever. If independent, update inside loop.
-        propulsion_state.set_power_lever(controls.power_lever);
+            // --- 2. Update Overall State (e.g., power lever for all engines) ---
+            // This assumes all engines respond to the same lever. If independent, update inside loop.
+            propulsion_state.set_power_lever(controls.power_lever);
 
-        // --- 3. Iterate Engines, Update State, Calculate Outputs ---
-        // Collect updates to avoid mutable borrow conflicts within the loop
-        let mut final_updates: Vec<(usize, PowerplantState, Force)> =
-            Vec::with_capacity(aircraft_config.propulsion.engines.len());
+            // --- 3. Iterate Engines, Update State, Calculate Outputs ---
+            // Collect updates to avoid mutable borrow conflicts within the loop
+            let mut final_updates: Vec<(usize, PowerplantState, Force)> =
+                Vec::with_capacity(aircraft_config.propulsion.engines.len());
 
-        for (index, (engine_config, current_engine_state)) in aircraft_config
-            .propulsion
-            .engines
-            .iter()
-            .zip(propulsion_state.engine_states.iter()) // Borrow immutably here
-            .enumerate()
-        {
-            // --- a. Update Engine's Internal State ---
-            let mut next_engine_state = current_engine_state.clone(); // Clone to modify
+            for (index, (engine_config, current_engine_state)) in aircraft_config
+                .propulsion
+                .engines
+                .iter()
+                .zip(propulsion_state.engine_states.iter()) // Borrow immutably here
+                .enumerate()
+            {
+                // --- a. Update Engine's Internal State ---
+                let mut next_engine_state = current_engine_state.clone(); // Clone to modify
 
-            // Pass the power lever from the *overall* state into the individual engine state
-            // before updating dynamics (in case set_power_lever didn't update individuals).
-            next_engine_state.power_lever = controls.power_lever;
+                // Pass the power lever from the *overall* state into the individual engine state
+                // before updating dynamics (in case set_power_lever didn't update individuals).
+                next_engine_state.power_lever = controls.power_lever;
 
-            update_powerplant_state(&mut next_engine_state, engine_config, dt);
+                update_powerplant_state(&mut next_engine_state, engine_config, dt);
 
-            // --- b. Calculate Outputs using Pure Function ---
-            // Pass the *updated* state to the calculation function
-            let outputs: EngineOutputs = calculate_engine_outputs(
-                engine_config,
-                &next_engine_state, // Use the state reflecting this frame's dynamics
-                air_data.density,
-                air_data.true_airspeed,
-            );
+                // --- b. Calculate Outputs using Pure Function ---
+                // Pass the *updated* state to the calculation function
+                let outputs: EngineOutputs = calculate_engine_outputs(
+                    engine_config,
+                    &next_engine_state, // Use the state reflecting this frame's dynamics
+                    air_data.density,
+                    air_data.true_airspeed,
+                );
 
-            // --- c. Store Final State and Force ---
-            // Update fuel flow on the state *after* calculation for tracking
-            next_engine_state.fuel_flow = outputs.fuel_flow;
-            // Store index, the final state for this frame, and the calculated force
-            final_updates.push((index, next_engine_state, outputs.force_component));
-            // Add moment here if calculate_engine_outputs returns one
-        }
-
-        // --- 4. Apply Updates to Bevy Components ---
-        for (index, final_state, force_component) in final_updates {
-            // Update the engine state in the main PropulsionState component
-            if let Some(state_mut) = propulsion_state.engine_states.get_mut(index) {
-                *state_mut = final_state;
+                // --- c. Store Final State and Force ---
+                // Update fuel flow on the state *after* calculation for tracking
+                next_engine_state.fuel_flow = outputs.fuel_flow;
+                // Store index, the final state for this frame, and the calculated force
+                final_updates.push((index, next_engine_state, outputs.force_component));
+                // Add moment here if calculate_engine_outputs returns one
             }
-            // Add the calculated force to the PhysicsComponent
-            if force_component.vector.norm_squared() > 1e-9 {
-                // Threshold check
-                physics.add_force(force_component);
+
+            // --- 4. Apply Updates to Bevy Components ---
+            for (index, final_state, force_component) in final_updates {
+                // Update the engine state in the main PropulsionState component
+                if let Some(state_mut) = propulsion_state.engine_states.get_mut(index) {
+                    *state_mut = final_state;
+                }
+                // Add the calculated force to the PhysicsComponent
+                if force_component.vector.norm_squared() > 1e-9 {
+                    // Threshold check
+                    physics.add_force(force_component);
+                }
+                // Add moment if applicable
+                // if let Some(moment_component) = moment_component {
+                //    if moment_component.vector.norm_squared() > 1e-9 {
+                //       physics.add_moment(moment_component);
+                //    }
+                // }
             }
-            // Add moment if applicable
-            // if let Some(moment_component) = moment_component {
-            //    if moment_component.vector.norm_squared() > 1e-9 {
-            //       physics.add_moment(moment_component);
-            //    }
-            // }
-        }
-    }
+        },
+    )
 }
 
 #[cfg(test)]
