@@ -1,4 +1,5 @@
 use bevy::prelude::*;
+use bevy_ecs_tilemap::prelude::*;
 use flyer::{
     components::{DubinsAircraftConfig, DubinsAircraftState, StartConfig},
     plugins::{
@@ -54,7 +55,7 @@ fn main() {
         }),
         task_config: Default::default(),
     };
-
+    app.add_plugins(TilemapPlugin);
     // Add aircraft plugin
     app.add_plugins(DubinsAircraftPlugin::new_single(aircraft_config));
 

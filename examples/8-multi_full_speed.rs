@@ -5,10 +5,13 @@ use flyer::{
         AircraftAeroCoefficients, AircraftGeometry, AircraftType, FullAircraftConfig, MassModel,
         PropulsionConfig, StartConfig,
     },
-    plugins::{FullAircraftPlugin, PhysicsPlugin, StartupSequencePlugin},
+    plugins::{
+        EnvironmentPlugin, FullAircraftPlugin, PhysicsPlugin, StartupSequencePlugin, TrimPlugin,
+    },
     resources::PhysicsConfig,
     systems::{
         aero_force_system, air_data_system, force_calculator_system, physics_integrator_system,
+        propulsion_system,
     },
 };
 use nalgebra::Vector3;
@@ -185,19 +188,23 @@ fn run_simulation(n_aircraft: usize, test_duration: std::time::Duration, log_dir
             timestep: 1.0 / 1e6,
             ..default()
         }),
+        TrimPlugin,
         FullAircraftPlugin::new_vector(configs),
+        EnvironmentPlugin::new(),
     ));
 
     // Add physics update system
     app.add_systems(
         FixedUpdate,
         (
-            air_data_system,
-            aero_force_system,
-            force_calculator_system,
-            physics_integrator_system,
-        )
-            .chain(),
+            air_data_system,                          // Base
+            propulsion_system.after(air_data_system), // Depends on air_data
+            aero_force_system.after(air_data_system), // Depends on air_data
+            force_calculator_system // Depends on propulsion & aero
+                .after(propulsion_system)
+                .after(aero_force_system),
+            physics_integrator_system.after(force_calculator_system), // Depends on force_calculator
+        ),
     );
 
     // Add Metrics resource with new constructor

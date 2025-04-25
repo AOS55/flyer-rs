@@ -1,4 +1,5 @@
 use bevy::prelude::*;
+use bevy_ecs_tilemap::prelude::*;
 use flyer::plugins::{StartupSequencePlugin, TerrainPlugin, TransformationPlugin};
 use std::time::Duration;
 use std::{fs::OpenOptions, io::Write, path::PathBuf};
@@ -237,6 +238,8 @@ fn main() {
         TransformationPlugin::new(1.0),
         TerrainPlugin::new(),
     ));
+
+    app.add_plugins(TilemapPlugin);
 
     // Add the performance test plugin
     app.add_plugins(PerformanceTestPlugin);

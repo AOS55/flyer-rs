@@ -1,7 +1,9 @@
 use bevy::prelude::*;
 use flyer::{
     components::{DubinsAircraftConfig, StartConfig},
-    plugins::{DubinsAircraftPlugin, PhysicsPlugin, StartupSequencePlugin},
+    plugins::{
+        AircraftBaseInitialized, DubinsAircraftPlugin, PhysicsPlugin, StartupSequencePlugin,
+    },
     resources::PhysicsConfig,
     systems::dubins_aircraft_system,
 };
@@ -124,6 +126,11 @@ fn main() {
     };
 
     // Add aircraft plugin with config
+    // app.add_plugins(AssetPlugin {
+    //     file_path: String::from("flyer/assets"),
+    //     ..default()
+    // });
+    app.insert_resource(AircraftBaseInitialized);
     app.add_plugins(DubinsAircraftPlugin::new_single(aircraft_config));
 
     // Add physics update system

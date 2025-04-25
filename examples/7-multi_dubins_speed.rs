@@ -2,7 +2,9 @@ use bevy::prelude::*;
 use chrono;
 use flyer::{
     components::{DubinsAircraftConfig, StartConfig},
-    plugins::{DubinsAircraftPlugin, PhysicsPlugin, StartupSequencePlugin},
+    plugins::{
+        AircraftBaseInitialized, DubinsAircraftPlugin, PhysicsPlugin, StartupSequencePlugin,
+    },
     resources::PhysicsConfig,
     systems::dubins_aircraft_system,
 };
@@ -173,6 +175,7 @@ fn run_simulation(n_aircraft: usize, test_duration: std::time::Duration, log_dir
 
     // Create configurations for all aircraft
     let configs = (0..n_aircraft).map(|i| create_aircraft_config(i)).collect();
+    app.insert_resource(AircraftBaseInitialized);
 
     // Add required plugins
     app.add_plugins((

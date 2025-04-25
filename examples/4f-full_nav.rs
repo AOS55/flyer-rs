@@ -2,6 +2,7 @@ use bevy::{
     prelude::*,
     // pbr::{CascadeShadowConfigBuilder, DirectionalLightShadowMap},
 };
+use bevy_ecs_tilemap::prelude::*;
 use flyer::{
     components::{
         AircraftConfig,
@@ -57,7 +58,7 @@ fn main() {
         RunwayPlugin::new(None),
         TrimPlugin,
     ));
-
+    app.add_plugins(TilemapPlugin);
     // --- Aircraft Setup ---
     let mut twin_otter_config = FullAircraftConfig::twin_otter();
     twin_otter_config.start_config = StartConfig::Fixed(flyer::components::FixedStartConfig {

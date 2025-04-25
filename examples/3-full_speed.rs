@@ -3,11 +3,12 @@ use flyer::{
     components::FullAircraftConfig,
     plugins::{
         EnvironmentPlugin, FullAircraftPlugin, PhysicsPlugin, StartupSequencePlugin,
-        TransformationPlugin,
+        TransformationPlugin, TrimPlugin,
     },
     resources::PhysicsConfig,
     systems::{
-        aero_force_system, air_data_system, force_calculator_system, physics_integrator_system,
+        aero_force_system, air_data_system, force_calculator_system, handle_trim_requests,
+        physics_integrator_system, propulsion_system, trim_aircraft_system,
     },
 };
 use std::{fs::OpenOptions, io::Write, path::PathBuf, time::Instant};
@@ -107,12 +108,14 @@ fn main() {
             timestep: 1.0 / 1e6, // 1MHz physics timestep
             ..default()
         }),
+        TransformationPlugin::new(1.0),
+        EnvironmentPlugin::new(),
+        TrimPlugin,
     ));
 
     // Create full aircraft config
     let aircraft_config = FullAircraftConfig::default();
 
-    app.add_plugins((TransformationPlugin::new(1.0), EnvironmentPlugin::new()));
     // Add aircraft plugin with config
     app.add_plugins(FullAircraftPlugin::new_single(aircraft_config));
 
@@ -120,8 +123,11 @@ fn main() {
     app.add_systems(
         FixedUpdate,
         (
+            handle_trim_requests,
+            trim_aircraft_system,
             air_data_system,
             aero_force_system,
+            propulsion_system,
             force_calculator_system,
             physics_integrator_system,
         )
