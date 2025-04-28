@@ -321,8 +321,8 @@ fn main() {
     ));
 
     // --- Aircraft Configuration ---
-    let aircraft_config_data = FullAircraftConfig::generic_transport();
-    let initial_speed = 80.0;
+    let aircraft_config_data = FullAircraftConfig::f16c();
+    let initial_speed = 150.0;
     let initial_altitude_m = 500.0;
     // *** Correct FixedStartConfig initialization ***
     let start_config = StartConfig::Fixed(FixedStartConfig {

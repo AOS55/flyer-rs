@@ -123,8 +123,8 @@ fn main() {
     app.add_systems(
         FixedUpdate,
         (
-            handle_trim_requests,
-            trim_aircraft_system,
+            // handle_trim_requests,
+            // trim_aircraft_system,
             air_data_system,
             aero_force_system,
             propulsion_system,

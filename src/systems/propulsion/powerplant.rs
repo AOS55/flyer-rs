@@ -87,7 +87,7 @@ fn calculate_thrust_and_fuel_flow(
     let speed_of_sound_sea_level = 340.3; // m/s approx
     let mach = (airspeed / speed_of_sound_sea_level).max(0.0);
     // *** CORRECTION: Use fixed factor as config field doesn't exist, ensure f64 types ***
-    let ram_factor = (1.0_f64 - 0.1_f64 * mach).max(0.0_f64); // Ensure non-negative and use f64 literals
+    let ram_factor = (1.0_f64 - 0.17_f64 * mach).max(0.0_f64); // Ensure non-negative and use f64 literals
 
     // Calculate available thrust range at current conditions
     let max_thrust_available = (config.max_thrust * rho_factor * ram_factor).max(0.0);

@@ -52,7 +52,7 @@ impl MassModel {
     }
 
     pub fn generic_transport() -> Self {
-        Self::new(22.5, 67.2, 5.77, 7.39, 0.163)
+        Self::new(22.5, 1.8, 5.77, 7.39, 0.163)
     }
 
     pub fn f16c() -> Self {

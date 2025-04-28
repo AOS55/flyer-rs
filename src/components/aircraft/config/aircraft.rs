@@ -102,7 +102,7 @@ impl FullAircraftConfig {
                 mass: MassModel::generic_transport(),
                 geometry: AircraftGeometry::generic_transport(),
                 aero_coef: AircraftAeroCoefficients::generic_transport(),
-                propulsion: PropulsionConfig::single_engine(PowerplantConfig::default()),
+                propulsion: PropulsionConfig::gtm(),
                 start_config: StartConfig::default(),
                 task_config: TaskType::default(),
                 trim_condition: None,

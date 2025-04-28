@@ -123,6 +123,34 @@ impl PropulsionConfig {
         Self::single_engine(engine)
     }
 
+    pub fn gtm() -> Self {
+        // Define the base engine config using values from MATLAB model
+        let base_engine = PowerplantConfig {
+            name: "JetCat P70 scale".to_string(), // Engine type implied in AC_calcparams_T2.m
+            max_thrust: 68.1,                     // N (Derived from 15.315 lbs in MWS.thrust_model)
+            min_thrust: 6.8,                      // N (Estimated ~10% of max thrust)
+            position: Vector3::zeros(),           // Position is set relative to CG by twin_engine
+            orientation: Vector3::new(1.0, 0.0, 0.0), // Approx. from MWS.engX_ang (small angles)
+            tsfc: 3.5e-4, // kg/N/s (Estimated for small turbines, MATLAB gives fuel flow polynomial)
+            spool_up_time: 2.0, // s (Estimated, faster than large engines)
+            spool_down_time: 1.5, // s (Estimated, faster than large engines)
+        };
+
+        // Use twin_engine to place them, using offsets calculated from MATLAB ARS positions
+        // Assumed Rust coordinate system: +X forward, +Y right wing, +Z down.
+        // Calculated Offsets (meters from CG):
+        // x = 0.1286 (slightly *ahead* of CG)
+        // y = +/- 0.36 (average magnitude lateral distance from centerline)
+        // z = 0.1017 (slightly *below* CG)
+        // IMPORTANT: Double-check this matches your Rust simulation's coordinate system convention!
+        Self::twin_engine(
+            base_engine, // The engine configuration to use for both engines
+            0.360,       // y_offset: Lateral distance from centerline (average |y|)
+            0.1286,      // x_offset: Longitudinal distance from CG (+forward)
+            0.1017,      // z_offset: Vertical distance from CG (+down)
+        )
+    }
+
     pub fn cessna_172() -> Self {
         let engine = PowerplantConfig {
             name: "Lycoming O-320".to_string(),
